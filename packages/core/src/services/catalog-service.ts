@@ -1,4 +1,4 @@
-import { readdir, readFile, stat, mkdir, cp, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, mkdir, cp, rm, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -186,6 +186,10 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
 
   // Wire secrets into vault
   const secretsWired: string[] = [];
+  // Secrets the vault could not take. They are written to .env.local instead — see the
+  // comment on the catch below for why the reference must NOT stay pointed at the vault.
+  const fallbackSecrets: string[] = [];
+
   if (secretInputs.length > 0) {
     const refs: Record<string, string> = {};
 
@@ -194,13 +198,33 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
         refs[input.name] = `vault://${name}/${input.name}?gen=password:32`;
         secretsWired.push(`${input.name} (auto-generate on first deploy)`);
       } else if (input.name in values) {
-        refs[input.name] = `vault://${name}/${input.name}`;
         try {
           const { setSecret } = await import("./vault-service.js");
           await setSecret(appbayHome, `${name}/${input.name}`, values[input.name]);
+          // 🚨 ONLY on success. This assignment used to happen BEFORE the try, so a vault
+          // failure left `vault://<app>/<name>` in the manifest pointing at a value the
+          // vault never took — and `appbay up` died with "Vault password required" on an
+          // app the installer had just called ready to deploy.
+          refs[input.name] = `vault://${name}/${input.name}`;
           secretsWired.push(`${input.name} (stored in vault)`);
         } catch {
-          secretsWired.push(`${input.name} (vault unavailable, written to .env.local)`);
+          // 🚨 THE FALLBACK IS NOW PERFORMED, NOT MERELY ANNOUNCED (issue #47).
+          //
+          // This branch used to push the string "(vault unavailable, written to
+          // .env.local)" and write nothing at all — measured 2026-08-16 with a non-empty
+          // value, so it was not an empty-value edge case. The install reported success,
+          // validation passed, and the app was undeployable.
+          //
+          // ⚠️ This puts the secret on disk in PLAINTEXT, which is a real downgrade from
+          // the AES-256-GCM vault. It is announced as such rather than described as
+          // ordinary wiring, because the user did not choose it — the vault being locked
+          // did.
+          fallbackSecrets.push(`${input.name}=${values[input.name]}`);
+          secretsWired.push(
+            `${input.name} (VAULT UNAVAILABLE — written to .env.local in PLAINTEXT; ` +
+              `run \`appbay secrets init\` then \`appbay secrets set ${name}/${input.name}\` ` +
+              `to move it into the vault)`,
+          );
         }
       }
     }
@@ -222,12 +246,23 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
     }
   }
 
-  if (configOverrides.length > 0) {
-    await writeFile(
-      join(targetDir, ".env.local"),
-      "# Appbay config overrides (non-secret values set at install time)\n" +
-        configOverrides.join("\n") + "\n",
-    );
+  if (configOverrides.length > 0 || fallbackSecrets.length > 0) {
+    const envLocalPath = join(targetDir, ".env.local");
+    let body = "# Appbay config overrides (non-secret values set at install time)\n";
+    if (configOverrides.length > 0) body += configOverrides.join("\n") + "\n";
+    if (fallbackSecrets.length > 0) {
+      body +=
+        "\n# ⚠️ PLAINTEXT SECRETS. The vault was unavailable at install time, so these\n" +
+        "# were written here instead. Move them into the vault with `appbay secrets init`\n" +
+        "# followed by `appbay secrets set <app>/<NAME>`, then delete these lines.\n" +
+        fallbackSecrets.join("\n") + "\n";
+    }
+    await writeFile(envLocalPath, body);
+    // 0600 whenever this file holds a secret — it is otherwise created world-readable by
+    // whatever the process umask happens to be.
+    if (fallbackSecrets.length > 0) {
+      await chmod(envLocalPath, 0o600);
+    }
   }
 
   return {
