@@ -20,6 +20,11 @@
 set -uo pipefail
 VM="${VM:-appbay-docker}"
 PRIV="${PRIV:-env}"
+# 🚨 RUNTIME-PORTABLE, because S28 R1.5 makes a journey that only runs on one engine half a
+# result. The first version hardcoded `docker` throughout AND ran a bare `appbay init`,
+# which on a Podman host defaults to Docker and dies in preflight with
+# "Could not determine Compose version / Install or upgrade Docker Compose v2".
+CBIN="${CBIN:-docker}"
 
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
@@ -34,8 +39,11 @@ echo
 # DOTFILES. Stage the payload in $HOME under a non-hidden name or the transfer fails with a
 # misleading "cannot access / permission denied".
 PAYLOAD="$(mktemp -p "$HOME" appbay-journey-payload.XXXXXX)"
-cat > "$PAYLOAD" <<'PAYLOAD_EOF'
+cat > "$PAYLOAD" <<PAYLOAD_HEADER
 #!/usr/bin/env bash
+CBIN="$CBIN"
+PAYLOAD_HEADER
+cat >> "$PAYLOAD" <<'PAYLOAD_EOF'
 set -uo pipefail
 r() { printf '%s\n' "$*"; }
 
@@ -47,13 +55,15 @@ IMAGE=localhost/appbay-buildprobe:1
 CTR=appbay.$APP.probe
 
 cleanup() {
-  docker rm -f "$CTR" >/dev/null 2>&1
-  docker rmi -f "$IMAGE" >/dev/null 2>&1
+  "$CBIN" rm -f "$CTR" >/dev/null 2>&1
+  "$CBIN" rmi -f "$IMAGE" >/dev/null 2>&1
   rm -rf "$W"
 }
 trap cleanup EXIT
 
-appbay init >/dev/null 2>&1 || { r "SETUP fail init-failed"; exit 1; }
+RUNTIME_FLAG=""
+[ "$CBIN" = podman ] && RUNTIME_FLAG="--container-runtime podman"
+appbay init $RUNTIME_FLAG >/dev/null 2>&1 || { r "SETUP fail init-failed"; exit 1; }
 
 D="$APPBAY_HOME/etc/apps/$APP"
 mkdir -p "$D"
@@ -91,9 +101,9 @@ RUN echo "$1" > /marker
 EOF
 }
 
-marker_in_running_container() { docker exec "$CTR" cat /marker 2>/dev/null | tr -d '\r\n'; }
-image_id() { docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null; }
-image_tag_present() { docker image inspect --format '{{index .RepoTags 0}}' "$IMAGE" 2>/dev/null; }
+marker_in_running_container() { "$CBIN" exec "$CTR" cat /marker 2>/dev/null | tr -d '\r\n'; }
+image_id() { "$CBIN" image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null; }
+image_tag_present() { "$CBIN" image inspect --format '{{index .RepoTags 0}}' "$IMAGE" 2>/dev/null; }
 
 # --- first converge -------------------------------------------------------------------
 write_dockerfile MARKER_V1
