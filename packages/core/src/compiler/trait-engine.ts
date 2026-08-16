@@ -226,9 +226,13 @@ export function applyTraits(input: TraitEngineInput): TraitEngineOutput {
     // reading the same contract the same way is not twelve mistakes; it is the contract
     // being wrong. On an app with exactly one service there is nothing to disambiguate.
     //
-    // ⚠️ ONLY when there is exactly one. Two services and a missing `service:` is a real
-    // question that only the author can answer, so that still errors — and it now names the
-    // candidates instead of saying the trait "requires" something the manifest cannot guess.
+    // ⚠️ ONLY when there is exactly one, and a MULTI-service app is NOT an error here.
+    // Whether a trait can work without being told which service is the trait's business:
+    // `gpu` cannot (it attaches a device), `hooks` can (its patterns handle an unset
+    // service). An earlier version of this rejected every service-scoped trait that named
+    // no service, which broke the bundled `homeassistant` app — three services, a hooks
+    // trait, and no `service:` — that had compiled for its whole life. Caught on a rootful
+    // Podman VM, 2026-08-16.
     //
     // This also fixes a silent case: the ingress trait fell back to `input.service ??
     // appName` and skipped `stripIngressPort` entirely when unset, so a single-service app
@@ -240,15 +244,6 @@ export function applyTraits(input: TraitEngineInput): TraitEngineOutput {
       const names = Object.keys((compose.services ?? {}) as Record<string, unknown>);
       if (names.length === 1) {
         targetService = names[0];
-      } else if (names.length > 1) {
-        errors.push({
-          trait: type,
-          message:
-            `Trait "${type}" applies to a service, but this app defines ${names.length} ` +
-            `and the trait names none. Add \`service: <name>\` to the trait. ` +
-            `Known services: ${names.join(", ")}.`,
-        });
-        continue;
       }
     }
 

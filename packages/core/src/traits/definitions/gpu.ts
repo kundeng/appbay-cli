@@ -181,7 +181,21 @@ export const gpuTraitDefinition: TraitDefinition<"gpu"> = {
     const serviceName = input.service;
 
     if (!serviceName) {
-      throw new Error("GPU trait requires a target service name.");
+      // Reached only on a MULTI-service app: the trait engine resolves the single-service
+      // case for us. Name the candidates — "requires a target service name" told the
+      // author what was missing but not what to write, and every catalog entry that hit
+      // this had exactly one obvious answer the message did not offer.
+      const known = Object.keys(
+        (input.compose.services ?? {}) as Record<string, unknown>,
+      );
+      return {
+        compose: structuredClone(input.compose),
+        errors: [
+          `App "${input.app}" defines ${known.length} services, so the gpu trait must say ` +
+            `which one gets the device. Add \`service: <name>\`. ` +
+            (known.length > 0 ? `Known services: ${known.join(", ")}.` : ""),
+        ],
+      };
     }
 
     // 🚨 AN EXPLICIT VARIANT USED TO SKIP THE HOST CHECK ENTIRELY (issue #47).
