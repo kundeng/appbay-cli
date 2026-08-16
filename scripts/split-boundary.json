@@ -45,6 +45,7 @@
     "docs/_quarto-internal.yml",
     "docker-compose.server.yml",
     "docs/dev/",
+    "docs/history/",
     "docs/design/",
     "docs/steering/",
     "scripts/build-server.sh",
