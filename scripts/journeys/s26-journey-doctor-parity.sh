@@ -16,7 +16,14 @@
 #   ./s26-journey-doctor-parity.sh
 
 set -uo pipefail
-REPO="${REPO:-$HOME/src/appbay}"
+# 🚨 DERIVED FROM THIS SCRIPT'S OWN LOCATION, never a hardcoded checkout path. This read
+# `$HOME/src/appbay` until 2026-08-16 — a directory that stopped existing when the three
+# scattered checkout roots were consolidated into ~/Projects on 2026-08-15. The journey then
+# ran `$REPO/apps/cli/dist/appbay init` against a path with no binary, swallowed the error
+# with `>/dev/null 2>&1`, and reported "init did not scaffold" — blaming the product for a
+# missing directory. All three local-only journeys had the same line, and because the sweep
+# runner SKIPS local-only scripts, none of them had been run since the move.
+REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PORT="${PORT:-3778}"
 SCRATCH="${SCRATCH:-/tmp/appbay-doctor-parity}"
 H="$SCRATCH/home"
