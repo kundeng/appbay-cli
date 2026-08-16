@@ -163,13 +163,16 @@ function normaliseArgs(args: unknown): Record<string, string> {
  * Turn a resolved build into the pre-deploy action that produces and checks the image.
  *
  * Order, and each step exists for a measured reason:
- *   1. already present    -> skip. Builds are expensive and idempotence is the whole point.
- *   2. pull_if_present    -> pull and retag. The escape hatch for hosts that must not build.
- *   3. build              -> plain `build`, NOT buildx: buildx drives the daemon's BuildKit
+ *   1. pull_if_present    -> pull and retag. The escape hatch for hosts that must not build.
+ *   2. build              -> plain `build`, NOT buildx: buildx drives the daemon's BuildKit
  *                            gRPC endpoints and podman serves the classic POST /build with
  *                            no BuildKit. `podman build` uses buildah and handles
  *                            multi-stage natively; `docker build` handles it too.
- *   4. verify             -> run the declared command IN the image and check the output.
+ *   3. verify             -> run the declared command IN the image and check the output.
+ *
+ * ⚠️ There is deliberately no "image already present -> skip" step. It existed, it keyed
+ * on the TAG rather than the context, and it meant changed source never rebuilt (#77).
+ * Caching belongs to the builder, whose key is the content.
  *
  * 🚨 STEP 4 BLOCKS. A build can succeed and still produce an image that cannot do the job —
  * a Caddy without its DNS module compiles, runs, serves, and quietly issues certificates
@@ -183,14 +186,24 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
     run: async () => {
       const bin = containerBin();
 
-      const present = spawnSync(bin, ["image", "inspect", build.image], {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      if (present.status === 0) {
-        verifyOrThrow(bin, build);
-        return { built: false, reason: "already present" };
-      }
-
+      // 🚨 THERE IS NO PRESENCE CHECK HERE, AND THAT IS THE FIX (#77).
+      //
+      // This used to `image inspect` the tag and skip the build when it resolved, on the
+      // stated grounds that "builds are expensive and idempotence is the whole point".
+      // That conflated two different things. Idempotence is same-input-same-output;
+      // presence is only that a NAME resolves. `:1` is a string someone typed — it says
+      // nothing about the bytes underneath it, so editing the source and re-converging
+      // changed nothing and reported nothing. The only way to get changed source built
+      // was `podman rmi` by hand.
+      //
+      // Worse, `verifyOrThrow` then ran against the stale image and PASSED, because a
+      // stale image is usually a working image. The one check placed to catch a wrong
+      // artifact instead certified it, on every converge, indefinitely.
+      //
+      // Nothing is lost by always invoking the builder: `podman build`/`docker build`
+      // already skip unchanged layers, and their cache key is derived from the context
+      // rather than from a name. A no-op rebuild against a warm layer cache is cheap; a
+      // silently stale image is not.
       if (build.pullIfPresent) {
         const pull = spawnSync(bin, ["pull", build.pullIfPresent], {
           stdio: ["pipe", "pipe", "pipe"],
