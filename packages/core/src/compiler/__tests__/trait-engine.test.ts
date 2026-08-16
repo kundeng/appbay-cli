@@ -364,6 +364,18 @@ describe("applyTraits (trait application engine)", () => {
   it("allows app-level and service-level traits to coexist", () => {
     registerCoreTraits(registry);
 
+    // ⚠️ The GPU must be PRESENT in the facts for this test to be about coexistence.
+    // The shared fixture reports `gpu: { available: false }`, and this test used to pass
+    // with it — because an explicit `variant` skipped the host check entirely and warnings
+    // had no producers, so `toHaveLength(0)` could not fail either way. Both of those are
+    // fixed (#47), so the context now has to say what the test means.
+    const gpuContext = makeContext({
+      runtimeFacts: {
+        ...context.runtimeFacts,
+        gpu: { available: true, cdiSupported: false, vendor: "nvidia", devices: [] },
+      },
+    });
+
     const input: TraitEngineInput = {
       appName: "test-app",
       compose: { ...BASE_COMPOSE },
@@ -373,7 +385,7 @@ describe("applyTraits (trait application engine)", () => {
         api: [{ type: "gpu", variant: "nvidia" }],
       },
       registry,
-      context,
+      context: gpuContext,
     };
 
     const output = applyTraits(input);

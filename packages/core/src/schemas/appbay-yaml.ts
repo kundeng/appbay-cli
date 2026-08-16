@@ -127,6 +127,18 @@ export const GpuTraitSchema = z.object({
   /** Explicit CDI device names. Used only with the `cdi` variant. */
   devices: z.array(z.string()).optional(),
   /**
+   * Is the GPU essential to this app?
+   *
+   * `false` (default) — a host with no GPU gets a WARNING and the app deploys without the
+   * device reservation. Ollama on CPU is slow but useful.
+   * `true` — a host with no GPU is a compile error. ComfyUI without a GPU is not a
+   * degraded install, it is a broken one, and starting it wastes the operator's time.
+   *
+   * EP1: which apps can survive on CPU is a property of the app, so it is declared in the
+   * manifest rather than decided by a rule inside the trait.
+   */
+  required: z.boolean().default(false),
+  /**
    * Target compose service name. Required for app-level GPU trait declarations.
    * Service-level declarations inherit the service name from the YAML key.
    */

@@ -122,6 +122,17 @@ export interface TraitTransformOutput {
   shepherd?: ShepherdAction[];
   /** Semantic errors discovered after schema parsing (for example, incompatible modes). */
   errors?: string[];
+  /**
+   * Non-fatal findings the operator must see — a trait that degraded rather than applied,
+   * a capability the host cannot provide.
+   *
+   * ⚠️ `TraitWarning` and the `warnings` array on the trait-engine result predate this by
+   * some time and had NO producers: the channel was declared, threaded through the
+   * compiler and surfaced by the CLI, and no trait could put anything in it. A trait that
+   * needed to say something non-fatal had to choose between `errors` (which fails the
+   * app) and silence, and silence usually won.
+   */
+  warnings?: string[];
 }
 
 // ---------------------------------------------------------------------------

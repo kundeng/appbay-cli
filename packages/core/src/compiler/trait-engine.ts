@@ -217,11 +217,46 @@ export function applyTraits(input: TraitEngineInput): TraitEngineOutput {
       }
     }
 
+    // 🚨 A SERVICE-SCOPED TRAIT WITH NO `service:` ON A ONE-SERVICE APP RESOLVES TO THAT
+    // SERVICE (issue #47).
+    //
+    // The schema said `service` was "required for app-level GPU trait declarations", and
+    // then ALL TWELVE GPU entries in the catalog omitted it — every GPU app failed to
+    // compile with "GPU trait requires a target service name". Twelve out of twelve authors
+    // reading the same contract the same way is not twelve mistakes; it is the contract
+    // being wrong. On an app with exactly one service there is nothing to disambiguate.
+    //
+    // ⚠️ ONLY when there is exactly one. Two services and a missing `service:` is a real
+    // question that only the author can answer, so that still errors — and it now names the
+    // candidates instead of saying the trait "requires" something the manifest cannot guess.
+    //
+    // This also fixes a silent case: the ingress trait fell back to `input.service ??
+    // appName` and skipped `stripIngressPort` entirely when unset, so a single-service app
+    // whose service is not named after the app got a route pointing at a host that does not
+    // exist — and compiled clean. Resolving here, once, fixes every service-scoped trait
+    // rather than each one separately.
+    let targetService = serviceFromConfig;
+    if (targetService === undefined && definition.scope === "service") {
+      const names = Object.keys((compose.services ?? {}) as Record<string, unknown>);
+      if (names.length === 1) {
+        targetService = names[0];
+      } else if (names.length > 1) {
+        errors.push({
+          trait: type,
+          message:
+            `Trait "${type}" applies to a service, but this app defines ${names.length} ` +
+            `and the trait names none. Add \`service: <name>\` to the trait. ` +
+            `Known services: ${names.join(", ")}.`,
+        });
+        continue;
+      }
+    }
+
     appTraitTypesSeen.add(type);
 
     const transformInput: TraitTransformInput = {
       app: appName,
-      service: serviceFromConfig,
+      service: targetService,
       properties: parseResult.data,
       compose,
       context,
@@ -241,6 +276,11 @@ export function applyTraits(input: TraitEngineInput): TraitEngineOutput {
     }
     if (output.errors) {
       for (const message of output.errors) errors.push({ trait: type, message });
+    }
+    if (output.warnings) {
+      for (const message of output.warnings) {
+        warnings.push({ trait: type, service: targetService, message });
+      }
     }
   }
 
@@ -327,6 +367,11 @@ export function applyTraits(input: TraitEngineInput): TraitEngineOutput {
       if (output.errors) {
         for (const message of output.errors) {
           errors.push({ trait: type, service: serviceName, message });
+        }
+      }
+      if (output.warnings) {
+        for (const message of output.warnings) {
+          warnings.push({ trait: type, service: serviceName, message });
         }
       }
     }

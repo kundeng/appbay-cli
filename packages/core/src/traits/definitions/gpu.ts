@@ -184,6 +184,41 @@ export const gpuTraitDefinition: TraitDefinition<"gpu"> = {
       throw new Error("GPU trait requires a target service name.");
     }
 
+    // 🚨 AN EXPLICIT VARIANT USED TO SKIP THE HOST CHECK ENTIRELY (issue #47).
+    //
+    // `resolveVariant` returns `props.variant` before consulting the facts, so
+    // `variant: nvidia` on a machine with no GPU rendered the device reservation happily
+    // and the operator met it as a runtime error from the container engine:
+    //
+    //   Error response from daemon: could not select device driver "nvidia"
+    //   with capabilities: [[gpu]]
+    //
+    // Measured on a GPU-less VM, 2026-08-16. That message names no app, no trait and no
+    // remedy, and it arrives after the network and container have been created.
+    //
+    // The host is now checked whatever the variant, and what happens next is the
+    // manifest's call, not this trait's: `required: true` fails the compile with a
+    // sentence that says which app and why; otherwise the app deploys WITHOUT the device
+    // and the operator is told, once, in terms they can act on.
+    if (!gpuFacts.available) {
+      const detail =
+        `App "${input.app}" declares a gpu trait but this host reports no usable GPU` +
+        (gpuFacts.vendor ? ` (vendor: ${gpuFacts.vendor})` : "") +
+        ". Check `appbay smi` and that the container runtime has a GPU toolkit installed " +
+        "(for Docker + NVIDIA: nvidia-container-toolkit, then `nvidia-ctk runtime configure`).";
+
+      if (props.required) {
+        return {
+          compose: structuredClone(input.compose),
+          errors: [`${detail} This app declares \`required: true\`, so it is not deployed.`],
+        };
+      }
+      return {
+        compose: structuredClone(input.compose),
+        warnings: [`${detail} Deploying WITHOUT GPU acceleration — expect it to be slow.`],
+      };
+    }
+
     const variant = resolveVariant(props.variant, gpuFacts);
     const count = props.count ?? 1;
 
