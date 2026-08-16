@@ -183,7 +183,7 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
     phase: "pre-deploy",
     label: `Build ${build.image} for service ${build.service}`,
     timeoutMs: 1_800_000,
-    run: async () => {
+    run: async (ctx) => {
       const bin = containerBin();
 
       // 🚨 THERE IS NO PRESENCE CHECK HERE, AND THAT IS THE FIX (#77).
@@ -214,6 +214,7 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
             stdio: ["pipe", "pipe", "pipe"],
           });
           verifyOrThrow(bin, build);
+          evictStaleContainer(bin, build, ctx.appName);
           return { built: false, reason: `pulled ${build.pullIfPresent}` };
         }
         // Pull failed — fall through and build. Recorded rather than fatal: the escape
@@ -239,9 +240,59 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
       }
 
       verifyOrThrow(bin, build);
+      evictStaleContainer(bin, build, ctx.appName);
       return { built: true, image: build.image };
     },
   };
+}
+
+/**
+ * Remove the service's container when it is running an image OTHER than the one the tag
+ * now points at, so the following `compose up -d` recreates it.
+ *
+ * 🚨 WITHOUT THIS, THE REBUILD FIX IS HALF A FIX (appbay-cli#6). Measured on rootful Podman
+ * with podman-compose 1.6.0, 2026-08-16:
+ *
+ *   after editing the source and re-converging
+ *     tag image id        ec8ace98deae…   <- the rebuild happened, the tag moved
+ *     container image id  66915b0e04a3…   <- the container never followed
+ *     marker in container V1              <- old code, still serving
+ *
+ * `compose up -d` exits 0, reports nothing, and the container shows `Up`. Docker Compose
+ * recreates a service whose image ID changed; podman-compose compares the image NAME and
+ * leaves a running container alone. So the container that #77 was reported against — "I had
+ * to `podman rmi` by hand to get the live source built at all" — kept serving old code even
+ * after the build itself was fixed.
+ *
+ * ⚠️ Deliberately NOT `--force-recreate` on the whole app. That would restart every service
+ * on every converge that touches any build, including databases that had no reason to move.
+ * This evicts exactly the one container whose image is provably stale, and only then.
+ *
+ * Best-effort by design: a missing container, an un-inspectable one, or a runtime that
+ * disagrees about naming all leave `up -d` to do what it would have done anyway. The
+ * failure mode of doing nothing here is the pre-existing bug, not a worse one.
+ */
+function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string): void {
+  const inspectId = (ref: string, format: string): string => {
+    const r = spawnSync(bin, ["inspect", "--format", format, ref], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    });
+    return r.status === 0 ? String(r.stdout ?? "").trim() : "";
+  };
+
+  // The compiler names containers `appbay.<app>.<service>` (upstream-transform).
+  const container = `appbay.${appName}.${build.service}`;
+  const running = inspectId(container, "{{.Image}}");
+  if (!running) return; // no container yet — `up -d` will create it
+
+  const tagged = inspectId(build.image, "{{.Id}}");
+  if (!tagged || tagged === running) return; // already on the right bytes
+
+  console.log(
+    `    ${build.image} moved; removing stale container ${container} so it is recreated.`,
+  );
+  spawnSync(bin, ["rm", "-f", container], { stdio: ["pipe", "pipe", "pipe"] });
 }
 
 function verifyOrThrow(bin: string, build: ResolvedBuild): void {
