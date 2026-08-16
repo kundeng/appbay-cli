@@ -1,0 +1,298 @@
+---
+title: "appbay.yaml Schema Reference"
+description: "Complete field-by-field reference for the app metadata file"
+---
+
+## Overview
+
+`appbay.yaml` is the metadata file that augments a Docker Compose project with Appbay features. It is placed alongside `docker-compose.yml` in an app directory under `$APPBAY_HOME/etc/apps/<name>/`.
+
+The file is optional. If absent, the app is treated as a plain Compose project with default scope values.
+
+## Scope fields
+
+These fields control where the app belongs in the organizational model.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `project` | `string` | `"default"` | Scope namespace. Determines which `projects/<project>/project.yaml` variable file is loaded for scope resolution. |
+| `environment` | `string` | `"default"` | Deployment variant. Determines which variable values are used. |
+| `collection` | `string[]` | (none) | Operational groupings for batch operations. Multi-valued. |
+| `operator` | `string` | (none) | Reserved for future multi-node placement. **Accepted and ignored in v1** — everything runs locally. |
+| `shared_network` | `string[]` | `["appbay_shared"]` | Shared network(s) that exposed services join. |
+| `tags` | `Record<string, string>` | (none) | Arbitrary key-value pairs for UI filtering and bulk operations. No scoping semantics. |
+
+```yaml
+project: homelab
+environment: prod
+collection: [media, gpu-apps]
+operator: local
+shared_network: [appbay_shared]
+tags:
+  tier: media
+  team: infra
+```
+
+## Upstream section
+
+Configures how a stock upstream Compose file is ingested without modification.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `upstream.source` | `string` | (none) | Path to the upstream compose file, relative to the app directory. |
+| `upstream.services.exclude` | `string[]` | (none) | Service names to remove from the upstream compose (e.g., remove nginx when using Traefik). |
+| `upstream.expose` | `ExposeEntry[]` | (none) | Services to alias on shared networks for external access. |
+
+### ExposeEntry
+
+Three shorthand forms are accepted:
+
+| Form | Example | Effect |
+|---|---|---|
+| String | `"api"` | Expose service `api` on all `shared_network` entries |
+| Alias map | `{ web: "dify-web" }` | Expose with a custom alias (key = alias, value = service name) |
+| Full object | `{ service: "api", networks: [...] }` | Explicit service name and network list |
+
+```yaml
+upstream:
+  source: jellyfin-upstream/docker-compose.yml
+  services:
+    exclude: [nginx]
+  expose:
+    - jellyfin                           # shorthand string form
+    # or:
+    - service: jellyfin
+      networks: [appbay_shared]          # full object form
+```
+
+## Overrides section
+
+Static Compose overrides keyed by original service name. These are deep-merged into the upstream compose output.
+
+```yaml
+overrides:
+  jellyfin:
+    environment:
+      - TZ=${{project.TZ}}
+    volumes:
+      - jellyfin_config:/config
+      - /mnt/media:/media:ro
+```
+
+## Overlays section
+
+Conditional Compose fragments applied when peer apps are active. Each overlay has a `when` clause and a `services` block.
+
+| Field | Type | Description |
+|---|---|---|
+| `overlays[].when` | `string[]` or `{ any: string[] }` | Condition for activation. Array = AND (all must be active). `{ any: [...] }` = OR (at least one active). |
+| `overlays[].services` | `Record<string, any>` | Compose service fragments to merge when the condition is met. |
+
+```yaml
+overlays:
+  # AND: both ollama and whisper must be active
+  - when: [ollama, whisper]
+    services:
+      webui:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+          - WHISPER_URL=http://whisper_web:9000
+
+  # OR: either postgres or mysql
+  - when:
+      any: [postgres, mysql]
+    services:
+      app:
+        environment:
+          - DB_AVAILABLE=true
+```
+
+## Traits section (app-level)
+
+App-level traits apply to the entire app. Declared at the top level.
+
+```yaml
+traits:
+  - type: backup
+    schedule: "0 2 * * *"
+    retention: 7
+  - type: auth
+    enabled: true
+```
+
+## Services section (service-level traits)
+
+Service-level traits apply to individual Compose services. Do not re-list services from the compose file -- only reference them for trait assignment.
+
+```yaml
+services:
+  jellyfin:
+    traits:
+      - type: ingress
+        host: "media.${{project.DOMAIN}}"
+        port: 8096
+        exposure: both
+      - type: gpu
+        variant: nvidia
+```
+
+## Trait schemas
+
+### ingress
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"ingress"` | (required) | Trait discriminator |
+| `host` | `string` | (required) | Hostname for the route (supports `${{scope.KEY}}` variables) |
+| `port` | `number` | (required) | Container port to route to |
+| `exposure` | `"internal" \| "external" \| "both"` | `"both"` | Internal (LAN), external (WAN), or both |
+| `tls.staging` | `boolean` | `false` | Use Let's Encrypt staging certificates |
+
+### gpu
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"gpu"` | (required) | Trait discriminator |
+| `variant` | `"nvidia" \| "cdi" \| "rocm"` | auto-detect | GPU variant (omit to auto-detect from runtime facts) |
+| `count` | `number` | `1` | Number of GPUs to reserve. Use `-1` for all |
+| `devices` | `string[]` | (none) | CDI device names. Only used with `variant: cdi` |
+
+### auth
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"auth"` | (required) | Trait discriminator |
+| `mode` | `"portal"` | `"portal"` | Auth mode |
+| `policy` | `"authenticated" \| "deny"` | `"authenticated"` | Access policy |
+| `group` | `string` | (none) | Optional identity role required in addition to the built-in admin role |
+| `enabled` | `boolean` | `true` | Enable/disable auth for this app |
+
+### hooks
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"hooks"` | (required) | Trait discriminator |
+| `pattern` | `"init" \| "sidecar" \| "config"` | (required) | Hook pattern |
+| `image` | `string` | (none) | Container image (init, sidecar) |
+| `command` | `string` | (none) | Command to run (init) |
+| `content` | `string` | (none) | Inline content (config pattern) |
+| `volumes` | `string[]` | (none) | Volume mounts |
+
+### secrets
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"secrets"` | (required) | Trait discriminator |
+| `provider` | `"vault" \| "keepass" \| "file" \| "env" \| "sops"` | `"vault"` | Secret provider |
+| `refs` | `Record<string, string>` | (required) | Map of env var name to secret URI |
+| `injection` | `"runtime-env" \| "wrapper"` | `"runtime-env"` | How secrets are injected |
+
+### backup
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"backup"` | (required) | Trait discriminator |
+| `schedule` | `string` | (required) | Cron expression |
+| `retention` | `number` | `7` | Days to retain backups |
+| `volumes` | `string[]` | (none) | Specific volumes to back up |
+
+### scoped-env
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `type` | `"scoped-env"` | (required) | Trait discriminator |
+| `vars` | `Record<string, string>` | (required) | Map of var name to value or `${{scope.KEY}}` reference |
+
+## Builds section
+
+Images this app builds from source, rather than pulls. Keyed by service name.
+
+```yaml
+builds:
+  web:
+    image: myapp/web:1.4.0
+    pull_if_present: docker.io/myapp/web:1.4.0
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `image` | string | yes | Tag to build and pin the service's `image:` to |
+| `when` | object | no | Conditions controlling whether the build runs |
+| `verify` | object | no | Post-build verification |
+| `pull_if_present` | string | no | Pull this reference instead, when it already exists |
+
+Appbay **hoists** the build: it builds ahead of the deploy, pins `image:` to the tag above,
+and **strips `build:` from the rendered output**. That last part is the point, not tidiness —
+a rendered compose still carrying `build:` puts an implicit image build inside `compose up`,
+which on Podman's compatibility API is the least-tested path in the stack. After hoisting,
+the render is purely "run this image".
+
+## Default models section
+
+Models to pull on first deploy — Ollama and similar. Skipped when the service already has
+them.
+
+```yaml
+default_models:
+  - llama3.2:3b
+  - nomic-embed-text
+```
+
+| Type | Required | Description |
+|---|---|---|
+| string[] | no | Model references, in the target service's own naming |
+
+## Policies section
+
+Conflict policies for trait combinations.
+
+```yaml
+policies:
+  conflicts:
+    - traits: [gpu, hooks]
+      action: error     # error | warn
+```
+
+## Complete example
+
+```yaml
+project: homelab
+environment: prod
+collection: [media, gpu-apps]
+tags:
+  tier: media
+
+upstream:
+  source: jellyfin-upstream/docker-compose.yml
+  services:
+    exclude: [nginx]
+  expose:
+    - service: jellyfin
+      networks: [appbay_shared]
+
+overrides:
+  jellyfin:
+    volumes:
+      - /mnt/media:/media:ro
+
+overlays:
+  - when: [sonarr, radarr]
+    services:
+      jellyfin:
+        environment:
+          - MEDIA_MANAGED=true
+
+traits:
+  - type: backup
+    schedule: "0 3 * * *"
+    retention: 14
+
+services:
+  jellyfin:
+    traits:
+      - type: ingress
+        host: "media.${{project.DOMAIN}}"
+        port: 8096
+      - type: gpu
+        variant: nvidia
+```

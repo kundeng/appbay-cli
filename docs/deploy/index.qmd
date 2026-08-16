@@ -1,0 +1,66 @@
+---
+title: "Deployment Overview"
+description: "Choose a deployment mode for Appbay"
+---
+
+## Deployment modes
+
+Appbay can run in two modes. Both produce the same behavior -- a Next.js control plane that manages Docker Compose apps -- but they differ in how the control plane itself is packaged.
+
+| | Compose (recommended) | Native |
+|---|---|---|
+| **What runs** | `appbay-server` container | Next.js dev server on bare metal |
+| **Prerequisites** | Docker Engine 24+ | Node.js 22+, pnpm, Docker Engine 24+ |
+| **Install** | Single CLI binary | Clone repo, install deps, build |
+| **Upgrades** | `appbay update` (pulls new image) | `git pull && pnpm install && pnpm turbo build` |
+| **Isolation** | Server runs inside a container with read-only socket mount | Server process runs on host |
+| **Best for** | Production, homelab, day-to-day use | Development, debugging, contributing |
+
+## How to choose
+
+**Use Compose** if you want a production-ready install with minimal moving parts. The CLI binary handles bootstrapping the server container, creating the shared network, and running health checks. This is the default path documented throughout Appbay.
+
+**Use Native** if you are developing Appbay itself, need to set breakpoints in the server code, or want to run the web UI in hot-reload mode. Native mode bypasses containerization of the control plane but still uses Docker Compose to manage your apps.
+
+## Architecture summary
+
+Regardless of deployment mode, the runtime architecture is the same:
+
+```
+Browser ──────────────────────────────────────────────────┐
+                                                           v
+CLI ──── Direct import @appbay/core ──────────────────────┤
+          (validate, compile, up, down, list, ...)         |
+                                                    Appbay Server (Next.js + tRPC)
+CLI ─ ─ ─ HTTP health check only ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ |
+          (server start/stop/status)                       |
+                                                           v
+                                                    Docker Engine
+                                              (socket mounted read-only)
+```
+
+The server container mounts the Docker socket read-only (`/var/run/docker.sock:/var/run/docker.sock:ro`) and uses the `docker` CLI directly for container operations.
+
+:::{.callout-note}
+The CLI operates **entirely offline** for all app management commands — it imports `@appbay/core` directly and does not require the Appbay server to be running. Only `appbay server start/stop/status` communicates with the server via HTTP health check. This means `appbay validate`, `appbay compile`, and `appbay up` all work in CI pipelines without a running server.
+:::
+
+## Data directory
+
+Both modes store all state under `$APPBAY_HOME`. Resolution order:
+
+1. `$APPBAY_HOME` environment variable (explicit)
+2. `<repo>/.appbay/` if inside the Appbay monorepo (development)
+3. `~/.appbay` (fallback for end users)
+
+The data directory follows an FHS-inspired layout:
+
+```
+$APPBAY_HOME/
+  etc/           # Authored configuration (app definitions, project config)
+  var/lib/       # Runtime state (renders, SQLite cache, generated values)
+  var/log/       # Logs
+  bin/           # CLI binary
+```
+
+See [Compose deployment](compose.qmd) or [Native installation](native.qmd) for step-by-step setup instructions. For hardened environments, see [Production deployment](production.qmd).

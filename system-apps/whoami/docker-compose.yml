@@ -1,0 +1,13 @@
+services:
+  whoami:
+    image: docker.io/traefik/whoami:latest
+    container_name: appbay.whoami
+    restart: unless-stopped
+    ports:
+      - "${WHOAMI_PORT:-8888}:80"
+    networks:
+      - appbay_shared
+
+networks:
+  appbay_shared:
+    external: true

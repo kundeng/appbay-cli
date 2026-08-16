@@ -1,0 +1,242 @@
+---
+title: "Scope Model Reference"
+description: "Project, Environment, and Collection -- complete reference"
+---
+
+## Overview
+
+Appbay has three organizational concepts. Each controls a different aspect of how apps are grouped, configured, and deployed.
+
+| Concept | Controls | Compose mapping | Cardinality |
+|---|---|---|---|
+| **Project** | Variable namespace | Which `project.yaml` vars are loaded | Single per app |
+| **Environment** | Variable values | Which `.env` gets rendered | Single per deploy |
+| **Collection** | App selection | Which `docker compose up` calls are made | Multi per app |
+
+Collection is NOT part of variable resolution — it is a selector only. Variable resolution is prefix-based: `${{project.KEY}}` reads from `project.yaml`, `${{environment.KEY}}` reads from `environment.yaml`, and `${{service.KEY}}` reads from service vars. Each prefix targets exactly one store; there is no cascading fallthrough.
+
+## Project
+
+A project is a variable scope namespace. It controls which `projects/<project>/project.yaml` vars are loaded for `${{project.KEY}}` resolution. Container naming, volume naming, and network naming are all derived from the **app name**, not the project field.
+
+```yaml
+# appbay.yaml
+project: homelab
+```
+
+### What it controls at Compose runtime
+
+- Container names: `appbay.ollama.web` (pattern: `appbay.<app>.<service>` — project is NOT part of the container name)
+- Volume prefixes: `ollama_data` (pattern: `<app>_<volume>`)
+- Compose project name: determined by Docker Compose from the render directory name (e.g., `ollama` from `renders/ollama/`) — no `-p` flag is passed by Appbay
+- Shared network: `appbay_shared` (the default; configurable via `shared_network:` in `appbay.yaml`)
+- Variable namespace: `${{project.DOMAIN}}` resolves from `projects/homelab/project.yaml`
+
+### When to use multiple projects
+
+- Separate variable namespaces on the same host (e.g., `homelab` vs `work-lab` with different domains and TZ)
+- Apps that need different project-level variable values to share the same config keys
+
+**Default:** If `project` is omitted from `appbay.yaml`, it defaults to `"default"`.
+
+## Environment
+
+An environment is a deployment variant. It determines which variable values are used -- different domains, secrets, ports, or feature flags for the same apps.
+
+```yaml
+# appbay.yaml
+environment: prod
+```
+
+### What it controls at Compose runtime
+
+- Which variables are rendered into `.env` files
+- Which secret URIs are resolved (prod secrets vs dev secrets)
+- Which cert resolver is used (staging vs production Let's Encrypt)
+- Variable namespace: `${{environment.DB_HOST}}` resolves from `environments/prod/environment.yaml`
+
+### Typical environments
+
+| Name | Domain | Certs | Secrets |
+|---|---|---|---|
+| `prod` | `homelab.example.com` | Production Let's Encrypt | Real secrets |
+| `dev` | `localhost` | Staging certs | Dev secrets |
+| `staging` | `staging.example.com` | Production-like | Separate data |
+
+**Default:** If `environment` is omitted, defaults to `"default"`.
+
+The environment for an app is set in `appbay.yaml`. To deploy with a different environment, set `environment:` in `appbay.yaml` or maintain separate app directories per environment.
+
+## Collection
+
+A collection is an operational grouping -- a named set of apps that are deployed, restarted, or stopped together. Collections are purely a selection mechanism.
+
+```yaml
+# appbay.yaml
+collection: [ai-stack, gpu-apps]
+```
+
+### What it controls
+
+Which apps are included in a batch operation. Nothing else.
+
+### What it does NOT control
+
+- Variable values (use environment for that)
+- Naming prefixes (use project for that)
+- Network isolation (use project for that)
+
+### Multi-valued
+
+An app can belong to multiple collections:
+
+```yaml
+# ollama
+collection: [ai-stack, gpu-apps]
+
+# jellyfin
+collection: [media, gpu-apps]
+```
+
+### CLI usage
+
+```bash
+appbay up --collection ai-stack          # Deploy all ai-stack apps
+appbay up ollama webui                   # Deploy specific apps (no collection needed)
+appbay down ollama webui tts             # Stop apps by name
+appbay restart ollama jellyfin           # Restart apps by name
+```
+
+## Variable resolution
+
+Variables are resolved by scope prefix — each `${{scope.KEY}}` reference targets exactly one variable store. There is no cascading fallthrough.
+
+Collection is NOT part of variable resolution. It is a selector, not a scope level.
+
+### Variable reference syntax
+
+| Syntax | Resolves from | Only from |
+|---|---|---|
+| `${{project.KEY}}` | `etc/projects/<name>/project.yaml` | project store only |
+| `${{environment.KEY}}` | `etc/projects/<name>/environments/<env>.yaml` | environment store only |
+| `${{service.KEY}}` | Service-level vars in `appbay.yaml` or `.env` | service store only |
+
+Undefined variable references produce explicit errors with the scope and key name. Appbay never silently substitutes empty strings.
+
+### Resolution example
+
+```yaml
+# projects/homelab/project.yaml
+vars:
+  DOMAIN: home.lan
+  TZ: UTC
+
+# projects/homelab/environments/prod.yaml
+vars:
+  DOMAIN: homelab.example.com    # separate environment-scope value, does NOT override project-scope
+  TZ: America/New_York
+```
+
+Resolution of `${{project.DOMAIN}}` in any environment:
+- Returns `home.lan` — resolved from `project.yaml` only
+
+Resolution of `${{environment.DOMAIN}}`:
+- In `prod`: returns `homelab.example.com` — resolved from `prod.yaml`
+- In `dev` (if `dev.yaml` has no `DOMAIN`): compile error — undefined variable
+
+### Magic generators
+
+| Generator | Output | Persisted? |
+|---|---|---|
+| `${password:N}` | Random N-character password | Yes -- stored in `generated-values.yaml` |
+| `${uuid}` | Random UUID v4 | Yes |
+| `${base64:N}` | Random N-byte base64 string | Yes |
+| `${hash}` | Deterministic hash of (project + env + service + key) | No -- always reproducible |
+| `${timestamp}` | Current ISO timestamp | No -- evaluated at render time |
+
+Generated values are keyed by `(project, environment, service, var_name)`. Once generated, they are reused on subsequent compiles to ensure deterministic output.
+
+## Compose runtime mapping
+
+When you run `appbay up --collection ai-stack`:
+
+```
+1. Select apps tagged with collection: ai-stack
+   -> [ollama, webui, tts]
+
+2. For each app, resolve variables:
+   ${{project.KEY}} from project.yaml (homelab), ${{environment.KEY}} from environment.yaml (prod), ${{service.KEY}} from app .env
+
+3. Compile each app:
+   upstream transform -> overlays -> traits -> render
+
+4. Execute each app as a separate Compose project:
+   docker compose -f renders/ollama/docker-compose.rendered.yml up -d
+   docker compose -f renders/webui/docker-compose.rendered.yml up -d
+   docker compose -f renders/tts/docker-compose.rendered.yml up -d
+```
+
+Each app is an independent Compose project. They communicate via shared networks (e.g., `appbay_shared`), not via Compose's internal service discovery.
+
+## Filesystem layout
+
+```
+$APPBAY_HOME/
+  etc/
+    projects/
+      homelab/                          # Project boundary
+        project.yaml                    # Project-level vars
+        environments/
+          prod.yaml                     # Prod variable values
+          dev.yaml                      # Dev variable values
+    apps/
+      ollama/                           # App definition
+        appbay.yaml                     # project: homelab, collection: [ai-stack]
+        docker-compose.yml
+      jellyfin/
+        appbay.yaml                     # project: homelab, collection: [media]
+        docker-compose.yml
+```
+
+## Reserved keys vs tags
+
+| Type | Keys | Semantics |
+|---|---|---|
+| **Reserved** | `project`, `environment`, `collection`, `operator`, `service` | Fixed meaning -- drives Appbay behavior |
+| **Tags** | Anything via `tags:` | No fixed meaning -- UI filtering and bulk ops only |
+
+## Anti-patterns
+
+### Do not use collections for variable scoping
+
+```yaml
+# WRONG: no collection-level variable resolution exists
+# RIGHT: use environment or app-level overrides
+environment: prod
+```
+
+### Do not use projects for operational grouping
+
+```yaml
+# WRONG
+project: ai-apps     # Just for grouping
+project: media-apps
+
+# RIGHT
+project: homelab
+collection: [ai-stack]    # ollama
+collection: [media]       # jellyfin
+```
+
+### Do not use environments for selecting different app sets
+
+```yaml
+# WRONG
+environment: ai-mode
+environment: media-mode
+
+# RIGHT
+environment: prod
+collection: [ai-stack]    # appbay up --collection ai-stack
+collection: [media]       # appbay up --collection media
+```

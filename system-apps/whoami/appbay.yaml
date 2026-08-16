@@ -1,0 +1,18 @@
+project: default
+environment: default
+collection: [starter]
+tags:
+  tier: demo
+  role: health-check
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - whoami
+
+traits:
+  - type: ingress
+    host: "whoami.${{project.DOMAIN}}"
+    port: 80
+    service: whoami
+    exposure: internal

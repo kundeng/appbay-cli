@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # The open-core boundary, enforced where it cannot be skipped. The pre-commit hook is the
+  # fast feedback, but it lives behind `git config core.hooksPath` and yields to
+  # `--no-verify` — neither of which survives a fresh clone or a contributor. A straddling
+  # commit cannot be cherry-picked upstream without dragging private files along, so it has
+  # to be caught before it is merged, not after.
+  #
+  # Trivially green in the public repo, which has no private paths to straddle.
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need history to walk a range
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the open-core boundary
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          # First push of a branch reports an all-zero "before"; fall back to the last
+          # commit rather than walking the entire history and re-flagging old commits.
+          case "$BASE" in
+            ""|0000000000000000000000000000000000000000) RANGE="HEAD~1..HEAD" ;;
+            *) RANGE="$BASE..HEAD" ;;
+          esac
+          echo "checking $RANGE"
+          node scripts/check-straddle.mjs --range "$RANGE"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm turbo build
+
+      - name: Test
+        run: pnpm turbo test
+
+      - name: Type check
+        run: pnpm turbo typecheck
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      # One command, correct in both repos. The private fork carries
+      # docs/_quarto-internal.yml (the Developer section, covering dev/ and design/);
+      # the public upstream does not. Testing for the file keeps this workflow
+      # byte-identical across both rather than making it a file that must differ —
+      # see .kiro/specs/appbay-v1/S27-open-core-split/spec.md.
+      - name: Render docs
+        run: |
+          cd docs
+          if [ -f _quarto-internal.yml ]; then
+            QUARTO_PROFILE=internal quarto render
+          else
+            quarto render
+          fi
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_site

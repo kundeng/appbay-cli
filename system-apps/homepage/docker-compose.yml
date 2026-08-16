@@ -1,0 +1,25 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: appbay.homepage
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - HOMEPAGE_ALLOWED_HOSTS=*
+    group_add:
+      - "${DOCKER_GID:-999}"
+    ports:
+      - "3001:3000"
+    volumes:
+      - homepage-config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - appbay_shared
+
+volumes:
+  homepage-config:
+
+networks:
+  appbay_shared:
+    external: true

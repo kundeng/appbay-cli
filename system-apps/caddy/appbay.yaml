@@ -1,0 +1,58 @@
+project: system
+environment: default
+collection: [system, infrastructure]
+tags:
+  tier: system
+  role: reverse-proxy
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - caddy
+
+# The supported Caddy mode is always the integrated Caddy Security edge. Both non-core
+# modules are pinned and inventory-gated; a stock Caddy image is not a supported fallback.
+builds:
+  caddy:
+    image: localhost/appbay-caddy-security:2.11.4-v1.1.64
+    verify:
+      command: [caddy, list-modules]
+      contains:
+        - http.authentication.providers.authorizer
+        - dns.providers.cloudflare
+
+services:
+  caddy:
+    traits:
+      # 🚨 THE ACME CREDENTIALS ARRIVE AS PROCESS ENV AND ARE NEVER WRITTEN TO A FILE.
+      # `docker compose config` prints file contents in cleartext — from both `${VAR}`
+      # interpolation and `env_file:` — so any config dump, UI panel or log would disclose
+      # them. The secrets trait resolves these at deploy time and injects them into the
+      # `compose up` process only.
+      #
+      # ⚠️ NO `?gen=` ON ANY OF THESE. They are issued by someone else — Cloudflare, or the
+      # institutional CA — so generating a value would produce a well-formed credential that
+      # authenticates to nothing, and the failure would land at certificate issuance rather
+      # than at configuration.
+      #
+      # ⚠️ A missing secret is not an error here. An install with no DNS-01 and no
+      # institutional CA resolves none of these, Caddy sees empty values, and the per-site
+      # tls import matches no files — which is the correct behaviour for HTTP-01 or the
+      # internal issuer.
+      - type: secrets
+        provider: vault
+        refs:
+          APPBAY_EDGE_TOKEN_SECRET: "vault://caddy/EDGE_TOKEN_SECRET?gen=hex:64"
+          AUTHP_ADMIN_SECRET: "vault://caddy/BOOTSTRAP_ADMIN_SECRET?gen=password:24"
+          CLOUDFLARE_API_TOKEN: "vault://caddy/CLOUDFLARE_API_TOKEN"
+          ACME_EMAIL: "vault://caddy/ACME_EMAIL"
+          ACME_CA: "vault://caddy/ACME_CA"
+          ACME_EAB_KID: "vault://caddy/ACME_EAB_KID"
+          ACME_EAB_HMAC: "vault://caddy/ACME_EAB_HMAC"
+        optional:
+          - CLOUDFLARE_API_TOKEN
+          - ACME_EMAIL
+          - ACME_CA
+          - ACME_EAB_KID
+          - ACME_EAB_HMAC
+        injection: runtime-env

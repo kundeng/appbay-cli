@@ -1,0 +1,154 @@
+---
+title: "Deploy as Compose App"
+description: "Run Appbay as a Docker Compose stack (recommended)"
+---
+
+## Overview
+
+The recommended deployment runs the Appbay control plane as a Docker Compose stack: an `appbay-server` container (Next.js + SQLite) with a read-only Docker socket mount. A single CLI binary manages the entire lifecycle.
+
+## Prerequisites
+
+- Docker Engine 24.0 or later with the Compose plugin (`docker compose` v2)
+- A Linux host (bare metal or VM). macOS and WSL2 work for development.
+
+## Quick start
+
+```bash
+# 1. Download the CLI binary (or build from source)
+curl -fsSL https://get.appbay.dev | sh
+
+# 2. Initialize the data directory
+appbay init
+
+# 3. Start the server stack
+appbay server start
+```
+
+After `appbay server start` completes, open <http://localhost:3000> to create your admin account.
+
+## What `appbay server start` does
+
+The command performs these steps in order:
+
+1. **Creates the shared network.** Runs `docker network create appbay_shared` if it does not already exist. All deployed apps join this network so they can reach each other and the Traefik ingress.
+
+2. **Starts the appbay-server container.** The Next.js standalone image mounts the Docker socket read-only and `$APPBAY_HOME` so it can read app definitions and write rendered output to the host filesystem. SQLite lives in a named volume (`appbay-data`) that persists across container rebuilds.
+
+4. **Waits for the health check.** The CLI polls `GET /api/trpc/health` until the server responds with `{ status: "ok" }`.
+
+5. **Prints the URL.** Once healthy, the CLI prints the server URL and next steps.
+
+## Configuration
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `APPBAY_HOME` | `~/.appbay` | Data directory on the host |
+| `APPBAY_PORT` | `3000` | Port the server listens on |
+| `APPBAY_DB` | `/app/data/appbay.db` | SQLite database path inside the container (backed by the `appbay-data` named volume) |
+| `DOCKER_HOST` | (system default) | Docker API endpoint (uses mounted socket) |
+
+### Volumes
+
+The server compose stack defines two volume mounts:
+
+```yaml
+volumes:
+  # Host data directory -- app definitions, renders, state files
+  - ${APPBAY_HOME:-~/.appbay}:${APPBAY_HOME:-/home/appbay/.appbay}
+  # Named volume for SQLite (persistent across image upgrades)
+  - appbay-data:/app/data
+```
+
+The host data directory is bind-mounted so that the server and CLI share the same filesystem view. The SQLite database uses a named volume because it is a rebuildable cache -- if lost, `appbay rebuild-cache` regenerates it from the filesystem.
+
+### Networks
+
+Two networks are created:
+
+- **`appbay_shared`** -- external network that deployed apps join. Created as an external network so it persists independently of the server stack lifecycle.
+
+## First-run setup
+
+On first launch the server enters setup mode. Navigate to `http://<host>:3000` and create an admin account (username and password). This account is stored in the SQLite database using Appbay's built-in scrypt-based auth.
+
+After creating the admin account, authenticate the CLI:
+
+```bash
+appbay admin reset-password admin --generate --reveal
+# Prompts for server URL, username, and password
+# Stores a session token locally
+```
+
+Alternatively, set a token via environment variable:
+
+```bash
+export APPBAY_TOKEN=<your-token>
+```
+
+## Updating
+
+Pull the latest server image and restart:
+
+```bash
+appbay update
+```
+
+This is equivalent to:
+
+```bash
+docker pull appbay/server:latest
+docker compose -f docker-compose.server.yml up -d
+```
+
+The SQLite database persists in a named volume across image upgrades. If the new version includes schema migrations, Drizzle ORM runs them automatically on startup.
+
+## Stopping
+
+```bash
+appbay server stop
+```
+
+This stops the server container but preserves all data. Your deployed apps continue running independently.
+
+## Backup
+
+Back up the entire `$APPBAY_HOME` directory to preserve:
+
+- `etc/` -- app definitions, project configs, environment configs
+- `var/lib/state/` -- generated values, active app set, operator registry
+- `var/lib/renders/` -- rendered compose output (can be regenerated with `appbay compile`)
+
+The SQLite database (the `appbay-data` named volume) does not need to be backed up separately. It is a metadata cache and can be rebuilt:
+
+```bash
+appbay rebuild-cache
+```
+
+## Troubleshooting
+
+**Server fails to start:**
+
+```bash
+# Check container logs
+docker logs appbay.server
+
+# Verify the shared network exists
+docker network ls | grep appbay_shared
+
+# Run the doctor command
+appbay doctor
+```
+
+**Port conflict:**
+
+```bash
+# Use a different port
+APPBAY_PORT=8080 appbay server start
+```
+
+**Permission denied on Docker socket:**
+
+Ensure your user is in the `docker` group, or run with appropriate permissions. The server container mounts `/var/run/docker.sock` read-only.

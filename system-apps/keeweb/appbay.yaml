@@ -1,0 +1,16 @@
+project: default
+environment: default
+tags:
+  tier: system
+  role: secrets-ui
+
+upstream:
+  source: ./docker-compose.yml
+
+services:
+  keeweb:
+    traits:
+      - type: ingress
+        host: secrets.${APPBAY_DOMAIN:-appbay.local}
+        port: 443
+        exposure: internal

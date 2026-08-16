@@ -1,0 +1,63 @@
+services:
+  # MQTT broker — home automation device integration backbone
+  mosquitto:
+    image: docker.io/library/eclipse-mosquitto:latest
+    container_name: appbay.homeassistant.mosquitto
+    restart: unless-stopped
+    volumes:
+      - mosquitto-config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    networks:
+      - ha-internal
+
+  # Zigbee2MQTT — bridges Zigbee devices to MQTT
+  # Requires a Zigbee coordinator USB dongle; disable if not available.
+  zigbee2mqtt:
+    image: docker.io/koenkk/zigbee2mqtt:latest
+    container_name: appbay.homeassistant.zigbee2mqtt
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    volumes:
+      - zigbee2mqtt-data:/app/data
+      # Mount your Zigbee coordinator device; adjust path as needed
+      # - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      TZ: ${TZ:-UTC}
+      ZIGBEE2MQTT_CONFIG_MQTT_SERVER: mqtt://mosquitto
+      ZIGBEE2MQTT_CONFIG_HOMEASSISTANT: "true"
+    networks:
+      - ha-internal
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: appbay.homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    volumes:
+      - ha-config:/config
+    environment:
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${HA_PORT:-8123}:8123"
+    # Home Assistant requires network_mode host for mDNS / device discovery,
+    # OR configure the frontend.homeassistant section in HA's configuration.yaml.
+    # Uncomment for full LAN device discovery:
+    # network_mode: host
+    networks:
+      - ha-internal
+      - appbay_shared
+
+volumes:
+  ha-config:
+  mosquitto-config:
+  mosquitto-data:
+  mosquitto-log:
+  zigbee2mqtt-data:
+
+networks:
+  ha-internal:
+  appbay_shared:
+    external: true

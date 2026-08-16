@@ -1,0 +1,21 @@
+project: default
+environment: default
+collection: [ai-stack, gpu-apps]
+tags:
+  tier: compute
+  role: llm-inference
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - ollama
+
+traits:
+  - type: gpu
+    variant: nvidia
+    service: ollama
+  - type: ingress
+    host: "ollama.${{project.DOMAIN}}"
+    port: 11434
+    service: ollama
+    exposure: internal

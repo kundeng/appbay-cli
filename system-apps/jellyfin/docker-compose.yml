@@ -1,0 +1,32 @@
+services:
+  jellyfin:
+    image: docker.io/jellyfin/jellyfin:latest
+    container_name: appbay.jellyfin
+    restart: unless-stopped
+    # Hardware transcoding: uncomment the device block matching your GPU
+    # devices:
+    #   - /dev/dri:/dev/dri          # Intel QSV / VAAPI
+    #   - /dev/nvidia0:/dev/nvidia0  # NVIDIA (prefer the gpu trait instead)
+    #   - /dev/nvidiactl:/dev/nvidiactl
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+      - ${JELLYFIN_MEDIA_PATH:-/mnt/media}:/media:ro
+    environment:
+      JELLYFIN_CACHE_DIR: ${JELLYFIN_CACHE_PATH:-/cache}
+      JELLYFIN_PublishedServerUrl: https://jellyfin.${{project.DOMAIN}}
+    ports:
+      - "8096:8096"
+      # Optional: DLNA auto-discovery (LAN only)
+      # - "1900:1900/udp"
+      # - "7359:7359/udp"
+    networks:
+      - appbay_shared
+
+volumes:
+  jellyfin-config:
+  jellyfin-cache:
+
+networks:
+  appbay_shared:
+    external: true

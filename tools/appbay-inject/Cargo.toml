@@ -1,0 +1,23 @@
+[package]
+name = "appbay-inject"
+version = "0.1.0"
+edition = "2021"
+description = "Entrypoint binary for secure secret injection into Docker containers"
+license = "MIT"
+
+[dependencies]
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zeroize = { version = "1", features = ["derive"] }
+hex = "0.4"
+nix = { version = "0.29", features = ["process"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1

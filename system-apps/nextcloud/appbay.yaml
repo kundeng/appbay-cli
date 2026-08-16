@@ -1,0 +1,26 @@
+project: default
+environment: default
+collection: [self-hosted, productivity]
+tags:
+  tier: personal
+  role: file-sync
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - nextcloud
+
+traits:
+  - type: ingress
+    host: "cloud.${{project.DOMAIN}}"
+    port: 80
+    service: nextcloud
+    exposure: external
+    tls:
+      staging: false
+  - type: backup
+    schedule: "0 3 * * *"
+    retention: 14
+    volumes:
+      - nextcloud-db
+      - nextcloud-data

@@ -1,0 +1,16 @@
+project: homelab
+environment: prod
+shared_network:
+  - appbay_shared
+upstream:
+  source: docker-compose.yml
+  expose:
+    - service: web
+      networks:
+        - appbay_shared
+services:
+  web:
+    traits:
+      - type: ingress
+        host: myapp.example.com
+        port: 80

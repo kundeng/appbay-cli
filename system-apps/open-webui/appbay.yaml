@@ -1,0 +1,49 @@
+project: default
+environment: default
+collection: [ai-stack]
+tags:
+  tier: frontend
+  role: chat-ui
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - open-webui
+
+traits:
+  - type: ingress
+    host: "chat.${{project.DOMAIN}}"
+    port: 8080
+    service: open-webui
+    exposure: both
+  - type: auth
+    enabled: true
+    mode: portal
+    service: open-webui
+
+# Conditional overlays — the killer feature
+overlays:
+  # When ollama is running, configure open-webui to use it via shared network
+  - when: [ollama]
+    services:
+      open-webui:
+        environment:
+          - OLLAMA_BASE_URL=http://appbay.ollama:11434
+          - ENABLE_OLLAMA_API=true
+
+  # When whisper (TTS) is running, enable audio features
+  - when: [whisper]
+    services:
+      open-webui:
+        environment:
+          - AUDIO_STT_ENGINE=openai
+          - AUDIO_STT_OPENAI_API_BASE_URL=http://whisper_whisper:8000/v1
+
+  # When both ollama AND searxng are available, enable web search
+  - when: [ollama, searxng]
+    services:
+      open-webui:
+        environment:
+          - ENABLE_RAG_WEB_SEARCH=true
+          - RAG_WEB_SEARCH_ENGINE=searxng
+          - SEARXNG_QUERY_URL=http://searxng_searxng:8080/search?q=<query>

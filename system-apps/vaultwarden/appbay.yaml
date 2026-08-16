@@ -1,0 +1,25 @@
+project: default
+environment: default
+collection: [self-hosted, security]
+tags:
+  tier: personal
+  role: password-manager
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - vaultwarden
+
+traits:
+  - type: ingress
+    host: "vault.${{project.DOMAIN}}"
+    port: 80
+    service: vaultwarden
+    exposure: external
+    tls:
+      staging: false
+  - type: backup
+    schedule: "0 2 * * *"
+    retention: 30
+    volumes:
+      - vaultwarden-data

@@ -1,0 +1,561 @@
+---
+title: "Traits"
+description: "The seven built-in traits: ingress, gpu, auth, hooks, scoped-env, secrets, and backup"
+---
+
+## Overview
+
+Traits are declarative transformations that add capabilities to your apps. Instead of manually editing Compose files to add Traefik labels, GPU device mappings, or auth middleware, you declare what you want in `appbay.yaml` and the compiler generates the correct configuration.
+
+Traits follow OAM (Open Application Model) rules:
+
+- Applied in the order they are declared
+- One configuration per trait type per service
+- Some traits declare `conflictsWith` to prevent incompatible combinations
+
+Traits are scoped to either the **service level** (applied to a specific Compose service) or the **app level** (applied to the entire app).
+
+## Ingress trait {#ingress}
+
+**Scope:** service
+
+The ingress trait generates reverse-proxy routing configuration for a service, as a file the proxy picks up — not as Docker labels.
+
+Which proxy it emits for is an **installation-level** setting, not a trait property (see [Ingress providers](#ingress-providers) below). By default it emits Traefik dynamic config; set `ingress_provider: caddy` and the same trait emits a Caddy site block instead. The trait's properties are identical either way.
+
+### Basic example
+
+```yaml
+# apps/nextcloud/appbay.yaml
+services:
+  nextcloud:
+    traits:
+      - type: ingress
+        host: cloud.homelab.example.com
+        port: 80
+        exposure: external
+        tls:
+          staging: false
+```
+
+Service-scoped traits like `ingress` are declared under `services.<name>.traits` to target a specific service. Service-scoped traits must always be declared at the service level -- they cannot be moved to the top-level `traits:` array (which is reserved for app-scoped traits like `auth` and `backup`).
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `host` | string | required | The hostname for routing (supports `${{project.DOMAIN}}`) |
+| `port` | number | required | Target port on the service |
+| `exposure` | enum | `both` | `internal` (LAN only), `external` (WAN), or `both` |
+| `tls` | object | omit for no TLS | TLS config: `{ staging: false }` for prod, `{ staging: true }` for LE staging |
+| `service` | string | (the service it is declared under) | Target compose service. Required when the trait is declared at **app level** in a multi-service app; inherited automatically when declared under a service. |
+
+### Exposure modes
+
+Traefik runs with two entrypoints:
+
+- **websecure** (port 443) — for HTTPS traffic
+- **web** (port 80) — HTTP (used for `both` exposure as a plain HTTP fallback)
+
+The `exposure` property controls which entrypoints the router listens on:
+
+```yaml
+# LAN-only service
+- type: ingress
+  host: nas.home.lan
+  port: 80
+  exposure: internal
+
+# Internet-facing service with TLS
+- type: ingress
+  host: blog.example.com
+  port: 3000
+  exposure: external
+  tls:
+    staging: false
+
+# Available on both LAN and WAN (HTTP + HTTPS)
+- type: ingress
+  host: cloud.example.com
+  port: 80
+  exposure: both
+  tls:
+    staging: false
+```
+
+### TLS certificates
+
+When `tls` is set, the ingress trait configures Let's Encrypt certificate resolution via the Traefik `certResolver` mechanism. Use `staging: true` while testing to avoid Let's Encrypt rate limits; switch to `staging: false` for production:
+
+```yaml
+# Production certificate
+tls:
+  staging: false
+
+# Staging certificate (untrusted, for testing)
+tls:
+  staging: true
+```
+
+### Using scoped variables
+
+```yaml
+services:
+  jellyfin:
+    traits:
+      - type: ingress
+        host: jellyfin.${{project.DOMAIN}}
+        port: 8096
+        exposure: external
+        tls:
+          staging: false
+```
+
+The `${{project.DOMAIN}}` reference resolves from `project.yaml` at compile time. To reference an environment-specific value, use `${{environment.KEY}}` instead.
+
+### Ingress providers {#ingress-providers}
+
+| provider | emits | where |
+|---|---|---|
+| `traefik` *(default)* | dynamic config YAML for the file provider | `etc/apps/traefik/config/dynamic/<app>.yml` |
+| `caddy` | a Caddy site block | `etc/apps/caddy/config/dynamic/<app>.caddy` |
+
+Choose it once per installation:
+
+```bash
+appbay init --ingress-provider caddy
+```
+
+::: {.callout-note}
+## Why this is not a trait property
+
+Every app on a host is fronted by the same proxy. If each app declared its own, two apps could disagree about which proxy is deployed — and the loser would emit a perfectly valid config file for a proxy that is not running. No error, no route, nothing to grep for.
+:::
+
+**Both providers compose the same way.** The ingress trait owns the routing; the [auth trait](#auth) contributes the authentication layer from its own file, and the proxy assembles them:
+
+- **Traefik** composes by *name* — auth defines a middleware, the router references it.
+- **Caddy** composes by *file glob* — the site block carries `import auth/<app>-*.caddy`, and auth drops that file beside it. An app with no auth trait produces no fragment, the glob matches nothing, and the configuration is still valid.
+
+So adding or removing the auth trait never requires touching the ingress trait, under either provider.
+
+::: {.callout-warning}
+Under Caddy, exactly one emitter may open a site block — two files declaring the same host is an `ambiguous site definition` error. That owner is the ingress trait, because it knows the host, the upstream service and the port. Anything the auth trait contributes is a bare directive list imported *into* that block, never a site block of its own.
+:::
+
+## GPU trait {#gpu}
+
+**Scope:** service
+
+The GPU trait adds GPU device passthrough to a service. It auto-detects the appropriate configuration from operator-reported runtime facts.
+
+### Basic example
+
+```yaml
+# apps/ollama/appbay.yaml
+services:
+  web:
+    traits:
+      - type: gpu
+```
+
+With no `variant` specified, the operator detects the available GPU and selects the right configuration automatically.
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `variant` | enum | auto-detect | `nvidia` (Docker GPU runtime), `cdi` (Container Device Interface), or `rocm` (AMD ROCm) |
+| `count` | number | `1` | Number of GPUs to allocate. Use `-1` for all GPUs |
+| `devices` | string[] | omit | CDI device names (e.g., `["all"]`). Only used with `variant: cdi` |
+| `service` | string | (the service it is declared under) | Target compose service. Required when the trait is declared at **app level** in a multi-service app; inherited automatically when declared under a service. |
+
+### GPU variants
+
+The compiler generates different Compose configurations based on the selected variant:
+
+**nvidia** (Docker GPU runtime):
+```yaml
+services:
+  web:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+**cdi** (Container Device Interface):
+```yaml
+services:
+  web:
+    devices:
+      - nvidia.com/gpu=all
+```
+
+**rocm** (AMD GPU):
+```yaml
+services:
+  web:
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+```
+
+### Auto-detection
+
+When `variant` is omitted (the default), the compiler probes the host and selects the variant based on what is available:
+
+- If CDI is supported → `cdi`
+- If an NVIDIA GPU is present → `nvidia`
+- If an AMD GPU is present → `rocm`
+
+If no GPU is detected and no explicit `variant` is set, the deploy fails with an error.
+
+### Do I need to install anything for GPU support?
+
+**Probably not.** Run this one command:
+
+```bash
+docker run --rm --device nvidia.com/gpu=all ubuntu:24.04 nvidia-smi -L
+```
+
+If it lists your GPU, Appbay will use it and **you have nothing to install** — no
+`nvidia-container-toolkit`, no `nvidia-container-runtime`. Your host already has a CDI spec
+(usually `/etc/cdi/nvidia.yaml`), and Docker 25+ and Podman 4.1+ read those directly.
+
+If the command fails, you need one of:
+
+- **a CDI spec** — generate one with `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`,
+  which you can run from a container rather than installing the toolkit; or
+- **the NVIDIA container runtime**, which is the older path Appbay's `nvidia` variant uses.
+
+Appbay picks CDI when a spec is present, because it needs nothing else on the host.
+
+## Auth trait {#auth}
+
+**Scope:** app
+
+The auth trait protects an app behind the Caddy Security edge — a browser login portal plus
+role-based authorization. It requires the Caddy ingress provider (`appbay init
+--ingress-provider caddy`); Traefik remains a supported ingress mode but is not an
+authentication provider.
+
+### Basic example
+
+```yaml
+# apps/nextcloud/appbay.yaml
+traits:
+  - type: auth
+    enabled: true
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `mode` | enum | `portal` | Auth mode (`portal`) |
+| `policy` | enum | `authenticated` | Access policy (`authenticated` or `deny`) |
+| `group` | string | omit | Optional identity role required in addition to the built-in admin role |
+| `enabled` | boolean | `true` | Toggle auth on/off per app |
+| `service` | string | (the service it is declared under) | Target compose service. Required when the trait is declared at **app level** in a multi-service app; inherited automatically when declared under a service. |
+
+### How it works
+
+1. During compilation, the auth trait generates a Caddy Security authentication route in
+   `etc/apps/caddy/config/dynamic/auth/<app>-security.caddy` and an authorization policy in
+   `etc/apps/caddy/config/security/policies/<app>.caddy`.
+2. The ingress trait's site block imports the auth fragment, so the app's host is protected
+   by the Caddy Security portal.
+3. Requests to the app are authenticated by the Caddy Security portal and authorized by the
+   generated policy. On success, Caddy injects `Remote-User`, `Remote-Email`, and
+   `Remote-Groups` headers that the app reads to identify the user.
+
+### Restricting to a group
+
+`group:` names an identity role the user must hold. Roles are namespaced `authp/<name>`,
+and you may write either form — `group: admins` and `group: authp/admins` are equivalent.
+
+```yaml
+traits:
+  - type: auth
+    policy: authenticated
+    group: admins          # only members of authp/admins may reach this app
+```
+
+The generated policy allows the built-in admin role **plus** the group you named:
+
+```
+allow roles authp/admin authp/admins
+```
+
+A user who authenticates successfully but holds neither role receives **403 Forbidden**.
+Create a user who does hold it with:
+
+```bash
+appbay edge users create alice --email alice@example.com --roles admins --generate --reveal
+```
+
+::: {.callout-important}
+## Restart the edge after changing a policy
+Authorization policies are imported inside Caddy's **global** block, and `--watch` does not
+reload those — per-app routes and auth fragments hot-reload, policies do not.
+
+```bash
+appbay down caddy && appbay up caddy
+```
+
+Skipping this makes a policy change appear to have no effect, which looks exactly like
+broken role matching and is not.
+:::
+
+::: {.callout-note}
+## Edge users are not AppBay accounts
+The people who sign in to your deployed apps are **edge users**, managed with
+`appbay edge users`. They are a separate credential domain from the account you use to sign
+in to AppBay itself (`appbay admin`) and from the vault password. See
+[The Three Credentials](credentials.qmd).
+:::
+
+### Verifying it actually restricts
+
+⚠️ **A successful login by a member proves nothing.** A member is admitted whether the
+policy matches or falls through to something permissive. The only test that distinguishes an
+enforcing policy from an inert one is a user who authenticates *and should be refused*:
+
+```bash
+scripts/journeys/s25-edge-authz.sh    # asserts member reaches the app AND outsider is 403
+```
+
+### Per-app toggle
+
+Auth can be enabled globally and disabled for specific apps:
+
+```yaml
+# apps/public-site/appbay.yaml
+traits:
+  - type: auth
+    enabled: false    # this app does not require login
+```
+
+## Hooks trait {#hooks}
+
+**Scope:** service
+
+The hooks trait adds auxiliary containers and configuration using three Compose-native patterns. Appbay never rewrites entrypoints.
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `pattern` | enum | required | `init`, `sidecar`, or `config` |
+| `image` | string | `busybox:latest` | Container image (init and sidecar patterns) |
+| `command` | string | omit | Command to run (single string, not array) |
+| `volumes` | string[] | omit | Volume names to mount (init and sidecar patterns) |
+| `content` | string | omit | Inline file content (config pattern only) |
+| `share` | object | omit | Namespace sharing: `{ network: bool, pid: bool, ipc: bool }` |
+| `service` | string | (the service it is declared under) | Target compose service. Required when the trait is declared at **app level** in a multi-service app; inherited automatically when declared under a service. |
+
+### Init pattern
+
+A one-shot container that must complete before the target service starts:
+
+```yaml
+services:
+  app:
+    traits:
+      - type: hooks
+        pattern: init
+        image: busybox:latest
+        command: "mkdir -p /data/subdir && chown -R 1000:1000 /data"
+        volumes:
+          - app-data
+```
+
+This generates a Compose service with `depends_on` using `condition: service_completed_successfully`. The init container gets `restart: no`.
+
+### Sidecar pattern
+
+A long-running companion service that runs alongside the main service:
+
+```yaml
+services:
+  app:
+    traits:
+      - type: hooks
+        pattern: sidecar
+        image: prom/node-exporter
+        volumes:
+          - metrics-data
+```
+
+The sidecar gets `restart: unless-stopped` and shares volumes with the target service.
+
+#### Namespace sharing
+
+Sidecars can share Linux namespaces with the target container using the `share` block:
+
+```yaml
+services:
+  app:
+    traits:
+      - type: hooks
+        pattern: sidecar
+        image: nicolaka/netshoot
+        command: "tcpdump -i any -w /captures/app.pcap"
+        share:
+          network: true
+          pid: true
+        volumes:
+          - captures-data
+```
+
+| Share flag | Docker effect | Use case |
+|-----------|---------------|----------|
+| `network` | `network_mode: service:<target>` | localhost access to target ports, packet capture |
+| `pid` | `pid: service:<target>` | Process inspection, signal delivery |
+| `ipc` | `ipc: service:<target>` | Shared memory (rare) |
+
+**Port forfeiture rule:** When `share.network` is true, the sidecar cannot publish its own ports (Docker limitation). Any `ports:` declaration is automatically stripped.
+
+**Auto-dependency:** When any share flag is set, `depends_on: { <target>: { condition: service_started } }` is added automatically.
+
+### Config pattern
+
+Injects a configuration file using Compose `configs` with inline `content` (requires Compose v2.23.1+):
+
+```yaml
+services:
+  app:
+    traits:
+      - type: hooks
+        pattern: config
+        content: |
+          {
+            "debug": false
+          }
+```
+
+The config is mounted into the target service at a generated path (`/<app>-<service>-hook-config`). No additional containers are created.
+
+## Scoped-env trait {#scoped-env}
+
+**Scope:** app
+
+The scoped-env trait injects variables from the project/environment scope chain into the app's environment:
+
+```yaml
+traits:
+  - type: scoped-env
+    vars:
+      DOMAIN: ${{project.DOMAIN}}
+      TZ: ${{environment.TZ}}
+      DB_HOST: ${{environment.DB_HOST}}
+      INSTANCE_ID: ${hash}
+```
+
+The scope prefix determines which variable store is consulted: `${{project.KEY}}` looks up `project.yaml`, `${{environment.KEY}}` looks up `environment.yaml`, and `${{service.KEY}}` looks up service-level vars. See [Core Concepts](concepts.qmd) for details.
+
+### Magic generators in scoped-env
+
+Generator expressions can be used as values:
+
+```yaml
+traits:
+  - type: scoped-env
+    vars:
+      SECRET_KEY: ${password:32}
+      INSTALL_ID: ${uuid}
+      NODE_HASH: ${hash}
+      API_TOKEN: ${base64:48}
+```
+
+Generated values are evaluated once and persisted in the state store. Subsequent renders reuse the stored values for deterministic output.
+
+## Secrets trait {#secrets}
+
+**Scope:** service
+
+The secrets trait declares URI-based secret references that are resolved at deploy time. See [Secrets Management](secrets.qmd) for the full documentation.
+
+```yaml
+traits:
+  - type: secrets
+    refs:
+      DB_PASSWORD: infisical://homelab/prod/nextcloud/db-password
+      SMTP_KEY: file:///run/secrets/smtp-key
+      API_TOKEN: env://EXTERNAL_API_TOKEN
+      ENCRYPTION_KEY: sops://secrets.enc.yaml#encryption_key
+```
+
+### Injection modes
+
+- **runtime-env** (default): Secrets are injected as process environment variables to `docker compose`. They never touch disk.
+- **wrapper** (opt-in): Secrets are mounted as tmpfs files via the wrapper hook pattern.
+
+## Backup trait {#backup}
+
+**Scope:** app
+
+The backup trait configures scheduled backups for an app's data:
+
+```yaml
+traits:
+  - type: backup
+    schedule: "0 2 * * *"       # daily at 2 AM
+    retention: 7                 # keep 7 days
+    volumes:
+      - data                     # which volumes to back up
+      - config
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `schedule` | cron string | required | Backup schedule in cron format |
+| `retention` | number | `7` | Number of days/copies to retain |
+| `volumes` | string[] | all | Which volumes to include (defaults to all app volumes) |
+
+### System backup
+
+In addition to per-app backup, Appbay supports system-level backup that covers:
+
+- Appbay configuration files (`etc/`)
+- State store (`var/lib/state/`)
+- Secrets metadata (URIs only, never values)
+- SQLite database
+
+System backup is configured globally, not per-app.
+
+## Trait conflicts
+
+Some traits are incompatible with each other. Trait definitions declare `conflictsWith` to prevent invalid combinations. The compiler reports a validation error if conflicting traits are applied to the same service.
+
+Example: if a hypothetical `static-ip` trait conflicts with `ingress`, applying both to the same service would produce:
+
+```
+ERROR: Trait conflict on service "web" in app "myapp":
+  "static-ip" conflicts with "ingress"
+  Remove one of the conflicting traits.
+```
+
+## Trait declaration order
+
+Traits are applied in the order they are declared. This matters when traits modify the same parts of the Compose model. Each trait's `transform()` receives the Compose state as left by all previous traits.
+
+```yaml
+services:
+  web:
+    traits:
+      - type: ingress      # runs first: creates Traefik router config
+        host: app.example.com
+        port: 3000
+      - type: gpu          # runs second: adds GPU devices to services.web
+        variant: nvidia
+```

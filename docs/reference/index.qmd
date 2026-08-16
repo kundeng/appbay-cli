@@ -1,0 +1,30 @@
+---
+title: "Reference"
+description: "Complete reference documentation for Appbay schemas, commands, and APIs"
+---
+
+## Reference documentation
+
+This section provides detailed, field-by-field reference for every configuration schema, CLI command, and API endpoint in Appbay.
+
+1. [appbay.yaml Schema](appbay-yaml.qmd) -- Complete field reference for the app metadata file, including scope, upstream, overrides, overlays, and traits.
+2. [CLI Commands](cli-commands.qmd) -- Every CLI command with flags, examples, and exit codes.
+3. [API Endpoints](api-endpoints.qmd) -- Every tRPC procedure with input schemas and output types.
+4. [Scope Model](scope-model.qmd) -- Project, Environment, and Collection -- how they work together and how variable resolution flows.
+
+## Conventions used in this reference
+
+**Required fields** are marked with no default value. **Optional fields** show their default in the "Default" column.
+
+Type notation follows TypeScript conventions:
+
+| Notation | Meaning |
+|---|---|
+| `string` | A string value |
+| `number` | A numeric value |
+| `boolean` | `true` or `false` |
+| `string[]` | Array of strings |
+| `Record<string, string>` | Key-value map of strings |
+| `"a" \| "b"` | Union type (one of the listed values) |
+
+YAML examples use the exact syntax expected in configuration files. TypeScript examples show the Zod schema types.

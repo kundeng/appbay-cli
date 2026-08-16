@@ -1,0 +1,150 @@
+---
+title: "Native Installation"
+description: "Run Appbay without Docker containers for development"
+---
+
+## When to use native mode
+
+Native mode builds and runs the CLI directly from a checkout rather than installing a
+released binary. Use this when you are:
+
+- **Developing Appbay itself** -- iterating on the compiler, traits, or CLI commands.
+- **Debugging** -- you want a binary built from your working tree.
+- **Contributing** -- you are preparing a pull request and need the full toolchain.
+
+The web control plane is a separate component distributed as a container image; it is not
+built from this repository, so there is no server to run natively. `appbay server start`
+runs it as a container whichever way you installed the CLI.
+
+For production or homelab use, prefer the [Compose deployment](compose.qmd).
+
+## Prerequisites
+
+| Tool | Version | Purpose |
+|---|---|---|
+| Node.js | 22+ | Toolchain runtime (tsc, turbo, scripts) |
+| pnpm | 10+ | Package manager (enabled via corepack) |
+| Bun | 1.1+ | CLI binary compilation (`bun build --compile`) |
+| Docker Engine | 24+ | Running deployed apps |
+| Docker Compose | v2 | Compose plugin for Docker CLI |
+| Turborepo | (installed via pnpm) | Monorepo build orchestration |
+
+Enable pnpm via corepack if you have not already:
+
+```bash
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+## Clone and build
+
+```bash
+git clone https://github.com/kundeng/appbay-cli.git
+cd appbay-cli
+pnpm install
+pnpm turbo build
+```
+
+This builds the packages in dependency order:
+
+1. `packages/core` -- shared types, Zod schemas, trait registry, compiler
+2. `packages/db` -- Drizzle schema, SQLite migrations, query helpers
+3. `apps/cli` -- CLI binary
+
+## Initialize the data directory
+
+```bash
+# Build and run the CLI
+pnpm --filter @appbay/cli build
+./apps/cli/dist/appbay init
+```
+
+Or use the Makefile shortcut:
+
+```bash
+make cli && make init
+```
+
+This scaffolds `$APPBAY_HOME` (defaults to `<repo>/.appbay/` when inside the monorepo) with the FHS directory structure:
+
+```
+.appbay/
+  etc/apps/          # App definitions
+  etc/projects/      # Project and environment configs
+  var/lib/renders/   # Rendered compose output
+  var/lib/state/     # Generated values, active apps
+  var/log/           # Logs
+```
+
+## Start the control plane
+
+```bash
+appbay server start
+```
+
+This writes a compose file referencing the published image and brings it up on
+<http://localhost:3000>. To skip the login gate on a machine you control:
+
+```bash
+APPBAY_DEV_AUTH=true appbay server start
+```
+
+That disables authentication outright, not just the setup form — local use only.
+
+The web control plane is a separate component and is not built from this repository, so
+there is no dev server to run here. Changes to `packages/core/` or `packages/db/` require a
+rebuild before the CLI picks them up:
+
+```bash
+pnpm turbo build --filter=@appbay/core
+pnpm turbo build --filter=@appbay/db
+```
+
+## Build the CLI binary
+
+```bash
+pnpm --filter @appbay/cli build
+# or
+make cli
+```
+
+This uses `bun build --compile` to produce a single native binary at `apps/cli/dist/appbay`.
+
+## Makefile shortcuts
+
+The project includes a Makefile with common development commands:
+
+| Command | Description |
+|---|---|
+| `make build` | Build all packages with Turborepo |
+| `make test` | Run all tests (Vitest) |
+| `make cli` | Build CLI binary |
+| `make init` | Initialize `$APPBAY_HOME` |
+| `make doctor` | Run prerequisite checks |
+| `make up APP=x` | Deploy an app |
+| `make down APP=x` | Stop an app |
+| `make clean` | Remove build artifacts |
+| `make typecheck` | Type-check all packages |
+
+## Running tests
+
+```bash
+pnpm turbo test
+# or
+make test
+```
+
+Tests use Vitest. Each test gets a temporary `$APPBAY_HOME` with a fresh SQLite database for isolation.
+
+## Pinning the control-plane image
+
+`appbay server start` pulls `ghcr.io/kundeng/appbay-server:latest` by default. To pin a
+version, or point at a different registry, set `APPBAY_SERVER_IMAGE` before starting — the
+generated compose reads it:
+
+```bash
+APPBAY_SERVER_IMAGE=ghcr.io/kundeng/appbay-server:0.0.1-alpha.4 appbay server start
+```
+
+The CLI itself is fully functional without the control plane — compile, validate, deploy,
+logs and eject all work with no server running.

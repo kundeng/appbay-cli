@@ -1,0 +1,5 @@
+project: 12345
+environment:
+  - this-should-be-a-string-not-an-array
+collection: not-an-array
+shared_network: also-not-an-array

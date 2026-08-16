@@ -1,0 +1,49 @@
+---
+title: "Appbay"
+description: "A control plane for the Docker Compose apps you already run"
+toc: false
+---
+
+Appbay manages Docker Compose apps — ingress, TLS, authentication, secrets and
+namespacing — without taking your Compose files away from you.
+
+You can **eject any app at any time** and run it with plain `docker compose up`. Appbay adds
+structure; it never locks you in.
+
+## Try it
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kundeng/appbay-cli/main/scripts/install.sh | sh
+appbay setup --domain home.lan
+```
+
+That installs a single binary — no Node.js, no Bun, nothing else on the host — then walks you
+through creating the install, its secret vault, and the reverse proxy.
+
+[Getting Started →](guide/quickstart.qmd){.btn .btn-primary}
+
+## What you get
+
+| | |
+|---|---|
+| **Your Compose files stay yours** | Upstream files are never modified. Appbay layers policy on top and renders a new file. |
+| **Traits instead of label soup** | `type: ingress` gives an app a hostname, TLS and forward-auth, rather than a dozen hand-written proxy labels. |
+| **Secrets that never reach disk in the clear** | An encrypted local vault, with five injection modes depending on how the app expects to read them. |
+| **One API, two interfaces** | The CLI and the web UI call the same code, so they cannot disagree about what your system is doing. |
+| **Docker or Podman** | Choose the runtime once, at `init`. Rootful Podman on RHEL-family hosts is supported and tested, SELinux included. |
+
+## Where to go next
+
+- **[Getting Started](guide/quickstart.qmd)** — install, deploy an app, reach it in a browser.
+- **[Core Concepts](guide/concepts.qmd)** — apps, traits, overlays, scopes and collections.
+- **[Traits](guide/traits.qmd)** — the full list, with what each one emits.
+- **[Deployment](deploy/index.qmd)** — running Appbay itself, on a server or in a container.
+- **[Reference](reference/index.qmd)** — every CLI command, every schema field.
+
+::: {.callout-note}
+## Alpha
+
+Appbay is alpha. The runtimes verified end-to-end are **Docker** and **rootful Podman**;
+rootless Podman runs apps but cannot own the edge's ports. See
+[Getting Started](guide/quickstart.qmd) for the specifics, including the RHEL-family notes.
+:::

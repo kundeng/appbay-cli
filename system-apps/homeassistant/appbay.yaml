@@ -1,0 +1,34 @@
+project: default
+environment: default
+collection: [self-hosted, home-automation]
+tags:
+  tier: personal
+  role: home-automation
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - homeassistant
+
+traits:
+  - type: ingress
+    host: "ha.${{project.DOMAIN}}"
+    port: 8123
+    service: homeassistant
+    exposure: external
+    tls:
+      staging: false
+  - type: hooks
+    pattern: init
+    image: busybox:latest
+    command: "mkdir -p /config/custom_components && chown -R 1000:1000 /config"
+    volumes:
+      # The trait namespaces this to homeassistant_ha-config. Do NOT drop the mount
+      # path to silence a compose error — a bare name is an ANONYMOUS volume, and the
+      # hook then chowns its own ephemeral directory and exits 0.
+      - ha-config:/config
+  - type: backup
+    schedule: "0 3 * * *"
+    retention: 14
+    volumes:
+      - ha-config

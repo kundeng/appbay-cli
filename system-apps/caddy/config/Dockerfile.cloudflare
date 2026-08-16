@@ -1,0 +1,19 @@
+# AppBay's integrated Caddy Security edge.
+#
+# 🚨 MULTI-STAGE, AND THAT MATTERS FOR THE RUNTIME. `community.docker.docker_image_build`
+# is buildx by definition and buildx drives the daemon's BuildKit gRPC endpoints; Podman
+# serves the classic POST /build and no BuildKit. Build this with `podman build`, which
+# uses buildah and handles multi-stage natively — verified by the substrate playbook's
+# build probe.
+#
+# Version pins are part of the release contract. Never replace them with @latest: the
+# Caddyfile directive surface is module-version-sensitive and must be VM-tested as a unit.
+ARG CADDY_VERSION=2.11.4
+FROM docker.io/library/caddy:${CADDY_VERSION}-builder-alpine AS builder
+RUN xcaddy build ${CADDY_VERSION} \
+    --with github.com/greenpau/caddy-security@v1.1.64 \
+    --with github.com/caddy-dns/cloudflare@v0.2.4
+
+ARG CADDY_VERSION=2.11.4
+FROM docker.io/library/caddy:${CADDY_VERSION}-alpine
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

@@ -1,0 +1,464 @@
+---
+title: "CLI Reference"
+description: "Complete reference for all Appbay CLI commands"
+---
+
+## Overview
+
+The Appbay CLI is a single compiled binary built with Bun. It operates offline — it imports `packages/core` directly and calls Docker via `docker compose` shell invocations. There is no tRPC client; the CLI does not connect to the running Appbay server for app management commands.
+
+```bash
+appbay <command> [args...] [flags]
+```
+
+## Bootstrap commands
+
+### appbay init
+
+Scaffold the `$APPBAY_HOME` directory, create project structure, and seed system app definitions.
+
+```bash
+appbay init
+appbay init --project homelab --domain homelab.example.com
+appbay init --dir /opt/appbay
+```
+
+| Flag | Description |
+|------|-------------|
+| `--project <name>` | Name of the default project |
+| `--domain <name>` | Base domain for ingress routing |
+| `--dir <path>` | Path for `$APPBAY_HOME` (default: `~/.appbay`) |
+| `--yes` | Non-interactive: accept all defaults without prompting |
+
+This command is idempotent -- running it again does not overwrite existing configuration.
+
+### appbay doctor
+
+Check prerequisites, runtime health, and system readiness.
+
+```bash
+appbay doctor
+```
+
+Checks Docker daemon, Compose version, GPU availability, disk space, system app definitions, and network connectivity. Exits with code 0 if all checks pass, non-zero otherwise.
+
+## Discovery commands
+
+### appbay list
+
+List all discovered apps from the filesystem.
+
+```bash
+appbay list
+appbay list --json
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Accepted for interface parity; all apps are shown regardless |
+| `--json` | Output as JSON |
+
+`appbay list` is offline-capable -- it reads from `$APPBAY_HOME/etc/apps/` directly and does not require the server or Docker daemon to be running.
+
+Example output:
+
+```
+  NAME           PROJECT    ENVIRONMENT  APPBAY.YAML  COMPOSE FILE
+  ----           -------    -----------  ----------   ------------
+  ollama         homelab    prod         yes          docker-compose.yml
+  webui          homelab    prod         yes          docker-compose.yml
+  jellyfin       homelab    prod         yes          docker-compose.yml
+```
+
+### appbay status
+
+Show detailed information about a specific app.
+
+```bash
+appbay status ollama
+appbay status ollama --json
+```
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+
+Displays app metadata, services, traits, overlays, and upstream configuration. Offline-capable -- does not require the server to be running.
+
+### appbay ps
+
+Show container status for running apps.
+
+```bash
+appbay ps
+appbay ps ollama webui
+appbay ps --all
+appbay ps --json
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Include all apps |
+| `--json` | Output as JSON |
+
+### appbay open
+
+Open an app's URL in the default browser.
+
+```bash
+appbay open jellyfin
+```
+
+Resolves the app's ingress URL and opens it. Use `appbay url` to print the URL without opening it.
+
+### appbay url
+
+Print an app's URL without opening it.
+
+```bash
+appbay url jellyfin
+appbay url jellyfin --lan
+```
+
+| Flag | Description |
+|------|-------------|
+| `--lan` | Print the LAN URL |
+| `--internal` | Print the internal URL |
+
+### appbay logs
+
+Stream or tail app logs.
+
+```bash
+appbay logs ollama
+appbay logs ollama web              # specific service
+appbay logs ollama --follow
+appbay logs ollama --tail 100
+```
+
+| Flag | Description |
+|------|-------------|
+| `--follow` | Follow log output (like `tail -f`) |
+| `--tail <n>` | Number of recent lines to show (default: all) |
+
+## Deployment commands
+
+### appbay validate
+
+Validate app definitions against Zod schemas. Checks `appbay.yaml` syntax, Compose file validity, trait configurations, and scoped variable references. Works offline.
+
+```bash
+appbay validate
+appbay validate ollama webui
+appbay validate --all
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Validate all apps |
+
+### appbay compile
+
+Run the compiler pipeline and output rendered Compose files. Does not deploy.
+
+```bash
+appbay compile ollama
+appbay compile ollama webui --output ./rendered
+```
+
+| Flag | Description |
+|------|-------------|
+| `--output <dir>` | Write rendered output to a custom directory |
+
+### appbay up
+
+Compile and deploy apps. This is the primary deployment command.
+
+```bash
+appbay up ollama webui
+appbay up --collection ai-stack
+appbay up --all
+```
+
+| Flag | Description |
+|------|-------------|
+| `--collection <name>` | Deploy all apps in a collection |
+| `--all` | Deploy all apps |
+
+### appbay down
+
+Stop running apps.
+
+```bash
+appbay down ollama
+appbay down webui tts
+appbay down --all
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Stop all apps |
+
+### appbay restart
+
+Stop and restart apps (equivalent to `down` then `up`).
+
+```bash
+appbay restart ollama
+appbay restart webui tts
+appbay restart --all
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Restart all apps |
+
+### appbay pull
+
+Pull latest images for apps.
+
+```bash
+appbay pull ollama
+appbay pull --all
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Pull images for all apps |
+
+### appbay apply
+
+Execute a compiled plan. Separates the compile and deploy steps for review.
+
+```bash
+appbay apply ollama --dry-run     # show what would change
+appbay apply ollama --yes          # apply without confirmation
+appbay apply --all                 # apply all apps
+```
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Show the plan without applying |
+| `--yes` | Skip confirmation prompt |
+| `--all` | Apply all discovered apps |
+
+### appbay delete
+
+Remove an app definition and optionally its volumes.
+
+```bash
+appbay delete myapp --keep-volumes
+appbay delete myapp --force
+```
+
+| Flag | Description |
+|------|-------------|
+| `--keep-volumes` | Keep Docker volumes after deletion |
+| `--force` | Skip confirmation prompt (required to proceed) |
+
+### appbay eject
+
+Export a rendered Compose file that runs standalone without Appbay. All traits, overlays, and variables are resolved and baked into the output.
+
+```bash
+appbay eject ollama
+appbay eject ollama --output ./standalone
+```
+
+| Flag | Description |
+|------|-------------|
+| `--output <dir>` | Write ejected files to a custom directory |
+
+## Config commands
+
+### appbay config
+
+Get or set per-app configuration values.
+
+```bash
+appbay config ollama                      # list all config
+appbay config ollama gpu.variant          # get a value
+appbay config ollama gpu.variant nvidia   # set a value
+```
+
+### appbay env
+
+Get or set per-app environment variables.
+
+```bash
+appbay env ollama                   # list all env vars
+appbay env ollama OLLAMA_HOST       # get a value
+appbay env ollama OLLAMA_HOST 0.0.0.0  # set a value
+appbay env ollama --list            # list all keys
+appbay env ollama OLLAMA_HOST --delete  # delete a variable
+```
+
+| Flag | Description |
+|------|-------------|
+| `--list` | List all environment variable keys |
+| `--delete` | Delete the specified variable |
+
+### appbay presets
+
+Manage named app selections stored in `$APPBAY_HOME/etc/presets/`.
+
+```bash
+appbay presets save my-stack --apps "ollama,webui,whisper" --description "AI stack"
+appbay presets list
+appbay presets load my-stack
+appbay presets delete my-stack
+```
+
+| Subcommand | Description |
+|------------|-------------|
+| `save <name>` | Save a preset with `--apps <csv>` and optional `--description` |
+| `load <name>` | Print the app names from the preset (pipe to `appbay up`) |
+| `list` | List all saved presets |
+| `delete <name>` | Delete a preset |
+
+## Secret commands
+
+### appbay secrets check
+
+Verify that all secret URI references resolve correctly.
+
+```bash
+appbay secrets check
+```
+
+### appbay secrets list
+
+List all secret URI references.
+
+```bash
+appbay secrets list
+appbay secrets list nextcloud
+```
+
+## Server commands
+
+### appbay server start
+
+Start the Appbay web UI and API server.
+
+```bash
+appbay server start
+appbay server start --open
+```
+
+| Flag | Description |
+|------|-------------|
+| `--open` | Open the web UI in a browser after start |
+
+### appbay server stop
+
+Stop the running Appbay server.
+
+```bash
+appbay server stop
+```
+
+### appbay server status
+
+Check if the Appbay server is running and healthy.
+
+```bash
+appbay server status
+```
+
+## Utility commands
+
+### appbay version
+
+Print the Appbay CLI version and build info.
+
+```bash
+appbay version
+```
+
+### appbay info
+
+Show system information: OS, Docker version, Compose version, GPU, paths.
+
+```bash
+appbay info
+```
+
+### appbay home
+
+Print the `$APPBAY_HOME` path.
+
+```bash
+appbay home
+```
+
+### appbay update
+
+Check for and apply CLI and system app updates.
+
+```bash
+appbay update              # check and update
+appbay update --check      # check only, do not apply
+appbay update --system-only  # update system apps only
+```
+
+| Flag | Description |
+|------|-------------|
+| `--check` | Check for updates without applying |
+| `--system-only` | Only update system app images |
+
+### appbay rebuild-cache
+
+Regenerate the SQLite metadata cache from filesystem state. Use this if the database is corrupted or deleted.
+
+```bash
+appbay rebuild-cache
+```
+
+### appbay fixfs
+
+Fix filesystem permissions for an app's volumes (UID/GID mapping for containers).
+
+```bash
+appbay fixfs jellyfin
+appbay fixfs jellyfin --uid 1000 --gid 1000
+appbay fixfs jellyfin --dry-run
+```
+
+| Flag | Description |
+|------|-------------|
+| `--uid <n>` | Target user ID |
+| `--gid <n>` | Target group ID |
+| `--dry-run` | Show what would change without applying |
+
+### appbay size
+
+Show disk usage for app volumes.
+
+```bash
+appbay size               # all user apps
+appbay size ollama        # specific app
+appbay size --all         # include system apps
+```
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Include system apps (traefik, caddy, etc.) in the output |
+
+## Global flags
+
+These flags are available on all commands:
+
+| Flag | Description |
+|------|-------------|
+| `--help` | Show help for the command |
+| `--version` | Show CLI version |
+| `--json` | Output in JSON format (where supported) |
+
+## Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `APPBAY_HOME` | Override the default data directory |
+| `APPBAY_TOKEN` | Bearer token for authentication with the Appbay server |
+| `APPBAY_DEV_AUTH` | Set to `true` to skip auth during development |

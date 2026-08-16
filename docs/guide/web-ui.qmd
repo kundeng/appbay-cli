@@ -1,0 +1,325 @@
+---
+title: "Web UI"
+description: "Dashboard, deploy flow, logs, shell, and settings"
+---
+
+## Overview
+
+![Dashboard](../images/appbay-dashboard.png){fig-alt="Appbay Dashboard" width="100%"}
+
+The Appbay web UI is a Next.js application that provides a visual management interface for your Docker apps. It communicates with the backend via tRPC (type-safe API calls) and Server-Sent Events (real-time logs and status updates).
+
+The web UI is **optional** -- the CLI and compiler work without it. The web UI adds real-time dashboards, visual diffs, log streaming, a built-in shell, and a deploy planner.
+
+### Starting the web UI
+
+```bash
+appbay server start
+```
+
+Open your browser to [http://localhost:3000](http://localhost:3000) (or the port you configured).
+
+### First-run setup
+
+On first visit, Appbay enters "setup mode" because no admin account exists yet. You will see a "Create Admin Account" form. Enter a username and password to create the admin account. All subsequent visits require login.
+
+### Bypassing authentication locally
+
+`APPBAY_DEV_AUTH=true` skips the login gate. It is read by the control-plane container, so
+set it in the environment `appbay server start` runs under:
+
+```bash
+APPBAY_DEV_AUTH=true appbay server start
+```
+
+Only appropriate on a machine you control — it disables authentication outright, not just
+the setup form.
+
+## Dashboard
+
+**Route:** `/`
+
+The dashboard is your home screen. It provides an at-a-glance view of your entire Appbay installation.
+
+### What you see
+
+- **System health** -- Docker status, Compose version, disk space, GPU availability
+- **App overview** -- Total apps, running count, stopped count, apps with issues
+- **Running apps** -- Cards showing each running app with its services, ports, and uptime
+- **Recent deployments** -- The last several deploy operations with status (success, failed, in progress)
+- **Quick actions** -- Buttons for common operations (deploy, restart all, check secrets)
+
+### App cards
+
+Each app card on the dashboard shows:
+
+- App name and project
+- Running/stopped status indicator
+- Service count and container health
+- Trait badges (ingress, gpu, auth, etc.)
+- Collection membership
+- Quick action buttons (restart, stop, logs, open URL)
+
+## App Detail
+
+**Route:** `/apps/:name`
+
+The app detail screen shows everything about a specific app.
+
+### Panels
+
+**Services panel** -- Lists all Compose services in the app with their container status, ports, image, and resource usage.
+
+**Traits panel** -- Shows all attached traits with their configuration. Service-level traits are grouped under their service. Conflict warnings are displayed if applicable.
+
+**Overlays panel** -- Shows all conditional overlays with their `when` clause and activation status. Active overlays are highlighted in green; inactive ones are grayed out.
+
+**Config panel** -- Displays current configuration values with variable provenance (showing where each value comes from: service, environment, or project level).
+
+**Secrets panel** -- Lists secret URI references for the app with resolution status (resolved, missing, auto-generated).
+
+### Quick actions
+
+From the app detail screen you can:
+
+- Start, stop, or restart the app
+- View logs (jumps to the log viewer)
+- Open the app URL in a new tab
+- Edit configuration
+- Trigger a recompile and deploy
+
+## Deploy Flow
+
+**Route:** `/deploy`
+
+The deploy screen provides a guided workflow: compile, review diff, confirm, and apply.
+
+### Step 1: Select apps
+
+Choose which apps to deploy by:
+
+- Clicking individual app checkboxes
+- Selecting a collection
+- Using "Select All"
+
+### Step 2: Compile
+
+Click "Compile" to run the compiler pipeline. Appbay resolves traits, overlays, scoped variables, and secrets, then generates rendered Compose files.
+
+### Step 3: Review diff
+
+The deploy screen shows a redacted diff comparing the rendered output against the currently deployed state. Secret values are always shown as `[REDACTED]`.
+
+```diff
+  services:
+    web:
+      environment:
++       OLLAMA_BASE_URL: http://ollama_web:11434
+        DB_PASSWORD: [REDACTED]
+      image: ghcr.io/open-webui/open-webui:latest
+```
+
+You can expand each app's diff to see the full changes.
+
+### Step 4: Confirm and apply
+
+Click "Apply" to deploy. The screen switches to a live progress view showing:
+
+- Current deployment phase (pulling, creating, starting)
+- Real-time log output (streamed via SSE)
+- Per-app status indicators (pending, in progress, success, failed)
+
+### Deploy history
+
+**Route:** `/deployments`
+
+View all past deployments with timestamps, included apps, status, and duration. Click a deployment to see its detail page.
+
+**Route:** `/deployments/:id`
+
+Shows the full detail of a specific deployment: which apps were included, the diff that was applied, logs, and final status.
+
+## Log Viewer
+
+**Route:** `/apps/:name/logs`
+
+The log viewer streams container logs in real time via Server-Sent Events.
+
+### Features
+
+- **Service filter** -- Select which services to show logs from (or all)
+- **Search** -- Filter log lines by keyword or regex
+- **Secret redaction** -- Any string matching a known secret pattern is replaced with `[REDACTED]`
+- **Follow mode** -- Auto-scroll to the latest log line (toggle on/off)
+- **Tail control** -- Set how many historical lines to load
+- **Timestamps** -- Toggle timestamp display
+
+### Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+F` | Focus the search filter |
+| `Ctrl+L` | Clear the log view |
+| `Esc` | Exit search |
+
+## Secrets Screen
+
+**Route:** `/secrets`
+
+The secrets screen has three tabs controlled by a segmented toggle:
+
+### References tab
+
+Global view of all secret URI references across all apps. Provider status strip at the top shows resolution health per provider (vault, keepass, file, env, sops). Searchable and filterable by provider.
+
+### Vault tab
+
+Local encrypted vault management. List, set, and delete secrets directly from the UI.
+
+- **Add secret** -- Enter key (plain `KEY` or scoped `APP/KEY`) and value
+- **List** -- Browse all vault entries grouped by scope
+- **Delete** -- Remove individual entries
+- **Initialize** -- First-time setup if vault doesn't exist
+
+### Scan tab
+
+Per-app secret discovery. Select an app to scan its compose and .env files for secret-like environment variables. Shows summary counts (total vars, secret-like, unmanaged) and flags variables that should be managed by a secret provider.
+
+## Auth Screen
+
+**Route:** `/auth`
+
+Application access and authentication. Application routes and access policies are declared
+in each app's `appbay.yaml` manifest and compiled into the selected edge configuration.
+Caddy installations use the integrated Caddy Security login portal; manage its local
+identities with `appbay edge users`. Traefik remains ingress-only.
+
+## Doctor Screen
+
+**Route:** `/doctor`
+
+The doctor screen runs the same checks as `appbay doctor` and displays results visually.
+
+### Checks
+
+- Docker daemon connectivity and version
+- Docker Compose version (must be v2.23.1+)
+- GPU runtime detection (Nvidia, AMD, Intel)
+- Disk space for data and backup directories
+- System app definitions present and valid
+- Network connectivity for image pulling
+- Server health and API responsiveness
+
+Each check shows a status badge: pass (green), warning (yellow), or fail (red) with actionable details.
+
+## Config Editor
+
+**Route:** `/apps/:name/config`
+
+The config editor provides Zod-driven forms for editing app configuration.
+
+### Features
+
+- **Type-safe editing** -- Form fields are generated from the app's Zod schema, ensuring valid input
+- **Variable provenance** -- Each field shows where its current value comes from (service, environment, or project level)
+- **Validation** -- Real-time validation as you type, with error messages from Zod
+- **Save and deploy** -- Save configuration changes and optionally trigger a deploy
+
+## Config Presets
+
+**Route:** `/settings/configs`
+
+Manage saved config presets from the settings screen.
+
+### Features
+
+- **List presets** -- View all saved presets with descriptions
+- **Create preset** -- Save the current app selection and configuration as a named preset
+- **Load preset** -- Load a preset to restore a saved app selection
+- **Delete preset** -- Remove a preset
+
+## Built-in Shell
+
+The web UI includes a terminal emulator powered by xterm.js. It provides direct shell access to running containers via `docker exec`.
+
+### Features
+
+- **Container selection** -- Choose which app and service to connect to
+- **Session multiplexing** -- Open multiple terminal tabs
+- **SSE transport** -- Terminal I/O is streamed over Server-Sent Events
+- **Authentication required** -- Shell access requires a valid session
+
+### Accessing the shell
+
+From any app detail page, click the "Shell" button on a running service to open a terminal session in that container.
+
+## Command Palette
+
+**Shortcut:** `Cmd+K` (macOS) / `Ctrl+K` (Linux/Windows)
+
+The command palette provides quick access to any action in the web UI.
+
+### Available actions
+
+- Navigate to any app or screen
+- Deploy, stop, or restart an app
+- Open an app's URL
+- Run doctor checks
+- Search app names, collections, or tags
+- Switch between screens
+
+Type to filter, use arrow keys to navigate, press Enter to execute.
+
+## Theme and Density
+
+**Route:** `/settings`
+
+The settings screen includes visual customization options:
+
+### Theme
+
+- **Light** -- Light background, dark text
+- **Dark** -- Dark background, light text (default)
+- **System** -- Follow the operating system preference
+
+### Density
+
+- **Comfortable** -- More spacing, larger text (default)
+- **Compact** -- Reduced spacing for information-dense views
+
+### Other settings
+
+- **Default environment** -- Which environment to use for deployments by default
+- **Server port** -- Port for the web UI
+- **Notification preferences** -- Which events trigger browser notifications
+
+## Authentication
+
+All web UI access requires authentication. The following rules apply:
+
+| Access path | Requirement |
+|-------------|-------------|
+| All web pages | Valid session cookie |
+| tRPC API calls | Valid session cookie or bearer token |
+| SSE connections | Auth token validated on connect |
+| `health.get` endpoint | No auth (for load balancer health checks) |
+
+### Login screen
+
+**Route:** `/login`
+
+Enter your username and password. Sessions are managed via HTTP-only secure cookies with configurable expiry.
+
+### Logout
+
+Click your username in the top-right corner and select "Logout" to end your session.
+
+## Keyboard shortcuts reference
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+K` | Open command palette |
+| `Cmd/Ctrl+/` | Toggle sidebar |
+| `Cmd/Ctrl+D` | Go to dashboard |
+| `Cmd/Ctrl+L` | Go to logs (current app) |
+| `Escape` | Close modal / palette |

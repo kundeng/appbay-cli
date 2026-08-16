@@ -1,0 +1,36 @@
+services:
+  traefik:
+    image: docker.io/library/traefik:v3.4
+    container_name: appbay.traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - traefik-certs:/letsencrypt
+      - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./config/dynamic:/etc/traefik/dynamic:ro
+      - ./certs:/certs:ro
+    # 🚨 PROVIDER-NEUTRAL ALIAS. Apps that must trust the reverse proxy (Nextcloud's
+      # TRUSTED_PROXIES, Grafana's root_url checks, anything reading X-Forwarded-*) need a
+      # name for it. Naming `traefik` or `caddy` directly breaks the moment the
+      # installation selects the other one — and breaks SILENTLY: the app just decides the
+      # forwarded headers are untrusted and serves wrong-scheme URLs.
+      #
+      # Both edges answer to `appbay-edge`, so an app names that and never learns which
+      # proxy it is behind. This also keeps the per-app compose fragment byte-identical
+      # across providers, which provider-agnostic.test.ts asserts.
+    networks:
+      appbay_shared:
+        aliases:
+          - appbay-edge
+    environment:
+      - TZ=${TZ:-UTC}
+
+volumes:
+  traefik-certs:
+
+networks:
+  appbay_shared:
+    external: true

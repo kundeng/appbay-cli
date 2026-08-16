@@ -1,0 +1,330 @@
+---
+title: "Managing Apps"
+description: "Directory conventions, appbay.yaml, upstream ingestion, and app selection"
+---
+
+## Directory convention
+
+Appbay discovers apps by scanning `$APPBAY_HOME/etc/apps/`. Each subdirectory containing a `docker-compose.yml` is an app. The directory name is the app name -- no registration step required.
+
+```
+$APPBAY_HOME/etc/apps/
+  ollama/
+    docker-compose.yml        # required
+    appbay.yaml               # optional
+    .env                      # optional, compose convention
+  jellyfin/
+    docker-compose.yml
+    appbay.yaml
+  nextcloud/
+    docker-compose.yml
+    appbay.yaml
+```
+
+The layout is flat. There is no forced nesting by project, environment, or collection. Organizational grouping is handled by metadata in `appbay.yaml`, not by directory hierarchy.
+
+### Adding an app
+
+To add a new app, create a directory and place your `docker-compose.yml` inside:
+
+```bash
+mkdir -p ~/.appbay/etc/apps/myapp
+cat > ~/.appbay/etc/apps/myapp/docker-compose.yml << 'EOF'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+EOF
+```
+
+The app is immediately discoverable:
+
+```bash
+appbay list
+# NAME           PROJECT   ENVIRONMENT  APPBAY.YAML  COMPOSE FILE
+# myapp          default   default      no           docker-compose.yml
+# whoami         default   default      no           docker-compose.yml
+```
+
+No `appbay.yaml` is needed for simple apps. It is only required when Compose alone cannot express what you need -- traits, upstream transforms, overlays, or scope assignments.
+
+## The appbay.yaml file
+
+`appbay.yaml` is an optional metadata file with three clearly separated sections: **scope**, **upstream/overrides/overlays** (the application model), and **traits**.
+
+Here is a complete example:
+
+```yaml
+# ---- Scope: where does this app belong? ----
+project: homelab
+environment: prod
+collection: [ai-stack, gpu-apps]
+operator: local
+shared_network: [appbay_shared]
+tags:
+  tier: compute
+  team: ml
+
+# ---- Application model: what does the compose look like? ----
+upstream:
+  source: ./docker-compose.upstream.yml
+  expose:
+    - web
+  services:
+    exclude:
+      - debug-tools
+
+overrides:
+  web:
+    environment:
+      - CUSTOM_HEADER=X-Appbay
+
+overlays:
+  - when: [ollama]
+    services:
+      web:
+        environment:
+          - OLLAMA_URL=http://ollama_web:11434
+
+# ---- Traits: declarative transformations ----
+traits:
+  - type: backup
+    schedule: "0 2 * * *"
+    retention: 7
+
+services:
+  web:
+    traits:
+      - type: ingress
+        host: myapp.${{project.DOMAIN}}
+        port: 3000
+        exposure: external
+        tls:
+          staging: false
+      - type: gpu
+        variant: nvidia
+```
+
+### Scope section
+
+The scope section assigns organizational metadata:
+
+| Key | Cardinality | Default | Description |
+|-----|-------------|---------|-------------|
+| `project` | single | `default` | Variable scope namespace (`${{project.KEY}}` resolution) |
+| `environment` | single | `default` | Deployment variant (variable values, certs) |
+| `collection` | multi | `[]` | Operational grouping for batch operations |
+| `operator` | single | `local` | Which operator runs this app |
+| `shared_network` | multi | `[appbay_shared]` | Shared networks for cross-app communication |
+| `tags` | key-value | `{}` | Arbitrary metadata for filtering and UI grouping |
+
+### Application model section
+
+The application model section controls how Compose files are processed:
+
+**`upstream.source`** -- Points to a stock upstream compose file. Appbay ingests it with zero edits required. Use this when you pull a `docker-compose.yml` directly from a project's repository and want to keep it unmodified.
+
+**`upstream.expose`** -- Lists which services are aliased onto the shared network. Internal services remain on the app's private network and are not accessible to other apps.
+
+**`upstream.services.exclude`** -- Filters out services you do not need (e.g., development tools, test runners).
+
+**`overrides`** -- Static compose overrides keyed by original service name. Merged on top of the upstream compose.
+
+**`overlays`** -- Conditional fragments applied when peer apps are active. See [Conditional Overlays](overlays.qmd).
+
+### Traits section
+
+Traits are declared at two levels:
+
+- **App-level** traits in the top-level `traits:` array apply to the entire app (e.g., `backup`, `auth`, `scoped-env`).
+- **Service-level** traits in `services.<name>.traits` apply to a specific service (e.g., `ingress`, `gpu`, `hooks`).
+
+## Upstream compose ingestion
+
+One of Appbay's key features is accepting stock upstream compose files with zero modifications. Many open-source projects ship a `docker-compose.yml` that you can use directly.
+
+### How it works
+
+1. Place the upstream file in your app directory (e.g., as `docker-compose.upstream.yml`).
+2. Reference it in `appbay.yaml`:
+
+```yaml
+upstream:
+  source: ./docker-compose.upstream.yml
+  expose:
+    - web
+```
+
+3. Appbay creates an internal network per app to preserve upstream service discovery. Services that reference each other by name (e.g., `app` connecting to `db`) continue to work because the internal network is maintained.
+
+4. Only services listed in `upstream.expose` are aliased onto the shared network. This provides namespace isolation -- two apps can both have a service named `db` without conflicts.
+
+### Namespace isolation
+
+When Appbay compiles an app, it applies namespace isolation:
+
+- **Container names** are prefixed: `appbay.<app>.<service>`
+- **Volume names** are prefixed: `<app>_<volume>`
+- **An internal network** is created per app for service-to-service communication (`<app>_internal`)
+- **Exposed services** are aliased onto the shared network with the format `<app>_<service>` (underscore)
+
+This means you can run multiple apps that have identically named services (like `web`, `db`, `redis`) without any port or name collisions.
+
+### Example: ingesting Nextcloud
+
+```yaml
+# apps/nextcloud/appbay.yaml
+project: homelab
+environment: prod
+collection: [productivity]
+
+upstream:
+  source: ./docker-compose.upstream.yml
+  expose:
+    - app
+  services:
+    exclude:
+      - cron    # not needed, using hooks instead
+
+overrides:
+  app:
+    environment:
+      - NEXTCLOUD_TRUSTED_DOMAINS=${{project.DOMAIN}}
+
+services:
+  app:
+    traits:
+      - type: ingress
+        host: cloud.${{project.DOMAIN}}
+        port: 80
+        exposure: external
+        tls:
+          staging: false
+```
+
+The upstream `docker-compose.upstream.yml` stays completely unmodified. Appbay applies overrides, traits, and namespace isolation during compilation.
+
+## App selection
+
+Appbay provides several ways to select which apps to operate on:
+
+### By name
+
+```bash
+appbay up ollama webui tts       # deploy specific apps
+appbay down jellyfin             # stop one app
+appbay restart nextcloud         # restart one app
+```
+
+### By collection
+
+```bash
+appbay up --collection ai-stack  # all apps in the ai-stack collection
+```
+
+### All apps
+
+```bash
+appbay up --all                  # deploy everything
+appbay ps --all                  # status of all apps
+```
+
+### Presets
+
+Save a named selection of apps for reuse:
+
+```bash
+# Save a preset
+appbay presets save my-stack --apps "ollama,webui,whisper" --description "AI and media apps"
+
+# List presets
+appbay presets list
+
+# Load a preset (prints app names; pipe to appbay up)
+appbay presets load my-stack
+
+# Delete a preset
+appbay presets delete my-stack
+```
+
+Presets are stored as YAML files in `$APPBAY_HOME/etc/presets/`.
+
+### Service selection within an app
+
+App selection determines which apps are deployed. Service selection within an app uses standard Docker Compose profiles. Pass `--profile` directly to `docker compose` after compiling with Appbay:
+
+```bash
+appbay compile ollama
+docker compose --profile debug -f ~/.appbay/var/lib/renders/ollama/docker-compose.yml up -d
+```
+
+Appbay does not reinvent service-level selection -- Compose profiles work as normal on the rendered output.
+
+## Listing and inspecting apps
+
+### List all discovered apps
+
+```bash
+appbay list
+```
+
+```
+  NAME           PROJECT    ENVIRONMENT  APPBAY.YAML  COMPOSE FILE
+  ----           -------    -----------  ----------   ------------
+  ollama         homelab    prod         yes          docker-compose.yml
+  webui          homelab    prod         yes          docker-compose.yml
+  jellyfin       homelab    prod         yes          docker-compose.yml
+  nextcloud      homelab    prod         yes          docker-compose.yml
+  whoami         default    default      no           docker-compose.yml
+```
+
+### Inspect a specific app
+
+```bash
+appbay status ollama
+```
+
+```
+App: ollama
+  Directory:   /home/user/.appbay/etc/apps/ollama
+  Project:     homelab
+  Environment: prod
+  Compose:     docker-compose.yml
+  appbay.yaml: yes
+
+  Services (1):
+    - ollama
+
+  Traits (2):
+    - gpu
+    - ingress
+
+  Overlays (0):
+    (none)
+```
+
+### Container status
+
+```bash
+appbay ps ollama
+```
+
+```
+APP       SERVICE   STATUS    PORTS                       CPU    MEM
+ollama    web       running   0.0.0.0:11434->11434/tcp    12%    4.2GB
+```
+
+## Deleting an app
+
+To remove an app and optionally its volumes:
+
+```bash
+# Stop and remove containers, keep volumes (--force required to confirm)
+appbay delete myapp --force --keep-volumes
+
+# Stop and remove everything including volumes
+appbay delete myapp --force
+```
+
+`--force` is always required to confirm the deletion. Without it, the command exits with an error. `--keep-volumes` controls whether Docker volumes are preserved.

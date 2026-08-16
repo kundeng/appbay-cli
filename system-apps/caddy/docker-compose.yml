@@ -1,0 +1,75 @@
+services:
+  caddy:
+    # Caddy mode means the integrated Caddy Security edge. There is intentionally no stock
+    # Caddy fallback: silently losing authentication would be worse than refusing deploy.
+    image: ${APPBAY_CADDY_IMAGE:-localhost/appbay-caddy-security:2.11.4-v1.1.64}
+    # ⭐ HOISTED BY APPBAY, NOT RUN BY COMPOSE. This block stays here because it is where a
+    # compose author would write it and it keeps this a valid compose file on its own — but
+    # appbay's build stage builds it BEFORE deploy, pins `image:` to the tag in
+    # appbay.yaml's `builds:`, and STRIPS this block from the rendered output. See
+    # packages/core/src/compiler/builds.ts for why the render must not carry it.
+    # The build is unconditional because Caddy Security is part of the supported edge mode;
+    # Cloudflare remains available even when a particular installation does not use DNS-01.
+    build:
+      context: .
+      dockerfile: config/Dockerfile.cloudflare
+    # AppBay validates and explicitly reloads manifest-derived route/policy changes. Imported
+    # files on bind mounts did not reliably trigger Caddy's watch path during rehearsal.
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    container_name: appbay.caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./config/dynamic:/etc/caddy/dynamic:ro
+      - ./config/global:/etc/caddy/global:ro
+      # Caddy Security owns this store. The portal may update users.json, so this mount is
+      # deliberately writable while Caddyfile and generated policy fragments stay read-only.
+      - ./config/security:/etc/caddy/security
+      # 🚨 WITHOUT THIS MOUNT THE PER-SITE TLS IMPORT CAN NEVER MATCH ANYTHING.
+      # Every site block the ingress trait emits carries `import /etc/caddy/tls/*.caddy`,
+      # and an import glob with ZERO matches is valid Caddy config — so the absence of this
+      # directory produced no error at all. Measured 2026-08-07 in the running container:
+      # `/etc/caddy/tls: No such file or directory`, while DNS-01 config had nowhere to live
+      # and Caddy quietly issued from its INTERNAL CA instead. An install can look healthy
+      # indefinitely having never spoken to a real CA.
+      - ./config/tls:/etc/caddy/tls:ro
+    # 🚨 PROVIDER-NEUTRAL ALIAS. Apps that must trust the reverse proxy (Nextcloud's
+      # TRUSTED_PROXIES, Grafana's root_url checks, anything reading X-Forwarded-*) need a
+      # name for it. Naming `traefik` or `caddy` directly breaks the moment the
+      # installation selects the other one — and breaks SILENTLY: the app just decides the
+      # forwarded headers are untrusted and serves wrong-scheme URLs.
+      #
+      # Both edges answer to `appbay-edge`, so an app names that and never learns which
+      # proxy it is behind. This also keeps the per-app compose fragment byte-identical
+      # across providers, which provider-agnostic.test.ts asserts.
+    networks:
+      appbay_shared:
+        aliases:
+          - appbay-edge
+    environment:
+      - TZ=${TZ:-UTC}
+      # 🚨 ACME/EAB values arrive as PROCESS ENV at deploy time and are never written to
+      # the Caddyfile. `docker compose config` prints file contents in cleartext; it does
+      # not print what the deploying process injected.
+      - ACME_CA=${ACME_CA:-}
+      - ACME_EAB_KID=${ACME_EAB_KID:-}
+      - ACME_EAB_HMAC=${ACME_EAB_HMAC:-}
+      - ACME_EMAIL=${ACME_EMAIL:-}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - APPBAY_EDGE_TOKEN_SECRET=${APPBAY_EDGE_TOKEN_SECRET:?required}
+      - AUTHP_ADMIN_USER=${AUTHP_ADMIN_USER:-admin}
+      - AUTHP_ADMIN_EMAIL=${AUTHP_ADMIN_EMAIL:-admin@appbay.local}
+      - AUTHP_ADMIN_SECRET=${AUTHP_ADMIN_SECRET:?required}
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  appbay_shared:
+    external: true

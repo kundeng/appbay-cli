@@ -1,0 +1,91 @@
+# Appbay base Caddyfile.
+#
+# 🚨 THIS FILE IS THE ONLY PLACE (appbay_security_headers) MAY BE DEFINED. Every per-app
+# site block emitted by the ingress trait does `import appbay_security_headers`, and Caddy
+# treats a second definition of the same snippet as a duplicate-definition error. Do not
+# copy it into a per-app file.
+#
+# Per-app site blocks live in config/dynamic/<app>.caddy and are written by the ingress
+# trait. Auth fragments live in config/dynamic/auth/<app>-*.caddy and are written by the
+# auth trait; the site block imports them with a GLOB, which is valid even when it matches
+# nothing — that is what lets an app without an auth trait need no placeholder.
+
+# The global block configures the Caddy Security HTTP handlers and a filesystem-backed local
+# identity store. The module serves its own browser login portal; this is not a Caddy
+# management dashboard. AppBay generates authorization policies into the imported directory.
+{
+	order authenticate before respond
+	order authorize before basicauth
+	import /etc/caddy/global/*.caddy
+
+	security {
+		local identity store appbay_local {
+			realm local
+			path /etc/caddy/security/users.json
+		}
+
+		authentication portal appbay_portal {
+			crypto default token lifetime 3600
+			crypto key sign-verify {$APPBAY_EDGE_TOKEN_SECRET}
+			enable identity store appbay_local
+			ui {
+				theme basic
+			}
+
+			# 🚨 WITHOUT THIS BLOCK NOBODY GETS IN. Caddy Security completes the password
+			# checkpoint, parks the user at /auth/sandbox/<id>, and never issues a token —
+			# so the next request to a gated app logs `no token found` and loops back to
+			# the portal. Authentication succeeds and access is still impossible, with
+			# nothing in the logs naming the cause. Measured on a VM 2026-08-12; adding
+			# this changes the landing to /auth/portal and a token is issued.
+			transform user {
+				match origin local
+				action add role authp/user
+			}
+		}
+
+		import /etc/caddy/security/policies/*.caddy
+	}
+}
+
+# Optional global ACME settings are imported inside the single global-options block above.
+# The glob is valid with no matches, so a local installation needs no placeholder files.
+#
+# An earlier version of this file carried `email {$ACME_EMAIL}` in a global block on the
+# assumption that an unset variable degrades harmlessly. It does not — Caddy fails to
+# parse:
+#
+#     Error: adapting config using caddyfile: parsing caddyfile tokens for 'email':
+#     wrong argument count or unexpected line ending after 'email', at Caddyfile:22
+#
+# So a fresh install with no ACME configuration could not start at all. Caddy has no
+# conditionals, and an empty env placeholder is an empty TOKEN, not an absent directive.
+#
+# ⇒ Institutional ACME configuration arrives as a file, through the same import-glob
+# mechanism the per-app blocks use — valid when it matches nothing. Drop a file in
+# config/global/ to enable it; see global/acme.caddy.example.
+# Shared security headers. Mirrors the Traefik middleware the other provider emits, so
+# switching providers does not change what a client sees.
+(appbay_security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Robots-Tag "none,noindex,nofollow,noarchive,nosnippet,notranslate,noimageindex"
+		-Server
+	}
+}
+
+# DNS-01 via Cloudflare, for wildcard or internal-only names. Requires an image built with
+# `xcaddy build --with github.com/caddy-dns/cloudflare` — the stock image does NOT carry
+# the module and will fail to parse this directive.
+#
+# (appbay_dns01) {
+# 	tls {
+# 		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+# 	}
+# }
+
+# Per-app site blocks, written by the ingress trait. The glob is valid with zero matches,
+# so a fresh install with no apps deployed still starts.
+import /etc/caddy/dynamic/*.caddy

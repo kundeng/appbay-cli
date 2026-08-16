@@ -1,0 +1,14 @@
+services:
+  keeweb:
+    image: docker.io/antelle/keeweb:latest
+    container_name: appbay.keeweb
+    restart: unless-stopped
+    ports:
+      - "8443:443"
+    volumes:
+      - keeweb-data:/keeweb
+      - ${APPBAY_HOME:-~/.appbay}/var/lib:/secrets:ro
+
+volumes:
+  keeweb-data:
+    driver: local

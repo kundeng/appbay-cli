@@ -1,0 +1,19 @@
+project: system
+environment: default
+collection: [system, dashboard]
+tags:
+  tier: system
+  role: dashboard
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - homepage
+
+services:
+  homepage:
+    traits:
+      - type: ingress
+        host: ${APPBAY_DOMAIN:-appbay.local}
+        port: 3000
+        exposure: internal

@@ -1,0 +1,11 @@
+project: system
+environment: default
+collection: [system, infrastructure]
+tags:
+  tier: system
+  role: reverse-proxy
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - traefik

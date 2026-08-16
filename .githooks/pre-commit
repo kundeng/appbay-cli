@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# S27 open-core boundary guard. Enable with:  git config core.hooksPath .githooks
+# Boundary lives in scripts/split-boundary.json — edit that, not this.
+exec node "$(git rev-parse --show-toplevel)/scripts/check-straddle.mjs"

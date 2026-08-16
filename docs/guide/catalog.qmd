@@ -1,0 +1,149 @@
+---
+title: "App Catalog"
+description: "Browse, install, and customize apps from curated catalogs"
+---
+
+## What is the catalog?
+
+The catalog is a collection of pre-configured app definitions — each one a `docker-compose.yml` paired with an `appbay.yaml` that wires the right traits (ingress, secrets, backup, auth) with sensible defaults.
+
+Instead of writing `appbay.yaml` from scratch for every app, browse the catalog, install what you need, and customize.
+
+## Browse the catalog
+
+```bash
+# List all available apps
+appbay catalog list
+
+# Filter by category
+appbay catalog list --category monitoring
+
+# Filter by readiness level
+appbay catalog list --readiness augmented
+
+# Search by name, tag, or description
+appbay catalog search ai
+
+# JSON output for scripting
+appbay catalog list --json
+```
+
+Example output:
+
+```
+NAME         READINESS  CATEGORY    SOURCE   DESCRIPTION
+--------------------------------------------------------
+grafana      augmented  monitoring  bundled  Observability dashboards with Prometheus metrics
+it-tools     raw        utilities   bundled  Collection of handy developer utilities
+n8n          augmented  automation  bundled  Workflow automation tool with 400+ integrations
+open-webui   augmented  ai          bundled  ChatGPT-style web UI for local LLMs
+uptime-kuma  augmented  monitoring  bundled  Self-hosted monitoring tool with status pages
+
+5 entries
+```
+
+## Install an app
+
+```bash
+# Install with defaults
+appbay install uptime-kuma
+
+# Provide required values non-interactively
+appbay install n8n --set N8N_DB_PASSWORD=mypass --set N8N_ENCRYPTION_KEY=mykey
+
+# Overwrite an existing installation
+appbay install open-webui --force
+
+# Skip post-install validation
+appbay install it-tools --no-validate
+```
+
+When you install an app:
+
+1. The catalog entry is copied to `$APPBAY_HOME/etc/apps/<name>/`
+2. If the app has required inputs, you're prompted (or use `--set`)
+3. A `.env` file is written with your values + defaults
+4. `appbay validate` runs to verify the result
+
+After install, the app is ready to deploy:
+
+```bash
+appbay up n8n
+```
+
+## Readiness levels
+
+Each catalog entry declares how much Appbay integration it has:
+
+| Level | What you get | What you may need to do |
+|-------|-------------|------------------------|
+| **raw** | Upstream compose only | Provide env vars, configure traits yourself |
+| **augmented** | Compose + curated `appbay.yaml` with traits | Fill in required inputs (domain, passwords) |
+| **native** | Compose + `appbay.yaml` written together | Nothing — works out of the box |
+
+Most catalog entries are **augmented** — someone has already configured ingress, secrets, backup, and other traits with good defaults.
+
+## Catalog sources
+
+The catalog supports multiple sources:
+
+- **Bundled** — ships with Appbay (cloned at `appbay init`)
+- **External** — git repos you add yourself
+
+```bash
+# Add an external catalog source (future)
+appbay catalog add-source community https://github.com/example/appbay-catalog
+
+# Update catalog sources
+appbay catalog update
+```
+
+## Required inputs
+
+Some apps need values before they can deploy — a domain name, database password, or API key. These are declared in the catalog entry's `catalog.yaml` as `required_inputs`:
+
+```yaml
+required_inputs:
+  - name: N8N_DB_PASSWORD
+    description: PostgreSQL password
+    type: secret
+    auto_generate: true
+  - name: N8N_HOST
+    description: Public domain for n8n
+    type: string
+    default: "n8n.${{project.DOMAIN}}"
+```
+
+- `type: secret` with `auto_generate: true` — a password is generated automatically if you don't provide one
+- `type: string` with `default` — pre-filled, you can accept or override
+- Scoped variables like `${{project.DOMAIN}}` are resolved from your `project.yaml`
+
+## Post-install customization
+
+After install, you own the files. Customize freely:
+
+```bash
+# Edit the appbay.yaml directly
+vi ~/.appbay/etc/apps/n8n/appbay.yaml
+
+# Or use the config CLI
+appbay config n8n set traits.0.exposure external
+
+# Or use the web UI's traits panel and config editor
+appbay server start
+# Navigate to http://localhost:3000 → Apps → n8n → Config
+```
+
+## Catalog entry structure
+
+Each catalog entry is a directory:
+
+```
+n8n/
+  catalog.yaml          # Browse metadata (description, tags, required inputs)
+  appbay.yaml           # Deployment config (traits, scope, upstream ref)
+  docker-compose.yml    # Upstream compose file
+  .env.defaults         # Optional: default environment values
+```
+
+`catalog.yaml` is for browsing and install logic. `appbay.yaml` is the deployment config that ends up in your apps directory.

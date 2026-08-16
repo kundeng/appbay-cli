@@ -1,0 +1,255 @@
+---
+title: "Production Deployment"
+description: "Harden Appbay for production use"
+---
+
+## Overview
+
+A production deployment builds on the [Compose deployment](compose.qmd) with additional hardening: a reverse proxy with TLS, system app infrastructure, authentication enforcement, and a backup strategy. This page covers each layer.
+
+## System app deployment order
+
+Appbay ships infrastructure system apps that must be deployed in dependency order. Deploy them in this sequence -- each depends on the previous:
+
+1. **caddy** -- Integrated ingress, TLS termination, and the Caddy Security edge (authentication + authorization). Protects apps that enable the `auth` trait.
+
+```bash
+# Deploy the edge:
+appbay up caddy
+```
+
+Traefik remains a supported ingress-only mode (`appbay init --ingress-provider traefik`),
+but authentication requires the Caddy Security edge.
+
+Each system app is a standard Appbay app with its own `appbay.yaml` and `docker-compose.yml` in `$APPBAY_HOME/etc/apps/`. The definitions are seeded during `appbay init`.
+
+## Reverse proxy setup
+
+Appbay generates Traefik dynamic configuration as YAML files (file provider), not Docker labels. When you assign the `ingress` trait to a service, the compiler writes a routing file to `var/lib/renders/<app>/traefik/dynamic/<app>.yml`.
+
+### Traefik configuration
+
+The system Traefik app is pre-configured with:
+
+- HTTP entrypoint on port 80 (redirects to HTTPS)
+- HTTPS entrypoint on port 443
+- File provider watching `$APPBAY_HOME/var/lib/renders/*/traefik/dynamic/`
+- Let's Encrypt ACME resolver for automatic TLS certificates
+
+Example ingress trait on a service:
+
+```yaml
+# apps/jellyfin/appbay.yaml
+services:
+  jellyfin:
+    traits:
+      - type: ingress
+        host: "media.${{project.DOMAIN}}"
+        port: 8096
+        exposure: both
+        tls:
+          staging: false    # Set true to use Let's Encrypt staging
+```
+
+This generates a Traefik dynamic config file with the router, service, and middleware definitions for the `jellyfin` service.
+
+## TLS certificates
+
+How certificates are issued depends on which edge you selected at `appbay setup`. The two
+providers are mutually exclusive — one host, one owner of ports 80 and 443.
+
+### Traefik
+
+Uses Let's Encrypt for automatic issuance.
+
+**Staging certificates** -- Set `tls.staging: true` in the ingress trait during initial setup to avoid rate limits while testing. Staging certificates are not trusted by browsers but verify that ACME challenges work.
+
+**Production certificates** -- Set `tls.staging: false` (the default) for valid certificates. Ensure your DNS records point to the host and ports 80/443 are reachable from the internet.
+
+Certificate storage is handled by Traefik's built-in ACME store, persisted in a volume.
+
+### Caddy
+
+Caddy issues from Let's Encrypt automatically with no configuration. For names a public
+CA cannot validate, it falls back to its own **internal issuer** — a locally-trusted CA it
+manages itself. On a `.test.local` host the served certificate reports:
+
+```
+issuer=CN = Caddy Local Authority - ECC Intermediate
+```
+
+This is why `config/tls/` ships empty: the site blocks import `/etc/caddy/tls/*.caddy` as a
+zero-match glob, so an install using the internal issuer needs no file and no placeholder.
+Browsers will warn unless you trust Caddy's local root.
+
+#### Institutional ACME (InCommon and similar)
+
+Institutional CAs require **external account binding**: your ACME account is tied to
+credentials the institution issues you. Copy the shipped example to enable it:
+
+```bash
+cd "$APPBAY_HOME/etc/apps/caddy/config/global"
+cp acme.caddy.example acme.caddy
+```
+
+The file contains placeholders only; the values are read from process environment at
+deploy time:
+
+```
+email {$ACME_EMAIL}
+acme_ca {$ACME_CA}
+
+acme_eab {
+	key_id {$ACME_EAB_KID}
+	mac_key {$ACME_EAB_HMAC}
+}
+```
+
+::: {.callout-important}
+## Three ways this fails quietly
+
+**`acme_eab` takes a block, not two inline arguments.** Written as
+`acme_eab {$ACME_EAB_KID} {$ACME_EAB_HMAC}` the whole config is rejected and **the edge
+will not start** — which takes every deployed app down with it, since the edge is the only
+path to them. AppBay shipped that form and fixed it; if you copied an older example, use
+the block above.
+
+**Do not wrap the file in `{ }`.** It is imported *inside* the base global options block,
+so it holds option directives only. An outer block is a syntax error.
+
+**Do not add a global `acme_dns` block here.** It is silently ignored: the config loads
+without complaint and certificates simply never issue by DNS. DNS-01 belongs in a site
+block or a `tls` directive, and needs an image built with the DNS provider compiled in
+(`xcaddy build --with github.com/caddy-dns/cloudflare`).
+:::
+
+Never write the secrets into `acme.caddy`. `docker compose config` prints file contents in
+cleartext; AppBay injects process environment precisely so the values need not be on disk.
+Store them in the vault (`appbay secrets set`) and reference them as `vault://` URIs.
+
+#### Validating before you rely on it
+
+An EAB misconfiguration fails at account **registration**, not renewal, so it reads like a
+network problem rather than a configuration one. Check the config parses and the directives
+actually reach Caddy's adapted output before pointing a real domain at it:
+
+```bash
+VM=<host> ./scripts/journeys/s25-acme-config-validate.sh
+```
+
+That proves everything up to the CA round-trip. The round-trip itself needs your real
+credentials and a publicly resolvable domain.
+
+## Security hardening
+
+### Change the default admin password
+
+The admin account created during first-run setup should use a strong password. There is no password complexity enforcement in v1 -- this is your responsibility.
+
+### Disable dev auth
+
+Never run production with `APPBAY_DEV_AUTH=true`. This flag bypasses all authentication and is intended only for local development. The Compose deployment does not set this flag by default.
+
+### Docker socket access
+
+The server container mounts the Docker socket read-only (`/var/run/docker.sock:/var/run/docker.sock:ro`) and uses the `docker` CLI directly via `spawnSync` for container operations.
+
+### Network isolation
+
+- **`appbay_shared`** -- Apps that need to communicate join this network. Each app also gets its own `<app>_internal` network for service-to-service discovery within the app.
+
+## Backups
+
+### What to back up
+
+Back up the entire `$APPBAY_HOME` directory. The critical subdirectories are:
+
+| Path | Contents | Regenerable? |
+|---|---|---|
+| `etc/apps/` | App definitions (`appbay.yaml`, `docker-compose.yml`) | No -- these are your source of truth |
+| `etc/projects/` | Project and environment configs | No |
+| `var/lib/state/` | Generated values, active app set | No -- generated values are random |
+| `var/lib/renders/` | Rendered compose output | Yes -- `appbay compile` regenerates |
+| `appbay-data` named volume | SQLite metadata cache (compose deployments) | Yes -- `appbay rebuild-cache` regenerates |
+| `var/log/` | Log files | Not critical |
+
+### Backup strategy
+
+```bash
+# Simple tarball backup
+tar czf appbay-backup-$(date +%Y%m%d).tar.gz $APPBAY_HOME/etc $APPBAY_HOME/var/lib/state
+
+# Restore
+tar xzf appbay-backup-20260503.tar.gz -C /
+appbay rebuild-cache    # Regenerate SQLite from restored files
+appbay compile          # Regenerate renders
+```
+
+### App data backup
+
+App data (Docker volumes) is separate from Appbay configuration. Use the `backup` trait to schedule volume snapshots:
+
+```yaml
+# appbay.yaml
+traits:
+  - type: backup
+    schedule: "0 2 * * *"    # Daily at 2 AM
+    retention: 7             # Keep 7 days
+    volumes:
+      - nextcloud_data
+      - nextcloud_db
+```
+
+## Monitoring
+
+### Health checks
+
+```bash
+# Run all prerequisite and health checks
+appbay doctor
+```
+
+The `doctor` command verifies: Docker connectivity, Compose version, server health, disk space, and system app status.
+
+### Container monitoring
+
+```bash
+# Docker-native container stats
+docker stats
+
+# List Appbay-managed containers
+docker ps --filter "label=com.appbay.managed=true"
+
+# Check a specific app
+appbay status jellyfin
+```
+
+### Logs
+
+```bash
+# Server logs
+docker logs appbay.server
+
+# App logs (via CLI or web UI)
+appbay logs jellyfin
+appbay logs jellyfin redis --follow
+```
+
+## Updating
+
+```bash
+# Pull the latest image and restart the server
+appbay update
+
+# Or manually:
+docker pull appbay/server:latest
+docker compose -f docker-compose.server.yml up -d
+```
+
+Drizzle ORM runs any pending SQLite migrations automatically on startup. Your app definitions and state files are untouched during updates.
+
+After updating, verify the system is healthy:
+
+```bash
+appbay doctor
+```

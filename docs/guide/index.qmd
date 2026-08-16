@@ -1,0 +1,46 @@
+---
+title: "User Guide"
+description: "Learn how to use Appbay to manage your Docker apps"
+---
+
+## What is Appbay?
+
+Appbay is a Docker-native PaaS control plane that treats Docker Compose as the application model. Rather than replacing Compose or inventing a new orchestration layer, Appbay augments your existing Compose files with traits, scoped variables, conditional overlays, secrets management, and namespace isolation -- all while keeping standard `docker compose` as the runtime contract.
+
+You can eject any app at any time and run it with plain `docker compose up`. Appbay adds structure; it never locks you in.
+
+## Who is Appbay for?
+
+Appbay serves three overlapping use cases:
+
+**Homelab**
+:   You host upstream applications (Jellyfin, Nextcloud, Vaultwarden) with minimal friction. You want ingress routing, TLS certificates, and forward authentication without hand-editing Traefik labels for every app.
+
+**Applab**
+:   You run curated application stacks for a team or department. You need consistent environments, secret management, and the ability to deploy a named collection of apps with one command.
+
+**Devlab**
+:   You build applications that require extensive configuration, iteration, and environment-specific wiring. You need scoped variables, conditional cross-app wiring, and deterministic renders so that the same inputs always produce the same outputs.
+
+## What you will learn
+
+This guide walks through every aspect of using Appbay:
+
+1. [Getting Started](quickstart.qmd) -- Install Appbay, deploy your first app, and verify it works.
+2. [Core Concepts](concepts.qmd) -- Understand apps, traits, overlays, scopes, collections, and operators.
+3. [Managing Apps](apps.qmd) -- Directory conventions, `appbay.yaml`, upstream ingestion, and app selection.
+4. [Traits](traits.qmd) -- The seven built-in traits: ingress, gpu, auth, hooks, scoped-env, secrets, and backup.
+5. [Conditional Overlays](overlays.qmd) -- Declarative cross-app wiring with `when` clauses.
+6. [Secrets Management](secrets.qmd) -- URI-based secret references, auto-generation, and verification.
+7. [CLI Reference](cli.qmd) -- All commands with examples and flags.
+8. [Web UI](web-ui.qmd) -- Dashboard, deploy flow, logs, shell, and settings.
+
+## Design principles
+
+Before diving in, these principles shape every feature in Appbay:
+
+- **Filesystem is the source of truth.** Your `appbay.yaml` and `docker-compose.yml` files on disk are authoritative. SQLite is a metadata cache that can be rebuilt at any time with `appbay rebuild-cache`.
+- **Deterministic renders.** Same inputs always produce the same outputs. Generated values are stored once and reused.
+- **Secrets never leak.** No plaintext secrets appear in logs, rendered artifacts, plan diffs, or events.
+- **CLI works without the web frontend.** Validate, compile, deploy, and eject all work with no server container running.
+- **Standard Compose output.** Everything Appbay produces is runnable with `docker compose` directly.

@@ -1,0 +1,25 @@
+{
+  "name": "@appbay/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@appbay/core": "workspace:*",
+    "better-sqlite3": "^11.9.0",
+    "drizzle-orm": "^0.44.0",
+    "yaml": "^2.8.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,722 @@
+---
+title: "CLI Command Reference"
+description: "Every CLI command with flags, examples, and exit codes"
+---
+
+## Overview
+
+The Appbay CLI is a single compiled binary built with Bun. It directly imports `@appbay/core` and operates entirely offline — it does not use a tRPC client or require the Appbay server to be running. Commands that deploy containers invoke `docker compose` directly.
+
+## Global flags
+
+| Flag | Description |
+|---|---|
+| `--help` | Show help for any command |
+| `--version` | Print CLI version |
+| `--server <url>` | Override server URL (default: `http://localhost:3000`) |
+| `--token <token>` | Override auth token (alternative to `APPBAY_TOKEN` env var) |
+
+## Commands
+
+### `appbay setup`
+
+The guided path, and the one most people should start with: it runs `init`, creates the
+secret vault, and brings up the edge, in order, asking only for what it cannot infer.
+
+```bash
+appbay setup --domain home.lan
+appbay setup --domain example.com --email you@example.com --ingress-provider caddy --yes
+appbay setup --status
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--domain <domain>` | (prompted) | Base domain for ingress routing |
+| `--project <name>` | (prompted) | Project name |
+| `--email <email>` | (prompted) | ACME email, for Let's Encrypt certificates |
+| `--ingress-provider <p>` | `traefik` | Edge to install: `traefik` or `caddy` |
+| `--yes` | `false` | Non-interactive: accept all defaults |
+| `--status` | — | Report what is already set up, and change nothing |
+| `--reset` | — | Tear down system apps and remove generated configs |
+
+⚠️ The administrator `setup` creates is the **edge** administrator, which guards apps behind
+the reverse proxy. The web control plane asks you to create its own administrator the first
+time you open it. See [Credentials](../guide/credentials.qmd) — the two are deliberately
+separate and are never synchronised.
+
+**Exit codes:** 0 = success, 1 = a step failed.
+
+### `appbay install`
+
+Install an app from the catalog into `$APPBAY_HOME/etc/apps/<name>/`.
+
+```bash
+appbay install jellyfin
+appbay install nextcloud --set ADMIN_USER=me --set TZ=Europe/Berlin
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--set <pairs...>` | — | Input values as `KEY=VALUE`, repeatable |
+| `--force` | `false` | Overwrite an app of the same name |
+| `--no-validate` | `false` | Skip post-install validation |
+
+Installing copies the upstream files unmodified and writes an `appbay.yaml` beside them.
+Nothing is deployed until you run [`appbay up`](#appbay-up).
+
+### `appbay catalog`
+
+Browse and manage catalog sources.
+
+```bash
+appbay catalog list
+appbay catalog search media
+appbay catalog info jellyfin
+appbay catalog add-source https://github.com/you/your-catalog
+appbay catalog update
+```
+
+### `appbay shell` · `appbay exec` · `appbay run`
+
+Reach into a running app.
+
+```bash
+appbay shell jellyfin                      # interactive shell in the service container
+appbay exec jellyfin -- ls /config          # run a command in the running container
+appbay run jellyfin -- /bin/backup.sh       # one-off command in a fresh container
+```
+
+`shell` and `exec` require the app to be running; `run` starts a container for the command
+and removes it afterwards.
+
+### `appbay init-system`
+
+Bootstrap a **fresh host** to run Appbay: installs the container runtime and sets up
+ownership and access for the Appbay tree. Written for RHEL-family hosts, where the defaults
+differ enough to matter.
+
+```bash
+sudo appbay init-system                     # --owner service (default)
+sudo appbay init-system --owner operator
+```
+
+`--owner service` creates a no-login system service account, which is the right choice for a
+homelab or worklab box. `--owner operator` uses your own account instead.
+
+### `appbay init`
+
+Scaffold the `$APPBAY_HOME` directory structure and seed system app definitions.
+
+```bash
+appbay init
+appbay init --dir /opt/appbay
+appbay init --project homelab --domain homelab.example.com --yes
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--dir <path>` | `~/.appbay` | Override `$APPBAY_HOME` location |
+| `--project <name>` | (prompted) | Name of the default project |
+| `--domain <name>` | (prompted) | Base domain for ingress routing |
+| `--yes` | `false` | Non-interactive: accept all defaults |
+
+Creates: `etc/apps/`, `etc/projects/`, `etc/presets/`, `var/lib/renders/`, `var/lib/state/`, `var/log/`. Seeds system app definitions if absent.
+
+**Exit codes:** 0 = success, 1 = filesystem error.
+
+### `appbay server start`
+
+Start the Appbay server as a Docker Compose stack.
+
+```bash
+appbay server start
+appbay server start --open
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--open` | `false` | Open the web UI in a browser after start |
+
+Creates `appbay_shared` network, starts the appbay-server container, waits for health check, prints the server URL.
+
+**Exit codes:** 0 = server healthy, 1 = start failed, 2 = health check timeout.
+
+### `appbay server stop`
+
+Stop the server container.
+
+```bash
+appbay server stop
+```
+
+**Exit codes:** 0 = stopped, 1 = error.
+
+### `appbay server status`
+
+Check whether the Appbay server is running. Prints the server URL and start time if running, or a "not running" message if it is not.
+
+```bash
+appbay server status
+```
+
+**Exit codes:** 0 = always (status is informational).
+
+### `appbay up`
+
+Deploy one or more apps.
+
+```bash
+appbay up jellyfin
+appbay up ollama webui tts
+appbay up --collection ai-stack
+appbay up --all
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--collection <name>` | (none) | Deploy all apps in a collection |
+| `--all` | `false` | Deploy all discovered apps |
+
+Runs the full pipeline: compile, apply overlays, write renders, and bring up via `docker compose up -d`.
+
+**Exit codes:** 0 = deployed, 1 = compile or deploy error.
+
+### `appbay apply`
+
+Compile and review a plan, then deploy with explicit confirmation. Separates compile and deploy for review workflows.
+
+```bash
+appbay apply jellyfin
+appbay apply ollama webui --dry-run
+appbay apply jellyfin --yes
+appbay apply --all --yes
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--dry-run` | `false` | Show the plan without applying |
+| `--yes` | `false` | Skip confirmation prompt and deploy immediately |
+| `--all` | `false` | Apply all discovered apps |
+
+**Exit codes:** 0 = applied (or dry run complete), 1 = compile or deploy error.
+
+### `appbay down`
+
+Stop one or more running apps.
+
+```bash
+appbay down jellyfin
+appbay down webui tts
+appbay down --all
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--all` | `false` | Stop all discovered apps |
+
+**Exit codes:** 0 = stopped, 1 = error.
+
+### `appbay delete`
+
+Remove an app definition and stop its containers.
+
+```bash
+appbay delete myapp --keep-volumes --force
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--keep-volumes` | `false` | Keep Docker volumes after deletion |
+| `--force` | `false` | Skip confirmation prompt (required to proceed) |
+
+Without `--force`, the command exits with an error and instructions. Runs `docker compose down` (with `-v` unless `--keep-volumes`) before removing the app definition directory.
+
+**Exit codes:** 0 = deleted, 1 = not found or confirmation required.
+
+### `appbay restart`
+
+Restart one or more apps.
+
+```bash
+appbay restart jellyfin
+appbay restart webui tts
+appbay restart --all
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--all` | `false` | Restart all discovered apps |
+
+**Exit codes:** 0 = restarted, 1 = error.
+
+### `appbay pull`
+
+Pull the latest Docker images for one or more apps.
+
+```bash
+appbay pull jellyfin
+appbay pull ollama webui
+appbay pull --all
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--all` | `false` | Pull images for all discovered apps |
+
+Uses the rendered compose file if available, otherwise falls back to the source compose.
+
+**Exit codes:** 0 = all pulls succeeded, 1 = one or more failed.
+
+### `appbay compile`
+
+Run the compiler pipeline without deploying.
+
+```bash
+appbay compile jellyfin
+appbay compile jellyfin webui
+appbay compile              # compiles all discovered apps
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output <dir>` | `var/lib/renders/` | Write rendered output to a custom directory |
+
+Runs the full compile pipeline and writes rendered compose and auxiliary files. Available offline (no server needed).
+
+**Exit codes:** 0 = compiled, 1 = error.
+
+### `appbay validate`
+
+Validate app definitions against Zod schemas.
+
+```bash
+appbay validate jellyfin
+appbay validate --all
+```
+
+Reports errors with file paths, field names, and expected types. Available offline.
+
+**Exit codes:** 0 = valid, 1 = validation errors found.
+
+### `appbay eject`
+
+Export a fully standalone Compose project.
+
+```bash
+appbay eject jellyfin
+appbay eject jellyfin --output ./exported/
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output <path>` | `./appbay-eject/<app>/` | Output directory |
+
+Produces a directory with `docker-compose.yml` and `.env` that can be run with `docker compose up` without Appbay. Available offline.
+
+**Exit codes:** 0 = ejected, 1 = error.
+
+### `appbay status`
+
+Show app configuration and metadata. Available offline.
+
+```bash
+appbay status
+appbay status jellyfin
+appbay status jellyfin --json
+```
+
+| Flag | Description |
+|---|---|
+| `--json` | Output as JSON |
+
+Without an app name, shows a summary table of all discovered apps (name, services count, traits count, errors). With an app name, shows full detail: directory, project, environment, services (with service-level traits), app-level traits, overlays, and upstream configuration.
+
+**Exit codes:** 0 = success, 1 = app not found.
+
+### `appbay logs`
+
+Show or stream app logs.
+
+```bash
+appbay logs jellyfin
+appbay logs jellyfin redis --follow
+appbay logs jellyfin --tail 100
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-f, --follow` | `false` | Stream logs in real time |
+| `--tail <n>` | (Docker default) | Number of lines to show from the end |
+
+The optional second positional argument filters to a specific service within the app.
+
+**Exit codes:** 0 = success, 1 = error.
+
+### `appbay doctor`
+
+Run prerequisite and health checks.
+
+```bash
+appbay doctor
+```
+
+Checks: Docker connectivity, Compose version, server health, disk space, system app status.
+
+**Exit codes:** 0 = all checks passed, 1 = one or more checks failed.
+
+### `appbay secrets init`
+
+Initialize the local secrets vault. Auto-generates a master password if none provided.
+
+```bash
+appbay secrets init
+appbay secrets init --password mypassword
+```
+
+### `appbay secrets set`
+
+Store a secret in the vault. Key format: `KEY` for default scope, `APP/KEY` for app-scoped.
+
+```bash
+appbay secrets set DB_PASSWORD myvalue
+appbay secrets set kestra/DB_PASSWORD myvalue
+```
+
+Warns if the secret already exists, with database-specific guidance.
+
+### `appbay secrets get`
+
+Retrieve a secret value from the vault.
+
+```bash
+appbay secrets get DB_PASSWORD
+appbay secrets get kestra/DB_PASSWORD
+```
+
+### `appbay secrets delete`
+
+Delete a secret from the vault.
+
+```bash
+appbay secrets delete DB_PASSWORD
+appbay secrets delete kestra/DB_PASSWORD
+```
+
+### `appbay secrets vault`
+
+List all secrets stored in the vault, grouped by scope. Shows metadata only — never values.
+
+```bash
+appbay secrets vault
+appbay secrets vault --scope kestra
+```
+
+### `appbay secrets scan`
+
+Discover secret-like env vars in an app's compose and .env files. Suggests vault URI mappings for unmanaged secrets.
+
+```bash
+appbay secrets scan kestra
+```
+
+### `appbay secrets import`
+
+Scan an app and auto-create vault entries for unmanaged secret-like variables.
+
+```bash
+appbay secrets import kestra
+appbay secrets import kestra --dry-run
+```
+
+### `appbay secrets export`
+
+Export vault contents to a KeePass .kdbx file.
+
+```bash
+# `secrets export` was removed with the kdbx work; use `appbay secrets list`
+appbay secrets list
+```
+
+### `appbay secrets import-kdbx`
+
+Import secrets from a KeePass .kdbx file into the vault.
+
+```bash
+appbay secrets import-kdbx secrets.kdbx --password mypass
+```
+
+### `appbay secrets check`
+
+Verify that all secret URI references across all apps can be resolved.
+
+```bash
+appbay secrets check
+```
+
+### `appbay secrets list`
+
+List secret URI references for an app (or all apps). Prints URIs only — never values.
+
+```bash
+appbay secrets list
+appbay secrets list jellyfin
+```
+
+### `appbay edge users list`
+
+List Caddy Security local edge users.
+
+```bash
+appbay edge users list
+```
+
+### `appbay edge users create`
+
+Create a Caddy Security local edge user.
+
+```bash
+appbay edge users create newuser --email user@example.com --roles user
+appbay edge users create newuser --email user@example.com --generate --reveal
+```
+
+### `appbay edge users reset-password`
+
+Reset a Caddy Security local edge user's password.
+
+```bash
+appbay edge users reset-password username
+```
+
+### `appbay rebuild-cache`
+
+Regenerate the SQLite metadata cache from filesystem state.
+
+```bash
+appbay rebuild-cache
+```
+
+Deletes the existing `appbay.db`, creates a fresh database with Drizzle migrations, and populates all tables from filesystem sources. Available offline.
+
+**Exit codes:** 0 = rebuilt, 1 = error.
+
+### `appbay update`
+
+Check for and apply CLI and system app updates.
+
+```bash
+appbay update
+appbay update --check
+appbay update --system-only
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--check` | `false` | Check for updates without applying |
+| `--system-only` | `false` | Only pull system app Docker images |
+
+**Exit codes:** 0 = updated, 1 = pull failed, 2 = restart failed.
+
+### `appbay list`
+
+List all discovered apps. Available offline.
+
+```bash
+appbay list
+appbay list --json
+```
+
+| Flag | Description |
+|---|---|
+| `--all` | Include apps with discovery errors (default: all apps shown anyway) |
+| `--json` | Output as JSON array |
+
+Reads from `$APPBAY_HOME/etc/apps/` and shows each app's name, project, environment, whether an `appbay.yaml` exists, and the compose filename. Does not require Docker or the server to be running.
+
+**Exit codes:** 0 = success.
+
+### `appbay ps`
+
+Show container runtime status for apps. Runs `docker compose ps` against rendered compose files.
+
+```bash
+appbay ps
+appbay ps jellyfin
+appbay ps jellyfin redis
+appbay ps --json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--all` | `false` | Include apps without rendered compose files |
+| `--json` | `false` | Output as JSON |
+
+Prefers the rendered compose file in `var/lib/renders/`; falls back to the source compose.
+
+**Exit codes:** 0 = success, 1 = docker compose failed or no apps found.
+
+### `appbay config`
+
+Get or set configuration values in an app's `appbay.yaml`. Uses dot-separated key paths.
+
+```bash
+appbay config jellyfin                          # show all config
+appbay config jellyfin upstream.source          # read a single key
+appbay config jellyfin upstream.source my-app  # set a value
+```
+
+Values are auto-coerced: `"true"` → boolean, `"42"` → number, everything else stays string.
+
+**Exit codes:** 0 = success, 1 = app or key not found.
+
+### `appbay env`
+
+Manage environment variables in an app's `.env` file (`$APPBAY_HOME/etc/apps/<app>/.env`).
+
+```bash
+appbay env jellyfin               # list all variables
+appbay env jellyfin DB_HOST       # get a variable
+appbay env jellyfin DB_HOST db    # set a variable
+appbay env jellyfin DB_HOST --delete  # delete a variable
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--list` | `false` | List all variables |
+| `--delete` | `false` | Delete the specified variable |
+
+**Exit codes:** 0 = success, 1 = app not found or key not found.
+
+### `appbay presets`
+
+Manage named app selection presets. Presets save which apps are selected together for quick recall. Stored as YAML in `$APPBAY_HOME/etc/presets/`.
+
+```bash
+appbay presets save ai-dev --apps "ollama,webui,whisper"
+appbay presets load ai-dev
+appbay presets list
+appbay presets delete ai-dev
+```
+
+#### `appbay presets save <name>`
+
+| Flag | Description |
+|---|---|
+| `--apps <list>` | Comma-separated app names to include |
+| `--description <desc>` | Optional description |
+
+#### `appbay presets load <name>`
+
+Prints the app list from the preset. Typically piped to `appbay up`:
+
+```bash
+appbay up $(appbay presets load ai-dev)
+```
+
+#### `appbay presets list`
+
+List all saved presets with their app lists.
+
+#### `appbay presets delete <name>`
+
+Delete a preset by name.
+
+### `appbay open`
+
+Open an app's URL in the default browser.
+
+```bash
+appbay open jellyfin
+```
+
+Resolves the app's ingress URL from the ingress trait configuration and opens it.
+
+**Exit codes:** 0 = opened, 1 = no ingress configured.
+
+### `appbay url`
+
+Print an app's URL without opening the browser. Resolves the ingress trait or falls back to compose port mappings.
+
+```bash
+appbay url jellyfin
+appbay url jellyfin --lan
+appbay url jellyfin --internal
+```
+
+| Flag | Description |
+|---|---|
+| `--lan` | Show the LAN address |
+| `--internal` | Show the internal Docker network address |
+
+**Exit codes:** 0 = success, 1 = app not found.
+
+### `appbay version`
+
+Print the Appbay CLI version.
+
+```bash
+appbay version
+```
+
+**Exit codes:** 0 = always.
+
+### `appbay home`
+
+Print the resolved `$APPBAY_HOME` path.
+
+```bash
+appbay home
+```
+
+Useful for scripting: `cd $(appbay home)/etc/apps`.
+
+**Exit codes:** 0 = always.
+
+### `appbay info`
+
+Print system information relevant to Appbay: OS/arch, Docker version, Docker Compose version, GPU availability, `$APPBAY_HOME` path, and number of discovered apps.
+
+```bash
+appbay info
+```
+
+**Exit codes:** 0 = always.
+
+### `appbay size`
+
+Show disk usage for app definitions and Docker volumes.
+
+```bash
+appbay size
+appbay size jellyfin
+```
+
+**Exit codes:** 0 = always.
+
+### `appbay fixfs`
+
+Fix filesystem permissions for app volume directories. Sets ACLs for common container UIDs (linuxserver.io 911, nginx 101, etc.) so containers can read/write their data directories without running as root.
+
+```bash
+appbay fixfs jellyfin
+appbay fixfs jellyfin --uid 911
+appbay fixfs jellyfin --dry-run
+```
+
+| Flag | Description |
+|---|---|
+| `--uid <n>` | Grant access to a specific UID |
+| `--gid <n>` | Grant access to a specific GID |
+| `--dry-run` | Show what would change without applying |
+
+**Exit codes:** 0 = success.
+
+### `appbay completion`
+
+Generate shell completion scripts for bash or zsh.
+
+```bash
+appbay completion bash >> ~/.bashrc
+appbay completion zsh  >> ~/.zshrc
+```
+
+**Exit codes:** 0 = always.

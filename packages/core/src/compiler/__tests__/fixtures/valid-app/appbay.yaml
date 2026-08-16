@@ -1,0 +1,6 @@
+project: homelab
+environment: prod
+collection:
+  - web-stack
+tags:
+  tier: frontend

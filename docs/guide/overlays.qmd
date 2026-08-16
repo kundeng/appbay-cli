@@ -1,0 +1,257 @@
+---
+title: "Conditional Overlays"
+description: "Declarative cross-app wiring with when clauses"
+---
+
+## What are overlays?
+
+Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The most common condition is "when a peer app is active" -- enabling automatic cross-app wiring without manual configuration.
+
+For example, Open WebUI can connect to Ollama when Ollama is running, and fall back to a standalone configuration when it is not. This is declared once and evaluated automatically at compile time.
+
+## Basic syntax
+
+Overlays are declared in the `overlays` section of `appbay.yaml`:
+
+```yaml
+# apps/webui/appbay.yaml
+overlays:
+  - when: [ollama]
+    services:
+      web:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+```
+
+The `when` clause specifies which apps must be active. The `services` block is a standard Compose fragment that gets merged into the app's rendered output.
+
+### How service names work in overlays
+
+When referencing a service from another app in an overlay, use the shared network alias format: `<app>_<service>` (underscore). In the example above, `ollama_web` refers to the `web` service of the `ollama` app, as aliased on the shared network.
+
+This is because each app runs in its own Compose project with an internal network. Cross-app communication happens through the shared network, where exposed services are aliased with their app name prefix.
+
+## The when clause
+
+### AND condition (array)
+
+A plain array means all listed apps must be active:
+
+```yaml
+overlays:
+  - when: [ollama, tts]
+    services:
+      web:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+          - TTS_URL=http://tts_web:5000
+```
+
+This overlay only applies when both `ollama` and `tts` are in the active app set.
+
+### OR condition ({any: []})
+
+Use the `any` key for OR logic -- the overlay applies when at least one of the listed apps is active:
+
+```yaml
+overlays:
+  - when:
+      any: [ollama, llamacpp, vllm]
+    services:
+      web:
+        environment:
+          - LLM_AVAILABLE=true
+```
+
+This overlay applies when any of `ollama`, `llamacpp`, or `vllm` is active.
+
+### Combining conditions with multiple overlays
+
+`when` supports either AND (array of strings) or OR (`any:` object) in a single clause -- not both at once. To require both conditions, use two separate overlays:
+
+```yaml
+overlays:
+  # Requires caddy (the auth edge) to be active
+  - when: [caddy]
+    services:
+      web:
+        environment:
+          - AUTH_ENABLED=true
+
+  # Requires at least one LLM backend to be active
+  - when:
+      any: [ollama, llamacpp]
+    services:
+      web:
+        environment:
+          - LLM_AVAILABLE=true
+```
+
+Both overlays are evaluated independently. If only `caddy` is active, only `AUTH_ENABLED` is injected. If both conditions are met, both fragments are merged.
+
+## Overlay evaluation
+
+Overlays are evaluated during the compile step, before traits are applied. The evaluation follows these rules:
+
+1. **Active app set** is determined from CLI arguments (`appbay up ollama webui`) or collection selection (`--collection ai-stack`).
+2. For each app being compiled, its overlays are checked against the active set.
+3. If a `when` clause is satisfied, the `services` fragment is deep-merged into the app's Compose model.
+4. Multiple matching overlays are applied in declaration order.
+5. After all overlays are merged, traits are applied on top.
+
+```{mermaid}
+flowchart TD
+    A[Determine active apps] --> B[For each app]
+    B --> C{Check when clause}
+    C -->|satisfied| D[Deep-merge services fragment]
+    C -->|not satisfied| E[Skip overlay]
+    D --> F{More overlays?}
+    E --> F
+    F -->|yes| C
+    F -->|no| G[Apply traits]
+```
+
+## Cross-app wiring examples
+
+### Ollama and Open WebUI
+
+```yaml
+# apps/webui/appbay.yaml
+overlays:
+  - when: [ollama]
+    services:
+      web:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+        depends_on:
+          ollama-proxy:
+            condition: service_started
+
+  - when: [tts]
+    services:
+      web:
+        environment:
+          - AUDIO_TTS_ENGINE=openai
+          - AUDIO_TTS_OPENAI_API_BASE_URL=http://tts_web:8000/v1
+```
+
+When both Ollama and TTS are active, both overlays apply and the WebUI is wired to both services.
+
+### Authentication for multiple apps
+
+Authentication is applied per-app with the `auth` trait (see [Traits](traits.qmd#auth)),
+not through overlays. Each app that needs login declares an `auth` trait, and the Caddy
+Security edge generates the authorization policy for it. Overlays are for conditional
+environment wiring, not for attaching auth middleware.
+
+### Database wiring
+
+```yaml
+# apps/gitea/appbay.yaml
+overlays:
+  - when: [postgres]
+    services:
+      server:
+        environment:
+          - GITEA__database__DB_TYPE=postgres
+          - GITEA__database__HOST=postgres_db:5432
+          - GITEA__database__NAME=gitea
+        depends_on:
+          postgres-proxy:
+            condition: service_healthy
+
+  # Fallback: use built-in SQLite when no shared postgres
+  # (This is the default when the overlay does not apply)
+```
+
+## Overlay merge behavior
+
+The `services` block in an overlay is deep-merged into the base compose using these rules:
+
+- **`environment`, `volumes`, `ports`** (arrays): appended — overlay entries follow base entries; Docker Compose uses the last definition for duplicate keys
+- **`labels`, `depends_on`** (objects): shallow-merged — overlay values override base values on key collision
+- **Scalars** (image, command, etc.): overlay value replaces base
+- **Services** are merged by name (not replaced); adding a key to an existing service, or a new service entirely, both work
+
+### Override vs append
+
+If the base compose already defines `OLLAMA_BASE_URL` and the overlay also sets it, the overlay value wins:
+
+```yaml
+# Base compose
+services:
+  web:
+    environment:
+      - OLLAMA_BASE_URL=http://localhost:11434   # default fallback
+
+# Overlay (when ollama is active)
+services:
+  web:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama_web:11434   # overrides the default
+```
+
+## Multiple overlays
+
+An app can have multiple overlays. They are evaluated independently and applied in order:
+
+```yaml
+overlays:
+  # First overlay
+  - when: [ollama]
+    services:
+      web:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+
+  # Second overlay
+  - when: [searxng]
+    services:
+      web:
+        environment:
+          - RAG_WEB_SEARCH_ENGINE=searxng
+          - SEARXNG_QUERY_URL=http://searxng_web:8080
+
+  # Third overlay (OR condition)
+  - when:
+      any: [whisper, faster-whisper]
+    services:
+      web:
+        environment:
+          - AUDIO_STT_ENGINE=openai
+```
+
+If all three conditions are met, all three fragments are merged. If only Ollama is active, only the first overlay applies.
+
+## Inspecting overlay state
+
+### CLI
+
+```bash
+appbay status webui
+```
+
+The output lists declared overlays and which services each affects:
+
+```
+  Overlays (3):
+    - when all: [ollama] -> services: web
+    - when all: [searxng] -> services: web
+    - when any: [whisper, faster-whisper] -> services: web
+```
+
+`appbay status` is offline-capable -- it reads from the `appbay.yaml` definition and does not require the server to be running. Because it does not know which apps are currently deployed, it lists all declared overlays without an active/inactive distinction.
+
+### Web UI
+
+The App Detail screen shows overlay activation state in the overlays panel, with visual indicators for active (green) and inactive (gray) overlays. The web UI has access to runtime state and can show which overlays are currently satisfied.
+
+## Best practices
+
+**Keep overlays simple.** An overlay should wire one integration concern. If you find yourself with complex nested logic, consider whether the app should use a different architecture.
+
+**Use overlays for optional dependencies, not required ones.** If an app cannot function without another app, use `depends_on` in the base compose, not an overlay.
+
+**Name services consistently.** Since shared network aliases follow the `<app>_<service>` pattern (underscore), use predictable service names like `web`, `api`, `db` to make cross-app references readable.
+
+**Test without overlays.** Run `appbay compile myapp` with no peer apps active to verify the base configuration works standalone.

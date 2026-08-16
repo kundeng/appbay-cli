@@ -1,0 +1,52 @@
+# Render/output
+out/
+.out/
+
+# Secrets/env (never commit)
+.env
+*.env
+*.env.*
+
+# Editors/OS
+.DS_Store
+.idea/
+.vscode/
+
+# Language/tool caches (stack TBD)
+node_modules/
+dist/
+build/
+bin/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Next.js
+.next/
+
+# Turborepo
+.turbo/
+
+/.quarto/
+**/*.quarto_ipynb
+tools/appbay-inject/target/
+apps/desktop/src-tauri/target/
+
+# bun build leaves these temp artifacts beside the entrypoint on interrupted/
+# concurrent `bun build --compile` runs. Never source, never worth committing.
+*.bun-build
+
+# TypeScript incremental build info (generated)
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+.scratch/
+
+# Default output dir of `appbay eject` — build output, not source. A stale copy was
+# tracked until 2026-08-15 and had gone two generations out of date, still naming
+# Authentik (removed in S19, and its successor Authelia removed in S25).
+appbay-eject/
+
+# Local agent state
+.claude/scheduled_tasks.lock

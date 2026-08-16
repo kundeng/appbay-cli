@@ -1,0 +1,32 @@
+# Institutional ACME — copy to acme.caddy (drop the .example) to enable.
+#
+# ⚠️ THIS FILE IS IMPORTED INSIDE THE BASE GLOBAL OPTIONS BLOCK, so it contains option
+# directives only. Do not wrap it in another `{ ... }` block.
+#
+# InCommon and other institutional CAs require EXTERNAL ACCOUNT BINDING. Without
+# acme_eab the directory rejects the account outright, so certificates never issue —
+# and the failure is at REGISTRATION, not renewal, which makes it look like a network
+# problem rather than a configuration one.
+#
+# ⚠️ Every value here is a placeholder read from process env at deploy time. Do not
+# write secrets into this file: `docker compose config` prints file contents in
+# cleartext, and appbay injects process env precisely so that it does not have to.
+email {$ACME_EMAIL}
+acme_ca {$ACME_CA}
+
+# 🚨 acme_eab TAKES A BLOCK, NOT TWO INLINE ARGUMENTS. This shipped as
+#     acme_eab {$ACME_EAB_KID} {$ACME_EAB_HMAC}
+# which does not parse — Caddy rejects the whole config:
+#     parsing caddyfile tokens for 'acme_eab': wrong argument count or unexpected
+#     line ending after '<kid>'
+# so an operator who enabled institutional ACME got an edge that REFUSED TO START, on the
+# one code path where a broken edge takes every deployed app down with it.
+acme_eab {
+	key_id {$ACME_EAB_KID}
+	mac_key {$ACME_EAB_HMAC}
+}
+
+# 🚨 DO NOT ADD A GLOBAL `acme_dns` BLOCK HERE. It is SILENTLY IGNORED — the config
+# loads without complaint and certificates simply never issue by DNS. DNS-01 belongs in
+# a site block or a `tls` directive. Requires an image built with
+# `xcaddy build --with github.com/caddy-dns/cloudflare` (see ../Dockerfile.cloudflare).

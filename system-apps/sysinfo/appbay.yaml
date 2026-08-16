@@ -1,0 +1,18 @@
+project: default
+environment: default
+collection: [starter, diagnostics]
+tags:
+  tier: ops
+  role: diagnostics
+
+upstream:
+  source: ./docker-compose.yml
+  expose:
+    - sysinfo
+
+traits:
+  - type: ingress
+    host: "sysinfo.${{project.DOMAIN}}"
+    port: 8080
+    service: sysinfo
+    exposure: internal

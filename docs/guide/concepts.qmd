@@ -1,0 +1,322 @@
+---
+title: "Core Concepts"
+description: "Understand apps, traits, overlays, scopes, collections, and operators"
+---
+
+## The application model
+
+Appbay is inspired by the [Open Application Model (OAM)](https://oam.dev/) -- a specification for describing cloud-native applications. OAM separates the concerns of application developers, platform operators, and infrastructure providers. Appbay adapts these ideas for single-node Docker Compose deployments.
+
+The central idea: **Docker Compose is the application model.** Your `docker-compose.yml` file is the component definition. Appbay adds traits, scopes, and policies on top -- without replacing Compose.
+
+```{mermaid}
+flowchart TD
+    A[docker-compose.yml] --> B[Appbay Compiler]
+    C[appbay.yaml] --> B
+    D[Runtime Facts] --> B
+    E[Scoped Variables] --> B
+    F[Secret URIs] --> B
+    B --> G[Rendered Compose]
+    G --> H[docker compose up]
+```
+
+## Apps
+
+An **app** is a directory under `$APPBAY_HOME/etc/apps/` containing a `docker-compose.yml` file. The directory name is the app name. No configuration file is needed to register an app -- just create the directory.
+
+```
+etc/apps/
+  ollama/
+    docker-compose.yml       # required
+    appbay.yaml              # optional -- only if you need traits, overlays, or scope
+  jellyfin/
+    docker-compose.yml
+    appbay.yaml
+  whoami/
+    docker-compose.yml
+```
+
+An app can contain multiple Compose services. For example, a `nextcloud` app might have services for the web server, the database, and a Redis cache. Appbay treats the entire directory as one deployable unit.
+
+## Services
+
+A **service** is a Docker Compose service within an app. Appbay does not redefine what a service is -- it uses the standard Compose service model. Traits can be applied at the service level (e.g., ingress on a specific service) or at the app level (e.g., backup for the entire app).
+
+## Traits
+
+A **trait** is a reusable, declarative transformation that adds or modifies behavior. Traits are attached to apps or services in `appbay.yaml` and are applied during compilation.
+
+Appbay v1 ships with seven core traits:
+
+| Trait | Scope | Purpose |
+|-------|-------|---------|
+| `ingress` | service | Traefik/Caddy routing, TLS, exposure modes |
+| `gpu` | service | GPU device passthrough (Nvidia/CDI/ROCm) |
+| `auth` | app | Caddy Security browser login and role-based authorization |
+| `hooks` | service | Init containers, sidecars, config injection |
+| `scoped-env` | app | Variable injection from project/environment scopes |
+| `secrets` | service | URI-based secret resolution |
+| `backup` | app | Scheduled backup with retention policy |
+
+Traits follow OAM rules:
+
+- **Applied in declaration order.** The order you list traits matters.
+- **One configuration per trait type per service.** You cannot attach two `ingress` traits to the same service.
+- **Conflict declarations.** Some traits declare `conflictsWith` to prevent incompatible combinations.
+
+See [Traits](traits.qmd) for detailed documentation of each trait.
+
+## Scopes
+
+Appbay has three organizational concepts that control different aspects of the runtime:
+
+```{mermaid}
+flowchart LR
+    P[Project] -->|variable namespace| V1[project.yaml vars]
+    E[Environment] -->|variable values| V2[environment.yaml vars]
+    E -->|cert selection| TLS[staging vs production]
+    CO[Collection] -->|app selection| S[which apps deploy]
+```
+
+### Installation settings — `$APPBAY_HOME/project.yaml`
+
+Settings that describe **this installation** rather than any one app. Written by `appbay init` and read on every command.
+
+| key | values | default | meaning |
+|---|---|---|---|
+| `project` | string | hostname | project name for scope resolution |
+| `domain` | string | — | base domain for ingress routing |
+| `catalog_source` | path or git URL | bundled catalog | where `appbay install` looks |
+| `container_runtime` | `docker` \| `podman` | `docker` | which container binary every command invokes |
+| `ingress_provider` | `traefik` \| `caddy` | `traefik` | which reverse proxy the ingress trait emits for |
+
+```yaml
+# $APPBAY_HOME/project.yaml
+project: homelab
+domain: homelab.example.com
+container_runtime: podman
+ingress_provider: caddy
+```
+
+The last two are set through `appbay init`, which applies them on re-init too and reports `created` / `updated` / `unchanged`:
+
+```bash
+appbay init --container-runtime podman --ingress-provider caddy
+```
+
+Both accept a per-invocation override — `$APPBAY_CONTAINER_RUNTIME` and `$APPBAY_INGRESS_PROVIDER` — which wins over the file and is not persisted.
+
+::: {.callout-warning}
+## Two different files are called `project.yaml`
+
+They are not interchangeable and they share nothing but a filename.
+
+| path | purpose | keys |
+|---|---|---|
+| `$APPBAY_HOME/project.yaml` | **this installation** — the table above | `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider` |
+| `$APPBAY_HOME/etc/projects/<name>/project.yaml` | **one project's variable scope**, described just below | `name`, `vars`, `defaults` |
+
+Everything from here to the end of this section is about the *second* one.
+:::
+
+### Project
+
+A **project** is a variable scope namespace. It determines which `projects/<project>/project.yaml` variable file is loaded when resolving `${{project.KEY}}` references.
+
+```yaml
+# appbay.yaml
+project: homelab
+```
+
+Container names, volume names, and shared network names are derived from the **app name**, not the project. Containers are named `appbay.<app>.<service>`, volumes are prefixed `<app>_`, and apps join the `appbay_shared` network (or whatever `shared_network` specifies).
+
+Use multiple projects when you need separate variable namespaces -- for example, `homelab` and `work-lab` can each have their own `DOMAIN`, `TZ`, and other project-level vars on the same host.
+
+### Environment
+
+An **environment** is a deployment variant. It determines which variable values, secret URIs, and certificate resolvers are used.
+
+```yaml
+# appbay.yaml
+environment: prod
+```
+
+Typical environments: `prod` (real domain, production certs), `dev` (localhost, staging certs), `staging` (staging domain, production-like data).
+
+The environment for an app is set in `appbay.yaml` via the `environment:` field. To deploy with a different environment, update `appbay.yaml` or maintain separate app directories per environment.
+
+### Collection
+
+A **collection** is an operational grouping -- a named set of apps that deploy, restart, or stop together. Collections are multi-valued and purely a selection mechanism.
+
+```yaml
+# appbay.yaml
+collection: [ai-stack, gpu-apps]
+```
+
+Usage: `appbay up --collection ai-stack` deploys all apps tagged with that collection.
+
+Collections do **not** participate in variable resolution. They are selectors, not scope levels.
+
+## Variable resolution
+
+Variables are resolved by scope prefix. Each `${{scope.KEY}}` reference targets a specific variable store:
+
+| Syntax | Resolves from |
+|--------|---------------|
+| `${{project.KEY}}` | `projects/<name>/project.yaml` only |
+| `${{environment.KEY}}` | `projects/<name>/environments/<env>.yaml` only |
+| `${{service.KEY}}` | Service-level vars in `appbay.yaml` or `.env` only |
+
+There is no cascading fallthrough between stores. If you write `${{project.DOMAIN}}`, it resolves from `project.yaml` only — even if `environment.yaml` also defines `DOMAIN`. An undefined reference produces an explicit error with the scope and key name. Appbay never silently substitutes empty strings.
+
+```yaml
+# In appbay.yaml or .env
+DB_HOST: ${{environment.DB_HOST}}   # resolves from environment.yaml
+DOMAIN: ${{project.DOMAIN}}         # resolves from project.yaml
+```
+
+### Magic generators
+
+Appbay supports generator expressions that produce values on first evaluation and are then stored for deterministic re-renders:
+
+| Generator | Example | Description |
+|-----------|---------|-------------|
+| `${password:N}` | `${password:16}` | Random alphanumeric string of length N |
+| `${uuid}` | `${uuid}` | Random UUID v4 |
+| `${hash}` | `${hash}` | Deterministic hash of project + environment + service + key |
+| `${base64:N}` | `${base64:32}` | Random base64 string of N bytes |
+| `${timestamp}` | `${timestamp}` | Current timestamp (evaluated at render time, not stored) |
+
+## Overlays
+
+**Conditional overlays** are Compose fragments that are applied only when specified conditions are met -- typically when a peer app is active. This enables declarative cross-app wiring without manual configuration.
+
+```yaml
+# apps/webui/appbay.yaml
+overlays:
+  - when: [ollama]
+    services:
+      web:
+        environment:
+          - OLLAMA_BASE_URL=http://ollama_web:11434
+```
+
+When Appbay detects that `ollama` is in the active app set, it merges this fragment into WebUI's rendered compose. See [Conditional Overlays](overlays.qmd) for full syntax.
+
+## How a deploy actually executes
+
+There is **no operator service**. Whichever interface you used — CLI, web, or desktop — calls `@appbay/core` in its own process, which compiles your app, spawns the configured compose client, reports, and exits. Runtime capabilities (GPU availability, runtime version, disk, OS) are probed from the host during that run.
+
+A deployed app keeps running after every Appbay process is gone. That is the design: Appbay is a deployer, not a supervisor.
+
+In v1, there is a single operator co-located with the server. The `operator` field in `appbay.yaml` is optional and defaults to `local`. The architecture supports multiple operators on different nodes in future versions.
+
+```{mermaid}
+flowchart TD
+    S[CLI / web / desktop] -->|in-process call| O["@appbay/core pipeline"]
+    O -->|Docker Socket<br/>read-only mount| D[Docker Engine]
+    O -->|reports| F[Runtime Facts<br/>GPU, disk, OS]
+```
+
+## System apps
+
+Appbay ships **system apps** as built-in definitions that are seeded into `$APPBAY_HOME/etc/apps/` during `appbay init`. They include infrastructure apps and ready-to-deploy user apps:
+
+**Infrastructure apps** (deployed automatically or on demand to enable Appbay features):
+
+| System app | Purpose |
+|------------|---------|
+| **Traefik** | Reverse proxy, ingress routing, TLS termination (ingress-only mode) |
+| **Caddy** | Integrated ingress + Caddy Security edge (authentication, authorization) |
+| **Whoami** | Starter demo app for verifying ingress routing |
+
+**Bundled user apps** (ready-to-deploy with pre-configured `appbay.yaml`):
+
+| System app | Purpose |
+|------------|---------|
+| **Ollama** | Local LLM inference server |
+| **Open WebUI** | Web UI for LLM models, integrates with Ollama |
+| **Nextcloud** | Self-hosted file sync and collaboration |
+| **Jellyfin** | Media server |
+| **Vaultwarden** | Bitwarden-compatible password manager |
+| **Home Assistant** | Home automation platform |
+
+System apps are regular Appbay apps with their own `docker-compose.yml` and `appbay.yaml`. They are authored in the `system-apps/` directory of the Appbay source tree and seeded into `$APPBAY_HOME/etc/apps/` during `appbay init`.
+
+::: {.callout-warning}
+## Contributors: edit the directory, run the generator
+
+`appbay init` seeds from the **embedded** definitions in
+`packages/core/src/system-apps.ts`, not from the `system-apps/` directory. The
+definitions are compiled into the binary so that seeding does not depend on filesystem
+paths relative to the source tree, which are unavailable in a `bun`-compiled binary.
+
+**`system-apps/` is the authored source, and a generator produces the embedded file from
+it.** The workflow is three steps:
+
+```bash
+# 1. edit the app definition
+vim system-apps/caddy/config/Caddyfile
+# 2. regenerate the embedded copy
+node scripts/generate-system-apps.mjs
+# 3. commit BOTH
+```
+
+`packages/core/src/__tests__/system-apps-sync.test.ts` fails the build if the committed
+generated file is not what the generator would produce right now, so a forgotten step 2
+cannot reach main.
+
+⚠️ The generated file is **committed** rather than built on demand, because `appbay init`
+must seed system apps from a single compiled binary with no source tree present.
+
+::: {.callout-note}
+## Why this matters historically
+Before the generator, these were two hand-maintained copies with nothing between them.
+They drifted to 8 differing files and 2 apps that existed only as embedded strings — and it
+cost the default ingress: a `depends_on: [socket-proxy]` left in the Traefik definition
+after socket-proxy was deleted, which makes Compose reject the *entire* project rather than
+skip the service.
+:::
+:::
+
+## What Appbay is and is not
+
+Appbay is a **centralized control plane** for Docker Compose apps. It adds ingress routing, authentication, secret management, and lifecycle orchestration on top of standard compose files --- without modifying the upstream compose.
+
+**It is not a service mesh.** There are no per-app sidecar proxies, no east-west traffic interception, no mTLS between containers, and no distributed tracing injection. Cross-cutting concerns (routing, auth, secrets) are handled by shared centralized services:
+
+- **Traefik** or **Caddy** handles all HTTP routing and TLS termination (one instance, not one per app)
+- **Caddy Security** handles authentication and authorization for the Caddy edge (one instance, not one per app)
+- **The secrets vault** resolves secrets at deploy time and injects them via process environment or file mounts
+
+When your app needs authentication, Appbay generates Caddy Security authorization policies and injects `Remote-User`/`Remote-Email`/`Remote-Groups` headers --- it doesn't inject a proxy container next to your app.
+
+This centralized approach means deploying 30 apps doesn't create 60 containers. Your compose files stay unmodified. Your apps start and stop independently of the control plane (in default mode).
+
+## The compiler pipeline
+
+When you run `appbay up`, the compiler transforms your app definitions into runnable Compose files, then deploys them:
+
+```{mermaid}
+flowchart LR
+    A[Discover + Parse] --> B[Upstream transform]
+    B --> C[Resolve variables]
+    C --> D[Select overlays]
+    D --> E[Apply traits]
+    E --> F[Render]
+    F --> G[Plan/Diff]
+    G --> H[docker compose up]
+```
+
+The pipeline runs in two phases. For each discovered app, stages run in this order:
+
+1. **Discover** -- Scan `etc/apps/` for directories with `docker-compose.yml`. Parse and validate `appbay.yaml` with Zod schemas. Errors are recorded but do not block other apps.
+2. **Upstream transform** -- For apps with an `upstream.source`, apply namespace isolation first (internal network creation, volume prefixing, shared network aliases). This runs *before* variable resolution so that scope references inside the upstream compose are visible to the resolver.
+3. **Resolve variables** -- Evaluate `${{scope.KEY}}` references against the appropriate variable store by scope prefix: `project` → `project.yaml`, `environment` → `environment.yaml`, `service` → service-level vars. Magic generators (`${password:N}`, `${uuid}`, etc.) are evaluated and persisted.
+4. **Select overlays** -- Evaluate `when` clauses against the active app set; merge matching fragments into the compose model.
+5. **Apply traits** -- Transform the compose model (add Traefik config, GPU devices, auth middleware, etc.) in declaration order.
+6. **Render** -- Write final compose YAML to `var/lib/renders/<app>/`
+7. **Plan/Diff** -- Compare rendered output against the previous render on disk; produce a redacted diff.
+
+After compilation, `docker compose up -d` is invoked with the rendered artifacts. The compile phase is deterministic: the same inputs always produce the same rendered output.

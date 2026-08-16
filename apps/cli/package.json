@@ -1,0 +1,28 @@
+{
+  "name": "@appbay/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "appbay": "dist/appbay"
+  },
+  "scripts": {
+    "build": "bun build --compile src/index.ts --outfile dist/appbay",
+    "dev": "bun run src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@appbay/core": "workspace:*",
+    "@appbay/db": "workspace:*",
+    "commander": "^14.0.0",
+    "yaml": "^2.8.4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^20.19.39",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

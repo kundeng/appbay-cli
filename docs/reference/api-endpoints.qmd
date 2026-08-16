@@ -1,0 +1,547 @@
+---
+title: "API Endpoint Reference"
+description: "Every tRPC procedure with input and output types"
+---
+
+## Overview
+
+All API endpoints are tRPC procedures served at `/api/trpc/`. Except where noted, all procedures require authentication via session cookie or bearer token.
+
+## Notation
+
+- **query** -- read-only, idempotent
+- **mutation** -- writes data or triggers side effects
+- Input types shown in Zod notation. `z.string()` means a string, `z.object({...})` means an object with the listed fields.
+
+## auth
+
+Current user and setup state. All procedures in this router are **public** (no auth required) except `auth.rotateSession`.
+
+### `auth.me`
+
+Return the currently authenticated user, or `null` if not logged in. Safe to call without a session -- no error is thrown.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ user: { id: string, username: string } | null }`
+- **Auth:** none
+
+### `auth.setupRequired`
+
+Check whether first-run setup is needed.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ setupRequired: boolean }` (true when zero users exist in the database)
+- **Auth:** none
+
+### `auth.rotateSession`
+
+Invalidate all active sessions globally, forcing all clients to re-authenticate.
+
+- **Type:** mutation
+- **Input:** none
+- **Output:** `{ rotated: boolean }`
+
+Application ingress authentication belongs to the integrated Caddy Security edge and is
+declared in appbay manifests. Edge-user administration has a web surface (`edge`, below) as
+well as a CLI (`appbay edge users`) — but that is **not** a second authentication
+configuration path: both drive the same `EdgeIdentityStore` in `@appbay/core`. One store,
+one hasher, one reload.
+
+::: {.callout-important}
+## Two credential domains, never synchronized
+
+`auth` owns **AppBay control-plane sessions** — who signs in to AppBay itself, stored in
+`etc/control-plane/users.yaml` and managed offline with `appbay admin`.
+
+`edge` owns **edge identities** — who signs in to your *deployed apps*, stored in Caddy
+Security's `users.json` and managed with `appbay edge users`.
+
+They are separate domains. Resetting one does not affect the other.
+:::
+
+## edge
+
+Protected router. Edge identities are the accounts the Caddy Security portal accepts for
+**deployed apps**; they are not AppBay accounts.
+
+Every mutation writes `users.json` and then restarts the edge, because a Caddy config
+reload does **not** rebuild AuthCrunch's in-memory identity store — without the restart the
+file on disk and the identities Caddy authenticates against diverge. `edgeRestarted: false`
+means the edge was not running, which is not a failure: the store is read at startup.
+
+### `edge.listUsers`
+
+List local edge identities. An empty list is a normal state on a fresh install, not an error.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ users: [{ id, username, email, roles[], created, lastModified }] }`
+
+::: {.callout-warning}
+Password hashes are never returned. Only the fields above cross the API boundary.
+:::
+
+### `edge.createUser`
+
+Create an edge identity with a generated password.
+
+- **Type:** mutation
+- **Input:** `{ username, email, roles?: string[] }` (roles default to `["user"]`)
+- **Output:** `{ user, password, edgeRestarted }`
+
+Roles given without an organization are namespaced to `authp/`, which is what app access
+policies match on. **The password is returned once and only once** — only a bcrypt hash is
+stored, so it cannot be retrieved again.
+
+### `edge.resetPassword`
+
+Reset an edge identity's password to a newly generated one. Every previous credential is
+revoked, so the old password stops authenticating immediately.
+
+- **Type:** mutation
+- **Input:** `{ username }`
+- **Output:** `{ user, password, edgeRestarted }`
+
+## catalog
+
+Protected router. Browse and install curated catalog entries.
+
+### `catalog.list`
+
+List catalog entries, optionally filtered.
+
+- **Type:** query
+- **Input:** `{ source?, readiness?, category?, query? }` (all optional)
+- **Output:** `{ entries: [{ ...entry, source, hasAppbayYaml, hasCompose }], errors: [{ dir, message }] }`
+
+`errors` reports entries that could not be read. It is part of the normal response, not an
+exception — one malformed entry must not hide the rest of the catalog.
+
+### `catalog.get`
+
+Fetch a single catalog entry by name.
+
+- **Type:** query
+- **Input:** `{ name }`
+- **Output:** the entry, with its source and file presence flags
+
+### `catalog.search`
+
+Search catalog entries.
+
+- **Type:** query
+- **Input:** `{ query }`
+- **Output:** matching entries
+
+### `catalog.install`
+
+Install a catalog entry into this AppBay home.
+
+- **Type:** mutation
+- **Input:** `{ name, values?: Record<string,string>, force? }`
+- **Output:** the install result from `catalogInstall()`
+
+## health
+
+Public router. No authentication required.
+
+### `health.get`
+
+Return server health status.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ status: "ok", version: string }`
+- **Auth:** none
+
+## doctor
+
+### `doctor.run`
+
+Run all prerequisite and health checks.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ checks: DoctorCheck[], passed: boolean }`
+
+Where `DoctorCheck` is `{ name: string, status: "pass" | "fail" | "warn", message: string }`.
+
+## system
+
+### `system.info`
+
+Get control-plane identity: the `$APPBAY_HOME` path, a display-friendly shortform, and the hostname. Used by the sidebar scope card.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ appbayHome: string, displayPath: string, hostname: string }`
+
+### `system.resources`
+
+Get live host resource metrics: RAM usage, GPU VRAM (per-GPU and aggregated), and static host identity (CPU model/cores, platform).
+
+- **Type:** query
+- **Input:** none
+- **Output:** `{ ram: { totalGb, usedGb, freeGb, pct }, gpu: GpuInfo[] | null, gpuSummary: GpuSummary | null, host: { hostname, platform, cpuModel, cpuCores, totalRamGb } }` where `GpuInfo` is `{ name, usedMib, totalMib, pct }`
+
+## apps
+
+### `apps.list`
+
+List all discovered apps with runtime status.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `App[]` where `App` is `{ name, project, environment, status, hasAppbayYaml, serviceCount, traits, collections, tags, errors }`
+
+### `apps.get`
+
+Get detailed information for a single app. Returns `null` if not found.
+
+- **Type:** query
+- **Input:** `{ name: string }`
+- **Output:** `AppDetail | null` where `AppDetail` is `{ name, dir, composePath, project, environment, status, services, hasAppbayYaml, appbayConfig, errors }`
+
+### `apps.create`
+
+Scaffold a new app directory with a minimal `compose.yaml` and `appbay.yaml`. Fails if the app name already exists.
+
+- **Type:** mutation
+- **Input:** `{ name: string, image?: string, project?: string }` (`image` defaults to `"ubuntu:latest"`, `project` defaults to `"default"`)
+- **Output:** `{ success: boolean, message: string, name: string }`
+
+### `apps.import`
+
+Import an existing compose project directory as an Appbay-managed app. Copies the source directory into `$APPBAY_HOME/etc/apps/<name>/` and writes a minimal `appbay.yaml` if one is absent.
+
+- **Type:** mutation
+- **Input:** `{ name: string, sourcePath: string }`
+- **Output:** `{ success: boolean, message: string, name: string }`
+
+### `apps.delete`
+
+Delete an app definition directory. Does not remove Docker volumes unless explicitly requested.
+
+- **Type:** mutation
+- **Input:** `{ name: string, keepVolumes?: boolean }` (`keepVolumes` defaults to `true`)
+- **Output:** `{ success: boolean, message: string }`
+
+### `apps.overlays`
+
+Return overlay connection edges across all apps (or filtered to a single app). Each edge represents a conditional compose merge that activates when a peer app is running.
+
+- **Type:** query
+- **Input:** `{ appName?: string }` (omit for all apps)
+- **Output:** `{ edges: OverlayEdge[] }` where `OverlayEdge` is `{ from, to, active, label, effect, reason }`
+
+### `apps.stats`
+
+Return live Docker runtime metrics (CPU %, memory MiB, uptime) for a running app.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ cpu: number | null, memMib: number | null, uptime: string | null }`
+
+### `apps.networks`
+
+List Docker networks declared in an app's compose file.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ name: string, external: boolean, driver: string | null }[]`
+
+### `apps.services.list`
+
+List services within an app, enriched with live Docker container status.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `Service[]` where `Service` is `{ name, image, ports, status }`
+
+### `apps.config.get`
+
+Read a parsed `appbay.yaml` for an app. Optionally read a single dot-separated key path.
+
+- **Type:** query
+- **Input:** `{ appName: string, key?: string }`
+- **Output:** `{ config: AppbayYaml, valid: boolean }` (no key) or `{ value: unknown, key: string, found: boolean }` (with key)
+
+### `apps.config.set`
+
+Write a value at a dot-separated key path in `appbay.yaml`. Creates the file if absent. Validates the result and reports errors but always writes.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, key: string, value: unknown }`
+- **Output:** `{ success: boolean, valid: boolean, errors: string[] }`
+
+### `apps.traits.add`
+
+Append a trait to an app's `appbay.yaml`. Optionally attach at the service level.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, traitType: string, service?: string }`
+- **Output:** `{ success: boolean, valid: boolean, errors: string[] }`
+
+### `apps.traits.remove`
+
+Remove the first trait of the given type from an app's `appbay.yaml`.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, traitType: string, service?: string }`
+- **Output:** `{ success: boolean }`
+
+### `apps.logs.follow`
+
+Start streaming Docker logs for all running containers in an app. Publishes each line to the `app.logs` SSE channel. Returns immediately with the container count.
+
+- **Type:** mutation
+- **Input:** `{ appName: string }`
+- **Output:** `{ followed: number }`
+
+## validation
+
+### `validation.run`
+
+Run schema validation on one or more app definitions.
+
+- **Type:** mutation
+- **Input:** `{ apps?: string[] }` (omit for all apps)
+- **Output:** `ValidationResult` with per-app errors including file paths and field names
+
+### `validation.get`
+
+Get the most recent validation result.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `ValidationResult`
+
+## plans
+
+### `plans.compile`
+
+Run the compiler pipeline for one or more apps. Results are cached in-memory for subsequent `plans.get` and `plans.diff` calls.
+
+- **Type:** mutation
+- **Input:** `{ apps?: string[], project?: string, environment?: string }` (all optional — omit `apps` to compile all)
+- **Output:** `{ apps: CompiledApp[], errorCount, warningCount, errors, warnings }` where `CompiledApp` is `{ appName, planStatus, hash, rendered, logicalChanges }`
+
+### `plans.get`
+
+Get plan metadata for a specific app from the most recent compile.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ appName, status, hash, rendered, auxiliaryFiles }` (secrets in `rendered` are redacted)
+
+### `plans.diff`
+
+Get the unified diff for a specific app from the most recent compile.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ appName, status, diff, diffLines }` (secrets are redacted)
+
+## deployments
+
+### `deployments.applyPlan`
+
+Apply a pre-compiled rendered compose file synchronously. The client sends the YAML string produced by `plans.compile`; the server writes it to disk and runs `docker compose up -d`. HTTP response is held open until the compose command completes.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, rendered: string }`
+- **Output:** `{ success: boolean, deployId: string }`
+
+### `deployments.enqueue`
+
+Async deploy path preferred by the web UI. Writes the rendered compose file to disk and enqueues a `"deploy"` job. Returns immediately — callers poll `jobs.get(jobId)` for status and subscribe to SSE `deploy.status` / `deploy.logs` for real-time progress.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, rendered: string }`
+- **Output:** `{ jobId: string, deployId: string }`
+
+### `deployments.up`
+
+Compile and deploy apps in one step.
+
+- **Type:** mutation
+- **Input:** `{ apps: string[] }`
+- **Output:** `{ success: boolean, errors: string[] }`
+
+### `deployments.down`
+
+Stop running apps.
+
+- **Type:** mutation
+- **Input:** `{ apps: string[], volumes?: boolean }` (`volumes` defaults to `false`)
+- **Output:** `{ success: boolean, errors: string[] }`
+
+### `deployments.restart`
+
+Restart running apps (down then up for each).
+
+- **Type:** mutation
+- **Input:** `{ apps: string[] }`
+- **Output:** `{ success: boolean, errors: string[] }`
+
+### `deployments.list`
+
+List deployment history.
+
+- **Type:** query
+- **Input:** `{ limit?: number }` (optional, defaults to 50)
+- **Output:** `Deploy[]` with `{ id, appName, status, startedAt, completedAt }`
+
+### `deployments.get`
+
+Get details for a specific deployment.
+
+- **Type:** query
+- **Input:** `{ id: string }` (deploy ID)
+- **Output:** `DeployDetail` with plan snapshot and error details
+
+## configs
+
+### `configs.list`
+
+List saved config presets.
+
+- **Type:** query
+- **Input:** none
+- **Output:** `ConfigPreset[]`
+
+### `configs.save`
+
+Save a named app selection preset. Creates or overwrites the preset file in `$APPBAY_HOME/etc/configs/`.
+
+- **Type:** mutation
+- **Input:** `{ name: string, description?: string, apps: string[] }` (apps is a list of app names to save)
+- **Output:** `{ success: boolean, name: string }`
+
+### `configs.load`
+
+Load a config preset by name. Returns `null` if not found.
+
+- **Type:** query
+- **Input:** `{ name: string }`
+- **Output:** `ConfigPreset | null` where `ConfigPreset` is `{ name, description?, apps, createdAt, updatedAt? }`
+
+### `configs.delete`
+
+Delete a config preset by name.
+
+- **Type:** mutation
+- **Input:** `{ name: string }`
+- **Output:** void
+
+## secrets
+
+### `secrets.check`
+
+Verify that secret URIs can be resolved. Omit `appName` to check all apps.
+
+- **Type:** query
+- **Input:** `{ appName?: string }` (optional — omit for all apps)
+- **Output:** `{ total: number, ok: number, failed: number, results: SecretCheckResult[] }` where `SecretCheckResult` is `{ appName, envVar, uri, ok, error? }`
+
+### `secrets.list`
+
+List secret URI references (URIs only, never values).
+
+- **Type:** query
+- **Input:** `{ appName?: string }` (optional — omit for all apps)
+- **Output:** `SecretMeta[]` with `{ appName, envVar, uri }`
+
+### `secrets.init`
+
+Initialize the local secrets vault.
+
+- **Type:** mutation
+- **Input:** `{ password?: string }` (optional — auto-generates if omitted)
+- **Output:** `{ vaultPath, passwordPath, generated }`
+
+### `secrets.set`
+
+Store a secret in the vault. Key format: `"KEY"` for default scope, `"APP/KEY"` for scoped.
+
+- **Type:** mutation
+- **Input:** `{ key: string, value: string }`
+- **Output:** `{ key, scope, uri }`
+
+### `secrets.delete`
+
+Delete a secret from the vault.
+
+- **Type:** mutation
+- **Input:** `{ key: string }`
+- **Output:** `{ deleted, key, scope }`
+
+### `secrets.vault`
+
+List all vault secrets (metadata only, no values).
+
+- **Type:** query
+- **Input:** `{ scope?: string }` (optional — omit for all scopes)
+- **Output:** `{ entries: { key, scope }[], total, byScope }`
+
+### `secrets.scan`
+
+Discover secret-like env vars in an app's compose and .env files.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ appName, vars: ScannedVar[], secrets: ScannedVar[], unmanaged: ScannedVar[] }`
+
+## jobs
+
+Read-only access to the in-process job queue backed by SQLite. All Docker-heavy operations (`deploy`, `pull-images`, `eject`, `rebuild-cache`) run as jobs so the HTTP response is not held open. Clients poll `jobs.get` or subscribe to SSE `deploy.status` / `deploy.logs` for progress.
+
+### `jobs.get`
+
+Get a single job by ID. Returns `null` if the ID does not exist. Suitable for 1–2 second polling while a job is running.
+
+- **Type:** query
+- **Input:** `{ id: string }`
+- **Output:** `{ id, type, status, payload, createdAt, startedAt?, completedAt?, error? } | null`
+
+### `jobs.list`
+
+List recent jobs, most-recent first.
+
+- **Type:** query
+- **Input:** `{ type?: "deploy" | "backup" | "rebuild-cache" | "pull-images" | "eject", limit?: number }` (all optional, `limit` defaults to 50)
+- **Output:** `{ id, type, status, createdAt, startedAt?, completedAt?, error? }[]`
+
+### `jobs.cancel`
+
+Cancel a pending job. Running jobs cannot be cancelled.
+
+- **Type:** mutation
+- **Input:** `{ id: string }`
+- **Output:** `{ cancelled: boolean }`
+
+### `jobs.rebuildCache`
+
+Enqueue a `rebuild-cache` job. Re-scans `$APPBAY_HOME/etc/apps/` and regenerates the SQLite cache. Safe to run at any time; does not affect running containers.
+
+- **Type:** mutation
+- **Input:** none
+- **Output:** `{ success: boolean, jobId: string | null }`
+
+### `jobs.pullImages`
+
+Enqueue a `pull-images` job. Pulls the latest Docker images for all system apps (Caddy, Traefik, etc.). Never touches running containers.
+
+- **Type:** mutation
+- **Input:** none
+- **Output:** `{ success: boolean, jobId: string | null }`
+
+### `jobs.ejectAll`
+
+Enqueue an `eject` job. Compiles all user apps and writes rendered compose YAML to `$APPBAY_HOME/eject/<app-name>/docker-compose.yml`. Never modifies running containers.
+
+- **Type:** mutation
+- **Input:** none
+- **Output:** `{ success: boolean, jobId: string | null }`

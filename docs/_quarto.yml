@@ -1,0 +1,79 @@
+# Public docs configuration. This file is SHARED VERBATIM with the open-core upstream —
+# do not add internal sections here. The Developer section (dev/, design/) is private and
+# is layered on by the `internal` profile in _quarto-internal.yml:
+#
+#   quarto render                          -> public site (guide, deploy, reference)
+#   QUARTO_PROFILE=internal quarto render  -> adds the Developer section
+#
+# See .kiro/specs/appbay-v1/S27-open-core-split/spec.md, task 1.3.
+project:
+  type: website
+  output-dir: _site
+  # Explicit render list, because a Quarto website renders EVERY .qmd it finds — the
+  # sidebar controls navigation, not publication. Measured 2026-08-15: with dev/ and
+  # design/ merely dropped from the sidebar, `quarto render` still emitted
+  # _site/dev/*.html and _site/design/data-architecture.html — unlisted, but reachable by
+  # URL. Upstream will not contain those directories at all, so this is defence in depth:
+  # it also makes the public config correct when rendered from inside the private fork.
+  render:
+    - index.qmd
+    - guide/**
+    - deploy/**
+    - reference/**
+
+website:
+  title: "Appbay"
+  description: "Docker-native PaaS control plane"
+  navbar:
+    left:
+      - text: "Guide"
+        href: guide/index.qmd
+      - text: "Deploy"
+        href: deploy/index.qmd
+      - text: "Reference"
+        href: reference/index.qmd
+    right:
+      - icon: github
+        href: https://github.com/kundeng/appbay-cli
+
+  sidebar:
+    - title: "User Guide"
+      contents:
+        - guide/index.qmd
+        - guide/quickstart.qmd
+        - guide/concepts.qmd
+        - guide/apps.qmd
+        - guide/catalog.qmd
+        - guide/traits.qmd
+        - guide/overlays.qmd
+        - guide/secrets.qmd
+        - guide/credentials.qmd
+        - guide/cli.qmd
+        - guide/web-ui.qmd
+
+    - title: "Deployment"
+      contents:
+        - deploy/index.qmd
+        - deploy/compose.qmd
+        - deploy/native.qmd
+        - deploy/production.qmd
+
+    - title: "Reference"
+      contents:
+        - reference/index.qmd
+        - reference/appbay-yaml.qmd
+        - reference/cli-commands.qmd
+        - reference/api-endpoints.qmd
+        - reference/scope-model.qmd
+
+format:
+  html:
+    theme:
+      dark: darkly
+      light: flatly
+    toc: true
+    toc-depth: 3
+    code-copy: true
+    code-overflow: wrap
+    filters:
+      - present-mode
