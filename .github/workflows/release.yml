@@ -73,7 +73,9 @@ jobs:
         env:
           APPBAY_VERSION: ${{ github.ref_name }}
 
-      - name: Smoke test (native targets only)
+      # Only the two NATIVE targets can run on the machine that built them. The two
+      # cross-compiled ones are smoke-tested in the `smoke` job below, under emulation.
+      - name: Smoke test (native targets)
         if: matrix.target == 'linux-x64' || matrix.target == 'macos-arm64'
         run: |
           chmod +x apps/cli/dist/${{ matrix.artifact }}
@@ -96,12 +98,81 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
+  # Smoke-test the two CROSS-COMPILED binaries under emulation (issue #72).
+  #
+  # `build-cli` can only execute the target it was built on, so for four releases
+  # `appbay-linux-arm64` and `appbay-macos-x64` were compiled, uploaded, and handed
+  # to users without ever being started once. That is backwards: the natively-built
+  # pair got the check, and the cross-compiled pair — the case where a binary can
+  # link cleanly and still fail to start — got none.
+  #
+  # This job gates the release. An artifact that cannot run does not ship.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: Smoke (${{ matrix.artifact }} under ${{ matrix.how }})
+    needs: [build-cli]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact: appbay-linux-arm64
+            runner: ubuntu-latest
+            how: qemu
+          - artifact: appbay-macos-x64
+            runner: macos-latest
+            how: rosetta
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+
+      - name: Enable qemu-user for aarch64
+        if: matrix.how == 'qemu'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # The binary is DYNAMICALLY linked, so registering binfmt is not enough on its
+      # own — bare `./appbay-linux-arm64` dies with
+      # `Could not open '/lib/ld-linux-aarch64.so.1'`. It needs an aarch64 userland,
+      # which an arm64 container supplies. Measured on an x86_64 host, 2026-08-16.
+      - name: Run under qemu (arm64 userland)
+        if: matrix.how == 'qemu'
+        run: |
+          chmod +x ${{ matrix.artifact }}
+          docker run --rm --platform linux/arm64 -v "$PWD:/w" -w /w \
+            docker.io/library/ubuntu:24.04 \
+            /bin/sh -c './${{ matrix.artifact }} --version > /w/.ver && ./${{ matrix.artifact }} --help > /dev/null'
+          ACTUAL="$(cat .ver)"
+          echo "reported version: $ACTUAL"
+          [ "$ACTUAL" = "${{ github.ref_name }}" ] || {
+            echo "::error::version mismatch — ${{ matrix.artifact }} reports '$ACTUAL', tag is '${{ github.ref_name }}'"; exit 1; }
+
+      # macos-latest is arm64, so an x86_64 Mach-O needs Rosetta 2. It is not
+      # preinstalled on the arm64 runners.
+      - name: Install Rosetta 2
+        if: matrix.how == 'rosetta'
+        run: softwareupdate --install-rosetta --agree-to-license
+
+      - name: Run under Rosetta (x86_64)
+        if: matrix.how == 'rosetta'
+        run: |
+          chmod +x ${{ matrix.artifact }}
+          ACTUAL="$(arch -x86_64 ./${{ matrix.artifact }} --version)"
+          echo "reported version: $ACTUAL"
+          [ "$ACTUAL" = "${{ github.ref_name }}" ] || {
+            echo "::error::version mismatch — ${{ matrix.artifact }} reports '$ACTUAL', tag is '${{ github.ref_name }}'"; exit 1; }
+          arch -x86_64 ./${{ matrix.artifact }} --help > /dev/null
+
+  # ---------------------------------------------------------------------------
   # Create GitHub Release with all binary artifacts
   # ---------------------------------------------------------------------------
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-cli]
+    needs: [build-cli, smoke]
     steps:
       - uses: actions/checkout@v4
 
