@@ -40,7 +40,10 @@ CBIN="${CBIN:-docker}"
 PRIV="${PRIV:-env}"
 
 IMAGE="${IMAGE:-localhost/appbay-caddy-security:2.11.4-v1.1.64}"
-LIVE="${LIVE:-/home/ubuntu/.appbay/etc/apps/caddy/config}"
+# HOME_DIR so a rootful install (/root/.appbay) is reachable; see the note in
+# s25-edge-authz.sh for why these three journeys were the last red ones on Podman.
+HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
+LIVE="${LIVE:-$HOME_DIR/etc/apps/caddy/config}"
 STAGE="/tmp/appbay-acme-validate"
 
 pass=0; fail=0

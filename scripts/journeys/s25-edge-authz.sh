@@ -59,20 +59,28 @@ OUTSIDER_PW="${OUTSIDER_PW:-}"
 GROUP="${GROUP:-admins}"
 PROVISIONED=no
 
-ab() { multipass exec "$VM" -- $PRIV bash -c "cd /home/ubuntu && appbay $1 2>&1"; }
+# ⚠️ HOME_DIR, not a hardcoded /home/ubuntu/.appbay. This journey predates the convention
+# and read the install from a literal path, so on a ROOTFUL install (/root/.appbay) it
+# reported "could not read domain from project.yaml" against a project.yaml that plainly
+# had one — a harness portability bug wearing the costume of a product failure. The three
+# S25 journeys with no HOME_DIR support were exactly the three still red on the Podman
+# sweep of 2026-08-16; every journey that honoured it passed.
+HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
+CLI_CWD="$(dirname "$HOME_DIR")"
+ab() { multipass exec "$VM" -- $PRIV bash -c "cd $CLI_CWD && APPBAY_HOME=$HOME_DIR appbay $1 2>&1"; }
 vmsh() { multipass exec "$VM" -- $PRIV bash -c "$1"; }
 
 if [ -z "$HOST" ]; then
-  DOMAIN=$(vmsh "grep -m1 '^domain:' /home/ubuntu/.appbay/project.yaml | awk '{print \$2}'" | tr -d '[:space:]')
+  DOMAIN=$(vmsh "grep -m1 '^domain:' $HOME_DIR/project.yaml | awk '{print \$2}'" | tr -d '[:space:]')
   [ -n "$DOMAIN" ] || { echo "  ❌ could not read domain from project.yaml"; exit 1; }
   HOST="$APP.$DOMAIN"
-  vmsh "mkdir -p /home/ubuntu/.appbay/etc/apps/$APP" >/dev/null 2>&1
-  vmsh "cat > /home/ubuntu/.appbay/etc/apps/$APP/docker-compose.yml <<'EOF'
+  vmsh "mkdir -p $HOME_DIR/etc/apps/$APP" >/dev/null 2>&1
+  vmsh "cat > $HOME_DIR/etc/apps/$APP/docker-compose.yml <<'EOF'
 services:
   app:
     image: docker.io/traefik/whoami:latest
 EOF" >/dev/null 2>&1
-  vmsh "cat > /home/ubuntu/.appbay/etc/apps/$APP/appbay.yaml <<EOF
+  vmsh "cat > $HOME_DIR/etc/apps/$APP/appbay.yaml <<EOF
 project: default
 environment: default
 upstream:
@@ -107,12 +115,12 @@ fi
 cleanup_users() {
   if [ "$PROVISIONED_APP" = "yes" ]; then
     ab "down $APP" >/dev/null 2>&1
-    vmsh "rm -rf /home/ubuntu/.appbay/etc/apps/$APP /home/ubuntu/.appbay/var/lib/renders/$APP /home/ubuntu/.appbay/etc/apps/caddy/config/dynamic/$APP.caddy /home/ubuntu/.appbay/etc/apps/caddy/config/dynamic/auth/$APP-*.caddy /home/ubuntu/.appbay/etc/apps/caddy/config/security/policies/$APP.caddy" >/dev/null 2>&1
+    vmsh "rm -rf $HOME_DIR/etc/apps/$APP $HOME_DIR/var/lib/renders/$APP $HOME_DIR/etc/apps/caddy/config/dynamic/$APP.caddy $HOME_DIR/etc/apps/caddy/config/dynamic/auth/$APP-*.caddy $HOME_DIR/etc/apps/caddy/config/security/policies/$APP.caddy" >/dev/null 2>&1
   fi
   [ "$PROVISIONED" = "yes" ] || return 0
   multipass exec "$VM" -- $PRIV bash -c "python3 - <<'PYEOF'
 import json, os
-p = '/home/ubuntu/.appbay/etc/apps/caddy/config/security/users.json'
+p = '$HOME_DIR/etc/apps/caddy/config/security/users.json'
 if os.path.exists(p):
     d = json.load(open(p))
     d['users'] = [u for u in d.get('users', []) if u.get('username') not in ('$MEMBER', '$OUTSIDER')]

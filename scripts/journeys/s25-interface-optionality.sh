@@ -26,7 +26,11 @@ HOST="${HOST:-whoami.test.local}"
 # `docker`; on the Podman host every container query printed "docker: command not found" and
 # silently returned nothing.
 CBIN="${CBIN:-docker}"
-BIN="${BIN:-/home/ubuntu/appbay}"
+# The BINARY, not the install: it sits next to $HOME_DIR on these VMs (~/appbay), and on a
+# rootful host that is /root/appbay. Derived rather than hardcoded for the same reason as
+# the paths in s25-edge-authz.sh.
+HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
+BIN="${BIN:-$(dirname "$HOME_DIR")/appbay}"
 
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
