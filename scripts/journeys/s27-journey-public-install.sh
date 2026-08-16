@@ -4,11 +4,11 @@
 # A stranger finds Appbay, runs the documented command, and ends up with a working install.
 # No token, no gh login, no membership. That is the whole property.
 #
-# 🚨 THIS SCRIPT IS EXPECTED TO FAIL UNTIL S27 P2 LANDS, AND THAT FAILURE IS THE POINT.
-# `kundeng/appbay` is private today, so every URL below returns 404 for an anonymous
-# caller. Measured 2026-08-15: raw install.sh, /releases/latest, /releases?per_page=1, the
-# asset download, and the catalog clone — all 404. A red run here is the defect reproducing,
-# not a broken harness.
+# STATUS as of 2026-08-16: the repo and catalog are PUBLIC (S27 P2), so R3.1's fetch and
+# R3.2 pass. **R3.3 still fails, correctly: no release has been cut for kundeng/appbay-cli**,
+# so there is nothing for `appbay update` to find and nothing for the installer to download.
+# That is the S28 gate, not a harness fault — cutting a tag is what makes this journey
+# completable, and S28's journey evidence is what should permit the tag.
 #
 # ⭐ THE POINT IS THAT IT IS ONE SITTING ON ONE MACHINE. Three separate green checks on
 # three machines would not prove this: an install that succeeds and then cannot fetch a
@@ -21,7 +21,7 @@
 # pass while telling us nothing about a stranger. That control runs first and aborts.
 #
 #   VM=appbay-public-test ./s27-journey-public-install.sh
-#   PUBLIC_REPO=kundeng/appbay CATALOG_REPO=kundeng/appbay-catalog ./s27-journey-public-install.sh
+#   PUBLIC_REPO=kundeng/appbay-cli CATALOG_REPO=kundeng/appbay-catalog ./s27-journey-public-install.sh
 #
 # Use a FRESH VM. A host that already has ~/.appbay, a binary on PATH, or a warm image
 # cannot distinguish "install worked" from "install was already here".
@@ -29,9 +29,9 @@
 set -uo pipefail
 VM="${VM:-appbay-public-test}"
 PRIV="${PRIV:-env}"
-PUBLIC_REPO="${PUBLIC_REPO:-kundeng/appbay}"
+PUBLIC_REPO="${PUBLIC_REPO:-kundeng/appbay-cli}"
 CATALOG_REPO="${CATALOG_REPO:-kundeng/appbay-catalog}"
-BRANCH="${BRANCH:-master}"
+BRANCH="${BRANCH:-main}"
 HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 
 pass=0; fail=0
@@ -80,7 +80,7 @@ INSTALL_URL="https://raw.githubusercontent.com/$PUBLIC_REPO/$BRANCH/scripts/inst
 code=$(vm "curl -s -o /tmp/install.sh -w '%{http_code}' '$INSTALL_URL'")
 if [ "$code" != "200" ]; then
   bad "install.sh is not anonymously reachable — HTTP $code at $INSTALL_URL"
-  echo "     (expected until S27 P2; the repo is private)"
+  echo "     (the public repo is kundeng/appbay-cli on branch main)"
 else
   ok "install.sh reachable anonymously (HTTP 200)"
 
@@ -115,7 +115,7 @@ echo "-- R3.2: appbay init fetches the catalog with no credentials"
 code=$(vm "curl -s -o /dev/null -w '%{http_code}' 'https://api.github.com/repos/$CATALOG_REPO'")
 if [ "$code" != "200" ]; then
   bad "catalog repo not anonymously readable — HTTP $code for $CATALOG_REPO"
-  echo "     (S27 task 3.4 makes it public; scanned 2026-08-15, 300 entries, no secrets)"
+  echo "     (made public in S27 task 3.4)"
 else
   ok "catalog repo anonymously readable"
 
@@ -127,8 +127,11 @@ else
 
   # Assert entries landed, not merely that the command was cheerful. An init that clones
   # nothing and reports success is exactly the shape this project keeps finding.
-  n=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay catalog list 2>/dev/null | grep -cE '^[a-z0-9-]+' || echo 0")
-  if [ "${n:-0}" -gt 0 ]; then
+  # `grep -c` prints 0 AND exits non-zero on no match, so `|| echo 0` appended a second
+  # line and `[ "0\n0" -gt 0 ]` died with "integer expression expected". Take the last
+  # line and strip anything non-numeric.
+  n=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay catalog list 2>/dev/null | grep -cE '^[a-z0-9-]+'" | tail -1 | tr -cd '0-9')
+  if [ "${n:-0}" -gt 0 ] 2>/dev/null; then
     ok "catalog populated ($n entries listed)"
   else
     bad "catalog is empty after init — the fetch reported success and delivered nothing"
@@ -148,14 +151,32 @@ code=$(vm "curl -s -o /dev/null -w '%{http_code}' 'https://api.github.com/repos/
 if [ "$code" != "200" ]; then
   bad "release list not anonymously readable — HTTP $code"
 else
-  ok "release list anonymously readable"
-  out=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay update --check 2>&1 || true")
-  case "$out" in
-    *"No releases found"*|*"404"*|*"error"*|*"Error"*)
-      bad "appbay update could not resolve a release: $(echo "$out" | head -1)" ;;
-    "") bad "appbay update produced no output" ;;
-    *)  ok "appbay update resolved a release" ;;
-  esac
+  # 🚨 A 200 here says the LIST is readable, not that it has anything in it. An empty
+  # array is a perfectly readable list, and treating it as success is how this check
+  # first reported "✅ resolved a release" against a repo with zero releases.
+  count=$(vm "curl -s 'https://api.github.com/repos/$PUBLIC_REPO/releases?per_page=100' | grep -c '\"tag_name\"'" | tail -1 | tr -cd '0-9')
+  if [ "${count:-0}" -eq 0 ] 2>/dev/null; then
+    bad "release list is readable but EMPTY — no release has been cut for $PUBLIC_REPO"
+  else
+    ok "release list readable and non-empty ($count release(s))"
+  fi
+
+  # And the binary has to exist before its output means anything. Without this the
+  # shell's "No such file or directory" matched none of the error patterns below and
+  # fell through to a pass.
+  if ! vm "test -x $HOME_DIR/bin/appbay"; then
+    bad "appbay update NOT EXERCISED — no binary installed (blocked by R3.1)"
+  else
+    out=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay update --check 2>&1 || true")
+    case "$out" in
+      *"No such file"*|*"not found"*)
+        bad "appbay update did not run: $(echo "$out" | head -1)" ;;
+      *"No releases found"*|*"404"*|*"error"*|*"Error"*)
+        bad "appbay update could not resolve a release: $(echo "$out" | head -1)" ;;
+      "") bad "appbay update produced no output" ;;
+      *)  ok "appbay update resolved a release" ;;
+    esac
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------
