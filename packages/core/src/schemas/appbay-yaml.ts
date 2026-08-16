@@ -129,15 +129,25 @@ export const GpuTraitSchema = z.object({
   /**
    * Is the GPU essential to this app?
    *
-   * `false` (default) — a host with no GPU gets a WARNING and the app deploys without the
-   * device reservation. Ollama on CPU is slow but useful.
-   * `true` — a host with no GPU is a compile error. ComfyUI without a GPU is not a
-   * degraded install, it is a broken one, and starting it wastes the operator's time.
+   * `true` (DEFAULT) — a host with no GPU is a compile error and nothing is deployed.
+   * `false` — the app deploys without the device reservation and the operator is WARNED.
+   *   Opt in only for apps that are genuinely useful on CPU, like Ollama.
+   *
+   * 🚨 THE DEFAULT IS `true`, AND IT IS NOT ARBITRARY. Journey 15 of the alpha gate
+   * (`scripts/journeys/s26-journey-degradation.sh`) requires that a GPU trait on a
+   * GPU-less host deploys NOTHING, and its reasoning outranks convenience: an app that
+   * deploys "successfully" without its GPU looks healthy in every listing and fails hours
+   * later when a model load times out, far from the cause. Silent CPU fallback is the
+   * expensive failure, not the safe one.
+   *
+   * ⚠️ This shipped as `default(false)` for exactly one commit and broke that journey.
+   * Fixing the cryptic `could not select device driver "nvidia"` runtime error did NOT
+   * require deploying anyway — it required refusing *clearly*, which is what this does.
    *
    * EP1: which apps can survive on CPU is a property of the app, so it is declared in the
    * manifest rather than decided by a rule inside the trait.
    */
-  required: z.boolean().default(false),
+  required: z.boolean().default(true),
   /**
    * Target compose service name. Required for app-level GPU trait declarations.
    * Service-level declarations inherit the service name from the YAML key.

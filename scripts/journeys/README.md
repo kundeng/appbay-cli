@@ -101,6 +101,21 @@ manifest on one VM, which is exactly how `tests/bdd/` went months with no passin
 | `s26-journey-degradation.sh` | an absent GPU is refused clearly and **nothing deploys anyway** |
 | `s26-journey-first-run-auth.sh` | setup → login → session invalidation, including a **wrong password being refused** |
 | `s26-journey-doctor-parity.sh` | the CLI and the web report the **same health for the same install** — same checks, same verdicts. Runs locally |
+| `s27-journey-public-install.sh` | a stranger with **no credentials** installs from the public repo and gets a working install — one sitting, one machine |
+| `s28-journey-install-integrity.sh` | the installer **refuses** a corrupted or truncated download. Includes a control that must still install, or "refused" would be indistinguishable from a broken harness |
+| `s28-journey-build-rebuild.sh` | a source edit rebuilds, asserted on the **running container** with the image tag held constant — same name, different bytes |
+| `s28-journey-rootful-podman.sh` | the rootful Podman contract end to end: runtime-aware doctor, one provider-neutral server compose, healthy control plane, login, data surviving a converge |
+
+⚠️ **This table is hand-maintained and it silently stopped being an index.** Audited
+2026-08-16: it listed 19 of 23 scripts — `s27-journey-public-install.sh` had been missing
+since S27, and a reader would have concluded the public-install path had no journey at all.
+An index that is not checked is a document that quietly becomes wrong, which is the exact
+failure this directory exists to catch elsewhere. Check it before trusting it:
+
+```bash
+diff <(ls scripts/journeys/*.sh | xargs -n1 basename | sort) \
+     <(grep -oE '`s[0-9]+-[a-z0-9-]+\.sh`' scripts/journeys/README.md | tr -d '`' | sort -u)
+```
 
 ## Writing a new one
 

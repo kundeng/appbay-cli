@@ -211,9 +211,12 @@ export const gpuTraitDefinition: TraitDefinition<"gpu"> = {
     // remedy, and it arrives after the network and container have been created.
     //
     // The host is now checked whatever the variant, and what happens next is the
-    // manifest's call, not this trait's: `required: true` fails the compile with a
-    // sentence that says which app and why; otherwise the app deploys WITHOUT the device
-    // and the operator is told, once, in terms they can act on.
+    // manifest's call, not this trait's. `required` DEFAULTS TO TRUE: the compile fails
+    // with a sentence naming the app and the remedy, and nothing is deployed — journey 15
+    // of the alpha gate requires exactly that, because an app running silently on CPU
+    // looks healthy everywhere and fails hours later, far from the cause. An app that is
+    // genuinely useful without a GPU opts out with `required: false` and gets a warning
+    // plus a deploy.
     if (!gpuFacts.available) {
       const detail =
         `App "${input.app}" declares a gpu trait but this host reports no usable GPU` +
@@ -222,9 +225,15 @@ export const gpuTraitDefinition: TraitDefinition<"gpu"> = {
         "(for Docker + NVIDIA: nvidia-container-toolkit, then `nvidia-ctk runtime configure`).";
 
       if (props.required) {
+        // ⚠️ Do NOT say "this app declares required: true" — `required` defaults to true,
+        // so in the common case the app declared nothing and the sentence sends the
+        // operator looking through their manifest for a line that is not there.
         return {
           compose: structuredClone(input.compose),
-          errors: [`${detail} This app declares \`required: true\`, so it is not deployed.`],
+          errors: [
+            `${detail} A gpu trait requires a GPU unless the app sets \`required: false\`, ` +
+              `so this app is not deployed.`,
+          ],
         };
       }
       return {

@@ -14,6 +14,9 @@ traits:
   - type: gpu
     variant: nvidia
     service: ollama
+    # Ollama runs on CPU — slowly, but usefully — so it opts OUT of the default
+    # refuse-without-a-GPU behaviour. Most GPU apps should not.
+    required: false
   - type: ingress
     host: "ollama.${{project.DOMAIN}}"
     port: 11434

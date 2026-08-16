@@ -71,7 +71,7 @@ describe("gpuTraitDefinition", () => {
 
 describe("gpu transform - nvidia variant", () => {
   it("adds deploy.resources.reservations.devices for nvidia", () => {
-    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: true };
     const output = gpuTraitDefinition.transform(makeInput(props));
 
     const services = output.compose.services as Record<
@@ -92,7 +92,7 @@ describe("gpu transform - nvidia variant", () => {
   });
 
   it("uses 'all' when count is -1 for nvidia", () => {
-    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: -1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: -1, required: true };
     const output = gpuTraitDefinition.transform(makeInput(props));
 
     const services = output.compose.services as Record<
@@ -110,7 +110,7 @@ describe("gpu transform - nvidia variant", () => {
 
 describe("gpu transform - cdi variant", () => {
   it("adds nvidia.com/gpu device entries from runtime facts", () => {
-    const props: GpuTrait = { type: "gpu", variant: "cdi", count: 2, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "cdi", count: 2, required: true };
     const context = makeContext({
       cdiSupported: true,
       devices: ["gpu0", "gpu1", "gpu2"],
@@ -131,7 +131,7 @@ describe("gpu transform - cdi variant", () => {
   });
 
   it("uses nvidia.com/gpu=all when no devices are listed", () => {
-    const props: GpuTrait = { type: "gpu", variant: "cdi", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "cdi", count: 1, required: true };
     const context = makeContext({ cdiSupported: true, devices: [] });
     const input = makeInput(props, { context });
     const output = gpuTraitDefinition.transform(input);
@@ -146,7 +146,7 @@ describe("gpu transform - cdi variant", () => {
   });
 
   it("uses all devices when count is -1", () => {
-    const props: GpuTrait = { type: "gpu", variant: "cdi", count: -1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "cdi", count: -1, required: true };
     const context = makeContext({
       cdiSupported: true,
       devices: ["gpu0", "gpu1"],
@@ -169,7 +169,7 @@ describe("gpu transform - cdi variant", () => {
 
 describe("gpu transform - rocm variant", () => {
   it("adds /dev/kfd, /dev/dri devices and video/render groups", () => {
-    const props: GpuTrait = { type: "gpu", variant: "rocm", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "rocm", count: 1, required: true };
     const context = makeContext({ vendor: "amd" });
     const input = makeInput(props, { context });
     const output = gpuTraitDefinition.transform(input);
@@ -185,7 +185,7 @@ describe("gpu transform - rocm variant", () => {
 
 describe("gpu transform - auto-detect", () => {
   it("auto-detects nvidia when vendor is nvidia and cdi not supported", () => {
-    const props: GpuTrait = { type: "gpu", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", count: 1, required: true };
     const context = makeContext({
       available: true,
       vendor: "nvidia",
@@ -206,7 +206,7 @@ describe("gpu transform - auto-detect", () => {
   });
 
   it("auto-detects cdi when cdiSupported is true", () => {
-    const props: GpuTrait = { type: "gpu", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", count: 1, required: true };
     const context = makeContext({
       available: true,
       vendor: "nvidia",
@@ -225,7 +225,7 @@ describe("gpu transform - auto-detect", () => {
   });
 
   it("auto-detects rocm when vendor is amd", () => {
-    const props: GpuTrait = { type: "gpu", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", count: 1, required: true };
     const context = makeContext({
       available: true,
       vendor: "amd",
@@ -245,7 +245,7 @@ describe("gpu transform - auto-detect", () => {
   // Was "throws when gpu is not available and no explicit variant". It no longer throws:
   // a host without a GPU is a degradation, not a manifest error, and the operator gets a
   // warning plus a running app rather than a stack trace (#47).
-  it("warns and leaves compose untouched when no GPU is available", () => {
+  it("warns and leaves compose untouched when the app opts out with required: false", () => {
     const props: GpuTrait = { type: "gpu", count: 1, required: false };
     const context = makeContext({ available: false, vendor: undefined });
     const input = makeInput(props, { context });
@@ -261,7 +261,8 @@ describe("gpu transform - auto-detect", () => {
 
   // The other half of the same decision: an app that cannot work on CPU says so, and is
   // not deployed rather than started into a state the operator has to diagnose.
-  it("errors instead of degrading when the manifest says required: true", () => {
+  // The DEFAULT. Journey 15 requires that an absent GPU deploys nothing.
+  it("errors instead of degrading by default (required: true)", () => {
     const props: GpuTrait = { type: "gpu", count: 1, required: true };
     const context = makeContext({ available: false, vendor: undefined });
     const input = makeInput(props, { context });
@@ -269,7 +270,7 @@ describe("gpu transform - auto-detect", () => {
     const output = gpuTraitDefinition.transform(input);
 
     expect(output.warnings ?? []).toHaveLength(0);
-    expect(output.errors?.join(" ")).toContain("required: true");
+    expect(output.errors?.join(" ")).toContain("required: false");
   });
 });
 
@@ -318,7 +319,7 @@ describe("resolveVariant", () => {
 
 describe("gpu transform - service isolation", () => {
   it("modifies only the target service", () => {
-    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: true };
     const output = gpuTraitDefinition.transform(makeInput(props));
 
     const services = output.compose.services as Record<
@@ -334,7 +335,7 @@ describe("gpu transform - service isolation", () => {
   });
 
   it("does not mutate the original compose input", () => {
-    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: false };
+    const props: GpuTrait = { type: "gpu", variant: "nvidia", count: 1, required: true };
     const input = makeInput(props);
     const originalCompose = structuredClone(input.compose);
 
