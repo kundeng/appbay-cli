@@ -34,6 +34,20 @@ CATALOG_REPO="${CATALOG_REPO:-kundeng/appbay-catalog}"
 BRANCH="${BRANCH:-main}"
 HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 
+# 🚨 The binary does NOT live under APPBAY_HOME. `install.sh` picks /usr/local/bin when
+# writable and falls back to ~/.local/bin; APPBAY_HOME holds DATA. This journey asserted
+# "$HOME_DIR/bin/appbay" and would have reported "no binary installed" on a perfectly good
+# install — a false failure waiting for the first release to be cut.
+HOME_ON_VM="${HOME_ON_VM:-/home/ubuntu}"
+BIN="${BIN:-}"
+resolve_bin() {
+  [ -n "$BIN" ] && return 0
+  for c in /usr/local/bin/appbay "$HOME_ON_VM/.local/bin/appbay"; do
+    if vm "test -x $c"; then BIN="$c"; return 0; fi
+  done
+  return 1
+}
+
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
@@ -61,7 +75,7 @@ fi
 ok "no cached gh or git credentials"
 
 # A fresh host, or we cannot tell an install from a pre-existing one.
-if vm "test -e $HOME_DIR || command -v appbay"; then
+if vm "test -e $HOME_DIR || test -x /usr/local/bin/appbay || test -x $HOME_ON_VM/.local/bin/appbay"; then
   bad "target already has $HOME_DIR or appbay on PATH — use a fresh VM"
   echo; echo "0 passed, 1 failed"; exit 1
 fi
@@ -90,16 +104,16 @@ else
     bad "installer failed — $(vm 'tail -3 /tmp/install.log' | tr '\n' ' ')"
   fi
 
-  if vm "test -x $HOME_DIR/bin/appbay"; then
-    ok "binary installed at $HOME_DIR/bin/appbay"
+  if resolve_bin; then
+    ok "binary installed at $BIN"
   else
-    bad "no binary at $HOME_DIR/bin/appbay after install"
+    bad "no binary found at /usr/local/bin/appbay or ~/.local/bin/appbay after install"
   fi
 
   # The version must be the release tag, not the build-time fallback. This is the bug
   # fixed in b1a5c84 — every binary before it reported 0.1.0-dev, which also broke
   # `appbay update`'s comparison against the latest tag.
-  ver=$(vm "$HOME_DIR/bin/appbay --version 2>/dev/null")
+  ver=$(vm "${BIN:-/nonexistent} --version 2>/dev/null")
   case "$ver" in
     ""|*dev*) bad "binary reports '$ver' — the tag was not injected at compile time" ;;
     *)        ok "binary reports a real version: $ver" ;;
@@ -119,7 +133,9 @@ if [ "$code" != "200" ]; then
 else
   ok "catalog repo anonymously readable"
 
-  if vm "cd /home/ubuntu && $HOME_DIR/bin/appbay init >/tmp/init.log 2>&1"; then
+  if [ -z "$BIN" ]; then
+    bad "appbay init NOT EXERCISED — no binary installed (blocked by R3.1)"
+  elif vm "cd $HOME_ON_VM && $BIN init >/tmp/init.log 2>&1"; then
     ok "appbay init exited 0"
   else
     bad "appbay init failed — $(vm 'tail -3 /tmp/init.log' | tr '\n' ' ')"
@@ -130,7 +146,7 @@ else
   # `grep -c` prints 0 AND exits non-zero on no match, so `|| echo 0` appended a second
   # line and `[ "0\n0" -gt 0 ]` died with "integer expression expected". Take the last
   # line and strip anything non-numeric.
-  n=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay catalog list 2>/dev/null | grep -cE '^[a-z0-9-]+'" | tail -1 | tr -cd '0-9')
+  n=$(vm "cd $HOME_ON_VM && ${BIN:-/nonexistent} catalog list 2>/dev/null | grep -cE '^[a-z0-9-]+'" | tail -1 | tr -cd '0-9')
   if [ "${n:-0}" -gt 0 ] 2>/dev/null; then
     ok "catalog populated ($n entries listed)"
   else
@@ -164,10 +180,10 @@ else
   # And the binary has to exist before its output means anything. Without this the
   # shell's "No such file or directory" matched none of the error patterns below and
   # fell through to a pass.
-  if ! vm "test -x $HOME_DIR/bin/appbay"; then
+  if [ -z "$BIN" ]; then
     bad "appbay update NOT EXERCISED — no binary installed (blocked by R3.1)"
   else
-    out=$(vm "cd /home/ubuntu && $HOME_DIR/bin/appbay update --check 2>&1 || true")
+    out=$(vm "cd $HOME_ON_VM && $BIN update --check 2>&1 || true")
     case "$out" in
       *"No such file"*|*"not found"*)
         bad "appbay update did not run: $(echo "$out" | head -1)" ;;
