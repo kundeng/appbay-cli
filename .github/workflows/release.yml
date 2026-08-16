@@ -135,10 +135,18 @@ jobs:
           cat SHA256SUMS
           # Prove it verifies before publishing it. A checksum file that does not validate
           # its own inputs is worse than none — it looks like a guarantee.
+          #
+          # Verify in a SCRATCH dir. download-artifact lays each artifact out as
+          # dist/<name>/<name>, so copying the file up into dist/ collides with the
+          # directory of the same name — `cp: cannot overwrite directory
+          # './appbay-linux-x64' with non-directory`, which is exactly how this failed on
+          # v0.0.1-alpha.5. The digests were correct; the check proving them was not.
+          V="$(mktemp -d)"
           for a in appbay-linux-x64 appbay-linux-arm64 appbay-macos-x64 appbay-macos-arm64; do
-            cp "$a/$a" .
+            cp "$a/$a" "$V/$a"
           done
-          sha256sum -c SHA256SUMS
+          cp SHA256SUMS "$V/"
+          ( cd "$V" && sha256sum -c SHA256SUMS )
 
       - name: Extract version
         id: version
