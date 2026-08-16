@@ -219,6 +219,15 @@ jobs:
           cp SHA256SUMS "$V/"
           ( cd "$V" && sha256sum -c SHA256SUMS )
 
+      # ⚠️ SIGNED PROVENANCE IS DEFERRED, DELIBERATELY (#73, last criterion).
+      # SHA256SUMS answers "is this the file that was uploaded?" It does NOT answer "was
+      # it built from this source, by this workflow?" — anyone who can write to the
+      # release can replace the binary and the digest together. Closing that gap is
+      # `actions/attest-build-provenance`, which needs `id-token: write` and is only
+      # meaningful once consumers check it; `install.sh` has no verification step for an
+      # attestation today, so adding one now would publish a signature nobody reads.
+      # Not done, on purpose, and recorded here rather than left as an unstated gap.
+
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
