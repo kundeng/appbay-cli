@@ -50,3 +50,8 @@ appbay-eject/
 
 # Local agent state
 .claude/scheduled_tasks.lock
+
+# Fixture homes for the `appbay home` command tests. They live under the package
+# rather than /tmp on purpose — one warning under test fires on saved pointers
+# beneath /tmp, so a fixture in /tmp could never exercise the healthy case.
+apps/cli/.tmp-home-tests/

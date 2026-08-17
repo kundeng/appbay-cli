@@ -32,6 +32,20 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 
+# 🚨 THIS JOURNEY RUNS ON THE WORKSTATION, so it must leave no trace on it.
+# `appbay init --dir X` PERSISTS X to ~/.config/appbay/home — a machine-wide
+# default every later appbay command reads. Passing $H there repoints the
+# developer's own CLI at $SCRATCH, which the trap below deletes on exit. That is
+# not hypothetical: on 2026-08-16 this file's pointer was found holding a
+# deleted /tmp path written by exactly this line, and `appbay` on the
+# workstation resolved into a directory that no longer existed.
+# APPBAY_HOME is the fix — init honours it as a runtime override and
+# deliberately does not save it. The check below proves the trace is absent
+# instead of asserting it in a comment, which is what the old comment did.
+WS_POINTER="$HOME/.config/appbay/home"
+ws_pointer() { if [ -f "$WS_POINTER" ]; then cat "$WS_POINTER"; else echo "<unset>"; fi; }
+WS_BEFORE="$(ws_pointer)"
+
 cleanup() {
   for p in $(ss -lptn "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do kill "$p" 2>/dev/null || true; done
   rm -rf "$SCRATCH"
@@ -41,12 +55,14 @@ cleanup
 mkdir -p "$H"
 
 echo "── A throwaway install both interfaces will read"
-"$REPO/apps/cli/dist/appbay" init --dir "$H" --domain parity.test.local --project parity >/dev/null 2>&1
+APPBAY_HOME="$H" "$REPO/apps/cli/dist/appbay" init --domain parity.test.local --project parity >/dev/null 2>&1
 [ -d "$H/etc" ] && ok "install scaffolded at $H" || { bad "init did not scaffold"; exit 1; }
+[ "$(ws_pointer)" = "$WS_BEFORE" ] \
+  && ok "workstation APPBAY_HOME pointer untouched" \
+  || bad "🚨 this journey repointed the workstation: $WS_BEFORE -> $(ws_pointer)"
 
 echo "── The CLI's view"
-# ⚠️ APPBAY_HOME, not --dir. `init --dir` persists a machine-wide default in
-# ~/.config/appbay/home; the env var wins and leaves the workstation untouched.
+# ⚠️ APPBAY_HOME, not --dir — same reason as the init above.
 CLI_JSON=$(APPBAY_HOME="$H" "$REPO/apps/cli/dist/appbay" doctor --json 2>/dev/null)
 CLI_N=$(echo "$CLI_JSON" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["checks"]))' 2>/dev/null || echo 0)
 [ "${CLI_N:-0}" -ge 10 ] \

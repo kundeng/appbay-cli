@@ -115,12 +115,28 @@ appbay init --project homelab --domain homelab.example.com --yes
 
 | Flag | Default | Description |
 |---|---|---|
-| `--dir <path>` | `~/.appbay` | Override `$APPBAY_HOME` location |
+| `--dir <path>` | `~/.appbay` | Override `$APPBAY_HOME` location — **persisted**, see below |
 | `--project <name>` | (prompted) | Name of the default project |
 | `--domain <name>` | (prompted) | Base domain for ingress routing |
 | `--yes` | `false` | Non-interactive: accept all defaults |
 
 Creates: `etc/apps/`, `etc/projects/`, `etc/presets/`, `var/lib/renders/`, `var/lib/state/`, `var/log/`. Seeds system app definitions if absent.
+
+::: {.callout-warning}
+## `--dir` changes where *every* later command looks
+
+`--dir` is not scoped to this one run: it writes the path to `~/.config/appbay/home`, so
+every subsequent `appbay` invocation on this account resolves there until you change it.
+Undo it with [`appbay home clear`](#appbay-home), or repoint with `appbay home set <path>`.
+
+To initialise a throwaway install **without** touching that default — what a test or a
+journey script wants — set the environment variable instead, which `init` honours as a
+runtime override and deliberately does not persist:
+
+```bash
+APPBAY_HOME=/tmp/scratch/home appbay init --project t --domain t.local --yes
+```
+:::
 
 **Exit codes:** 0 = success, 1 = filesystem error.
 
@@ -661,15 +677,41 @@ appbay version
 
 ### `appbay home`
 
-Print the resolved `$APPBAY_HOME` path.
+Print, explain or repoint the resolved `$APPBAY_HOME` path.
 
 ```bash
-appbay home
+appbay home                  # print the resolved path, and nothing else
+appbay home --explain        # show every tier and which one wins
+appbay home set <path>       # persist a new home for future commands
+appbay home clear            # forget the persisted home
 ```
 
-Useful for scripting: `cd $(appbay home)/etc/apps`.
+Bare `appbay home` prints only the path, so `cd $(appbay home)/etc/apps` keeps working.
 
-**Exit codes:** 0 = always.
+**Resolution order** — the first tier with a value wins:
+
+| # | Tier | Set by |
+|---|---|---|
+| 1 | `$APPBAY_HOME` | the environment; a runtime override that always wins |
+| 2 | `/etc/appbay/config` | `appbay init-system` (a host-level decision) |
+| 3 | `~/.config/appbay/home` | `appbay init --dir`, or `appbay home set` |
+| 4 | `~/.appbay` | built-in default |
+
+`--explain` prints all four with the winner marked, and warns when the resolved path
+does not exist, has no `etc/` (never initialised), or is a saved pointer under a temp
+directory that will not survive a reboot.
+
+`set` writes tier 3 and **refuses** when tier 1 or 2 would shadow it — a saved path that
+a higher tier overrides is a setting that reports success and changes nothing. It also
+refuses a path that does not exist. `--force` overrides both refusals; when forced past a
+shadowing tier it says so rather than claiming the resolved home changed.
+
+`clear` removes tier 3 and reports the tier now in force. Use it to undo an
+`appbay init --dir` that pointed at a directory you no longer want — including a
+throwaway one that has since been deleted.
+
+**Exit codes:** 0 = printed, explained, set or cleared; 1 = `set` refused (shadowed by a
+higher tier, or the path is missing or not a directory).
 
 ### `appbay info`
 

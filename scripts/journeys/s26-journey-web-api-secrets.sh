@@ -32,6 +32,16 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 
+# 🚨 THIS JOURNEY RUNS ON THE WORKSTATION, so it must leave no trace on it.
+# `appbay init --dir X` PERSISTS X to ~/.config/appbay/home — a machine-wide
+# default every later appbay command reads. Passing $H there repoints the
+# developer's own CLI at $SCRATCH, which the trap below deletes on exit. Use
+# APPBAY_HOME instead: init honours it as a runtime override and does not save
+# it. See s26-journey-doctor-parity.sh for the incident this prevents.
+WS_POINTER="$HOME/.config/appbay/home"
+ws_pointer() { if [ -f "$WS_POINTER" ]; then cat "$WS_POINTER"; else echo "<unset>"; fi; }
+WS_BEFORE="$(ws_pointer)"
+
 cleanup() {
   for p in $(ss -lptn "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do kill "$p" 2>/dev/null || true; done
   rm -rf "$SCRATCH"
@@ -49,7 +59,10 @@ trpc() {
 }
 
 echo "── Stage an install whose app has a plaintext secret in its compose"
-"$REPO/apps/cli/dist/appbay" init --dir "$H" --domain leak.test.local --project leak >/dev/null 2>&1
+APPBAY_HOME="$H" "$REPO/apps/cli/dist/appbay" init --domain leak.test.local --project leak >/dev/null 2>&1
+[ "$(ws_pointer)" = "$WS_BEFORE" ] \
+  && ok "workstation APPBAY_HOME pointer untouched" \
+  || bad "🚨 this journey repointed the workstation: $WS_BEFORE -> $(ws_pointer)"
 mkdir -p "$H/etc/apps/leaky"
 cat > "$H/etc/apps/leaky/docker-compose.yml" <<EOF
 services:

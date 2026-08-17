@@ -3,8 +3,14 @@
  *
  * Resolution order under test:
  *   1. $APPBAY_HOME env var (highest — overrides everything)
- *   2. Saved config at ~/.config/appbay/home (written by appbay init)
- *   3. ~/.appbay fallback
+ *   2. System config at /etc/appbay/config (written by appbay init-system)
+ *   3. Saved config at ~/.config/appbay/home (written by appbay init)
+ *   4. ~/.appbay fallback
+ *
+ * Tier 2 has its own suite in commands/__tests__/init-system.test.ts; the cases
+ * here exercise 1, 3 and 4. The tier numbering in the case names below is the
+ * real four-tier order, not the three-tier order this file described until
+ * 2026-08-16 — the docblock had gone stale against the code it tests.
  *
  * Tests mock the filesystem reads so no files are actually touched.
  */
@@ -19,6 +25,7 @@ vi.mock("node:fs", () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  rmSync: vi.fn(),
 }));
 
 import * as fs from "node:fs";
@@ -96,15 +103,15 @@ describe("saveAppbayHome", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveAppbayHome — 3-tier priority
+// resolveAppbayHome — 4-tier priority
 // ---------------------------------------------------------------------------
 
 describe("resolveAppbayHome", () => {
-  it("tier 3 (fallback): returns ~/.appbay when nothing is configured", () => {
+  it("tier 4 (fallback): returns ~/.appbay when nothing is configured", () => {
     expect(resolveAppbayHome()).toBe(join(homedir(), ".appbay"));
   });
 
-  it("tier 2 (saved config): returns saved path when config file exists", () => {
+  it("tier 3 (saved config): returns saved path when config file exists", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue("/srv/appbay\n");
     expect(resolveAppbayHome()).toBe("/srv/appbay");
