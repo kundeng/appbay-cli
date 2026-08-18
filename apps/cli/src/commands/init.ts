@@ -31,6 +31,7 @@ import {
   type AcmeDnsProvider,
   parseInstanceConfig,
   clearContainerRuntimeCache,
+  containerStoreRoot,
   resolveIngressProvider,
   type ContainerRuntime,
   inspectEdgePorts,
@@ -515,6 +516,35 @@ export async function upsertIngressProvider(
   return upsertInstanceKey(appbayHome, "ingress_provider", provider, DEFAULT_INGRESS_PROVIDER);
 }
 
+/**
+ * Record which container STORE this install is bound to (#58 R3).
+ *
+ * 🚨 THIS IS WHAT MAKES A LATER MISMATCH DETECTABLE. `container_runtime: podman`
+ * was already recorded and was not enough: rootful and rootless podman keep
+ * separate stores, so an install created by an ordinary user put `appbay_shared`
+ * in `~/.local/share/containers/storage` while `sudo appbay up` looked in
+ * `/var/lib/containers/storage` and reported
+ * `External network [appbay_shared] does not exists` — a message with nothing in
+ * it pointing back at the choice made during init.
+ *
+ * ⚠️ MUST run AFTER the runtime key is settled, because the store root is read by
+ * asking the configured binary. Recording it before a `--container-runtime podman`
+ * takes effect would store the DOCKER daemon's root under a podman install and
+ * fail every check afterwards.
+ *
+ * ⚠️ Its default is the EMPTY STRING for the same reason as the ACME provider:
+ * there is no default store root, so "setting it to the default" is not a case
+ * that can arise. A null probe (runtime not answering) writes nothing at all —
+ * recording "unknown" would be worse than recording nothing, because the check
+ * treats absent as "never asked" and would treat a literal "unknown" as a path.
+ */
+export async function upsertContainerStore(
+  appbayHome: string,
+  store: string,
+): Promise<"created" | "updated" | "unchanged"> {
+  return upsertInstanceKey(appbayHome, "container_store", store, "");
+}
+
 /** Same, for the ACME DNS-01 provider. */
 export async function upsertAcmeDnsProvider(
   appbayHome: string,
@@ -535,7 +565,7 @@ export async function upsertAcmeDnsProvider(
  */
 async function upsertInstanceKey(
   appbayHome: string,
-  key: "container_runtime" | "ingress_provider" | "acme_dns_provider",
+  key: "container_runtime" | "ingress_provider" | "acme_dns_provider" | "container_store",
   value: string,
   defaultValue: string,
 ): Promise<"created" | "updated" | "unchanged"> {
@@ -949,6 +979,43 @@ export const initCommand = new Command("init")
               ? `  ACME DNS: ${acmeDnsProvider} (already set)`
               : `  ACME DNS: ${acmeDnsProvider} (${outcome})`,
           );
+        }
+      }
+
+      // ── Record the container STORE this install is bound to (#58 R3) ────────
+      //
+      // 🚨 OUTSIDE the if/else on purpose. Both branches must record it: a fresh
+      // install needs the binding written, and a RE-INIT is the documented way to
+      // rebind an install to the store you are actually on — which is exactly what
+      // the `store binding` check's remediation tells the operator to run. Putting
+      // this inside `if (configWritten)` would make that remediation a no-op on
+      // every host that has ever been initialised, i.e. every host that can hit
+      // the mismatch in the first place.
+      //
+      // Runs LAST so the runtime key above is already applied and the cache cleared.
+      {
+        clearContainerRuntimeCache(appbayHome);
+        const store = containerStoreRoot(appbayHome);
+        if (store) {
+          const outcome = await upsertContainerStore(appbayHome, store);
+          clearContainerRuntimeCache(appbayHome);
+          if (outcome === "updated") {
+            // A CHANGED binding is the interesting case and must not scroll past as
+            // a status line: the apps and networks of the previous store are still
+            // in it, and this install can no longer see them.
+            console.log("");
+            console.log(`  ⚠️  Store binding CHANGED — this install now points at`);
+            console.log(`      ${store}`);
+            console.log(`      Anything created in the previous store stays there;`);
+            console.log(`      init does not migrate containers, volumes or networks.`);
+          } else {
+            console.log(`  Store:   ${store}${outcome === "unchanged" ? " (already set)" : ""}`);
+          }
+        } else {
+          // Not fatal: init must work on a host whose daemon is not up yet, and
+          // `doctor` reports the unreachable runtime under runtime-access. Absent
+          // reads as "never recorded", which the check passes rather than blocks.
+          console.log(`  Store:   not recorded — runtime not answering (run "appbay doctor")`);
         }
       }
 

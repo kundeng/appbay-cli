@@ -90,6 +90,30 @@ export const InstanceConfigSchema = z.object({
   container_runtime: ContainerRuntimeSchema.optional(),
 
   /**
+   * The container STORE this installation is bound to — the directory holding the
+   * images, volumes and networks it created (#58 R3).
+   *
+   * 🚨 WHY A SECOND KEY, when `container_runtime` already says "podman". Because
+   * "podman" is not one store. Rootful and rootless podman keep entirely separate
+   * ones:
+   *
+   *   rootful   /var/lib/containers/storage
+   *   rootless  /home/<user>/.local/share/containers/storage
+   *
+   * `appbay init` as an ordinary user on a host with an active rootful socket bound
+   * to the rootless store without saying so, put `appbay_shared` there, and the
+   * operator met `External network [appbay_shared] does not exists` on a later
+   * `sudo appbay up`. The runtime matched; the store did not. Recording the store is
+   * what makes that detectable — and detectable LATER, which a check performed only
+   * at init can never be, because init is not when the switch happens.
+   *
+   * Absent is meaningful: the installation predates this key. Callers must treat it
+   * as "unknown, do not block" rather than as a mismatch, or every existing install
+   * fails closed on upgrade for a question it was never asked.
+   */
+  container_store: z.string().optional(),
+
+  /**
    * Reverse proxy for this installation. Absent means the installation predates this
    * key, so callers fall back to DEFAULT_INGRESS_PROVIDER — which is not the same
    * statement as "traefik was chosen".

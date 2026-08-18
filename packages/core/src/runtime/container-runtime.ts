@@ -204,26 +204,57 @@ export interface RuntimeProfile {
   displayName: string;
   /** `info --format` template yielding the SERVICE version. The one real divergence. */
   serverVersionFormat: string;
+  /**
+   * `info --format` template yielding the STORE ROOT — the directory holding this
+   * service's images, volumes and networks.
+   *
+   * 🚨 THE SECOND REAL DIVERGENCE, and it arrived exactly as this table predicted:
+   * as another field, not as a branch. Measured 2026-08-18:
+   *
+   *   podman info {{.Store.GraphRoot}}  rootful  -> /var/lib/containers/storage
+   *                                     rootless -> /home/<u>/.local/share/containers/storage
+   *   docker info {{.DockerRootDir}}             -> /var/lib/docker
+   *   docker info {{.Store.GraphRoot}}           -> (empty — docker has no such field)
+   *
+   * The store root, not the socket path, is the right identity: it is where
+   * `appbay_shared` and every named volume actually live, so two sockets sharing
+   * one store are the same store and must not be reported as a mismatch.
+   */
+  storeRootFormat: string;
   /** Where to get it, when it is missing. */
   installUrl: string;
   /** What to do when the service is not answering. */
   startHint: string;
+  /**
+   * How to re-run a command against the OTHER store on this runtime.
+   *
+   * Part of the profile because the remediation differs: podman's rootful store is
+   * reached with `sudo`, while a docker store mismatch means a different
+   * `DOCKER_HOST`/context, and telling a docker user to "try sudo" sends them nowhere.
+   */
+  otherStoreHint: string;
 }
 
 const PROFILES: Record<ContainerRuntime, RuntimeProfile> = {
   docker: {
     displayName: "Docker",
     serverVersionFormat: "{{.ServerVersion}}",
+    storeRootFormat: "{{.DockerRootDir}}",
     installUrl: "https://docs.docker.com/get-docker/",
     startHint:
       "Start Docker: systemctl start docker (Linux) or open Docker Desktop / OrbStack (macOS)",
+    otherStoreHint:
+      "Check DOCKER_HOST and `docker context ls` — this shell is pointed at a different daemon",
   },
   podman: {
     displayName: "Podman",
     serverVersionFormat: "{{.Version.Version}}",
+    storeRootFormat: "{{.Store.GraphRoot}}",
     installUrl: "https://podman.io/docs/installation",
     startHint:
       "Start Podman: systemctl --user start podman.socket (Linux) or podman machine start (macOS)",
+    otherStoreHint:
+      "Rootful and rootless podman keep SEPARATE stores. Re-run with `sudo` for the rootful one, or without it for your own",
   },
 };
 
@@ -334,4 +365,32 @@ export function containerServerVersion(appbayHome?: string): string | null {
   if (result.exitCode !== 0) return null;
   const version = result.output.trim();
   return version || null;
+}
+
+/**
+ * The store root this invocation is talking to, or null when unavailable.
+ *
+ * 🚨 THIS IS THE FACT THAT WAS MISSING FROM DISK (#58 R3). `appbay init` as an
+ * ordinary user on a host with an ACTIVE ROOTFUL SOCKET succeeded quietly against
+ * that user's ROOTLESS store, creating `appbay_shared` where a rootful deploy
+ * cannot see it. The operator met `External network [appbay_shared] does not
+ * exists` much later, with nothing connecting it back to the choice made at init.
+ *
+ * Nothing recorded which store an install was bound to, so nothing could warn on a
+ * switch either — and on a homelab box the switch is not exotic, it is
+ * `appbay init` followed by `sudo appbay up`.
+ *
+ * Returns null rather than throwing when the service is not answering: "cannot
+ * reach the runtime" is `runtime-access`'s verdict to give, and a store check that
+ * also fails there would report the same outage twice under a misleading name.
+ */
+export function containerStoreRoot(appbayHome?: string): string | null {
+  const { storeRootFormat } = runtimeProfile(appbayHome);
+  const result = containerExec(["info", "--format", storeRootFormat], {
+    appbayHome,
+    timeout: 10_000,
+  });
+  if (result.exitCode !== 0) return null;
+  const root = result.output.trim();
+  return root || null;
 }

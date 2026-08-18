@@ -23,8 +23,10 @@ import {
   containerBin,
   runtimeProfile,
   containerServerVersion,
+  containerStoreRoot,
   resolveIngressProvider,
 } from "../runtime/container-runtime.js";
+import { parseInstanceConfig } from "../schemas/instance.js";
 
 /**
  * Try to execute a binary. Returns trimmed stdout on success, null on failure.
@@ -158,6 +160,7 @@ export type HealthCheckId =
   | "platform"
   | "runtime"
   | "runtime-access"
+  | "store-binding"
   | "compose"
   | "compose-version"
   | "appbay-home"
@@ -208,6 +211,80 @@ export function checkDocker(appbayHome: string): HealthCheckResult {
     passed: false,
     detail: `${displayName} not found`,
     fix: `Install ${displayName}: ${installUrl}  (or run "appbay init-system" on a RHEL-family host to install it)`,
+    required: true,
+  };
+}
+
+/**
+ * Is this invocation talking to the store the installation was created against?
+ *
+ * 🚨 #58 R3. `container_runtime: podman` matching is not enough — rootful and
+ * rootless podman are two SEPARATE stores, and an install bound to one is invisible
+ * from the other. The symptom used to arrive far downstream and misattributed:
+ *
+ *     ERROR: External network [appbay_shared] does not exists
+ *
+ * with nothing tying it back to whether `init` was run under sudo. On a homelab box
+ * that switch is the normal path, not an exotic one: `appbay init` as yourself, then
+ * `sudo appbay up` because the rootful socket is the one the server needs.
+ *
+ * ⭐ THREE OUTCOMES, and the third is the one that keeps this honest:
+ *
+ *   recorded == live    pass
+ *   recorded != live    FAIL, required — refuse before anything is deployed
+ *   nothing recorded    PASS, and say so — an install predating the key was never
+ *                       asked the question, and failing it closed would break every
+ *                       existing homelab on upgrade to prove a point about a
+ *                       situation that may not even apply.
+ *
+ * The unreachable-runtime case returns a PASS too, deliberately: `runtime-access`
+ * owns that verdict, and reporting one outage under two names sends the operator
+ * looking for a second fault that does not exist.
+ */
+export function checkStoreBinding(appbayHome: string): HealthCheckResult {
+  const name = "store binding";
+  const { displayName, otherStoreHint } = runtimeProfile(appbayHome);
+
+  let recorded: string | undefined;
+  try {
+    recorded = parseInstanceConfig(
+      readFileSync(join(appbayHome, "project.yaml"), "utf-8"),
+    ).container_store;
+  } catch {
+    // No project.yaml at all — an uninitialised install. `appbay-home` reports that.
+  }
+
+  if (!recorded) {
+    return {
+      name,
+      passed: true,
+      detail: "not recorded (install predates the key) — run `appbay init` to record it",
+      required: true,
+    };
+  }
+
+  const live = containerStoreRoot(appbayHome);
+  if (!live) {
+    return {
+      name,
+      passed: true,
+      detail: `recorded ${recorded}; runtime not answering — see runtime-access`,
+      required: true,
+    };
+  }
+
+  if (live === recorded) {
+    return { name, passed: true, detail: recorded, required: true };
+  }
+
+  return {
+    name,
+    passed: false,
+    detail: `bound to ${recorded}, but this shell reaches ${live}`,
+    fix:
+      `This install's networks and volumes live in ${recorded}. ${otherStoreHint}. ` +
+      `To rebind it to the store you are on now, re-run \`appbay init\` — ` +
+      `${displayName} will not move the existing ones for you.`,
     required: true,
   };
 }
@@ -793,6 +870,7 @@ export async function runChecks(appbayHome: string): Promise<IdentifiedHealthChe
     tag("platform", checkPlatform(appbayHome)),
     tag("runtime", checkDocker(appbayHome)),
     tag("runtime-access", checkDockerAccessible(appbayHome)),
+    tag("store-binding", checkStoreBinding(appbayHome)),
     tag("compose", checkComposeInstalled(appbayHome)),
     tag("compose-version", checkComposeVersion(appbayHome)),
     tag("appbay-home", await checkAppbayHome(appbayHome)),

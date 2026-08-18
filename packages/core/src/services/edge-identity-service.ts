@@ -176,10 +176,22 @@ function passwordRecord(hash: string, createdAt: string) {
 }
 function hashPassword(password: string): string {
   const image = process.env.APPBAY_CADDY_IMAGE || DEFAULT_CADDY_SECURITY_IMAGE;
-  const result = spawnSync(containerBin(), ["run", "--rm", "-i", "--entrypoint", "caddy", image,
+  const bin = containerBin();
+  const result = spawnSync(bin, ["run", "--rm", "-i", "--entrypoint", "caddy", image,
     "hash-password", "--algorithm", "bcrypt", "--bcrypt-cost", "10"], {
     input: `${password}\n`, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
   });
+  // ⚠️ A FAILED SPAWN SETS `.error`, NOT `.stderr`. When the binary is missing entirely,
+  // status is null and stderr is null, so the old message read
+  //     Caddy password hashing failed: null
+  // which names neither the binary nor the reason. Measured on a Fedora host where core had
+  // resolved the runtime to "docker" and only podman was installed — the operator was shown
+  // "null" for what was simply ENOENT. Report the spawn error, and the binary, first.
+  if (result.error) {
+    throw new Error(
+      `Caddy password hashing failed: could not run "${bin}" — ${result.error.message}`,
+    );
+  }
   if (result.status !== 0) throw new Error(`Caddy password hashing failed: ${String(result.stderr).trim()}`);
   const hash = String(result.stdout).trim();
   if (!/^\$2[aby]\$10\$/.test(hash)) throw new Error("Caddy returned an unexpected password hash.");

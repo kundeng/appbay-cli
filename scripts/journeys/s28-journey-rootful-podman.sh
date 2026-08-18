@@ -69,31 +69,52 @@ else
   r "R2 fail $(printf '%s' "$DOC" | grep -A1 'Required fixes' | tail -1)"
 fi
 
-# --- R3: an unprivileged init on a rootful host says WHICH STORE it bound to ------------
+# --- R3: the store an install bound to is RECORDED, and a mismatch is REFUSED -----------
 #
-# 🚨 THIS IS EXPECTED TO FAIL, and it is the open half of #58 rather than a harness fault.
+# 🚨 THIS WAS #58's LAST OPEN CRITERION AND IT IS NOW CLOSED. Kept as two checks because the
+# contract has two halves and only the pair is worth anything.
 #
-# Rootless and rootful Podman are separate stores. This host runs an active ROOTFUL socket
-# (root-owned, 0660) and that is the alpha target — but `appbay init` as an ordinary user
-# does not fail, does not warn, and does not consult it: it quietly succeeds against the
-# user's ROOTLESS store, creating `appbay_shared` somewhere a rootful deploy cannot see.
-# The operator then meets `External network [appbay_shared] does not exists` much later,
-# with nothing connecting it to the choice made here.
+# Rootless and rootful Podman are SEPARATE STORES. This host runs an active rootful socket
+# (root-owned, 0660) and that is the alpha target. `appbay init` as an ordinary user binds
+# to that user's ROOTLESS store — which is legitimate; what was broken is that it happened
+# silently and left nothing on disk saying so. `appbay_shared` went somewhere a rootful
+# deploy could not see, and the operator met `External network [appbay_shared] does not
+# exists` much later with nothing connecting it back to this moment.
 #
-# Nothing on disk records which store an install is bound to, so nothing can warn on a
-# switch either. Binding an install to a context — or detecting and refusing — is an owner
-# decision, which is why this stays red instead of being papered over.
+#   R3a  init RECORDS the store it bound to           (the fact that was missing)
+#   R3b  a rootful invocation against that install REFUSES with both paths named
+#
+# ⚠️ R3a ALONE WOULD BE A VACUOUS PASS. Recording a value nothing ever compares is a
+# `container_store:` line in a YAML file and no behaviour. R3b is what makes the record
+# load-bearing — and it is deliberately run from the OTHER privilege level, because a check
+# that reads back what it just wrote at the same privilege can never observe a mismatch.
 #
 # ⚠️ An earlier version of this ran the same init AS ROOT, where nothing fails and no
-# message prints, and reported the absence of the message as the defect. The defect is
+# message prints, and reported the absence of the message as the defect. The defect was
 # real; that run was not evidence of it.
-PRE="$(su ubuntu -c 'APPBAY_HOME=/home/ubuntu/appbay-s58-preflight appbay init --container-runtime podman' 2>&1)"
-su ubuntu -c 'rm -rf /home/ubuntu/appbay-s58-preflight' >/dev/null 2>&1
-if printf '%s' "$PRE" | grep -qiE "rootless|rootful|separate store|never creates system accounts"; then
-  r "R3 ok unprivileged-init-states-the-store-or-privilege-contract"
+S58H=/home/ubuntu/appbay-s58-preflight
+su ubuntu -c "rm -rf $S58H"
+su ubuntu -c "APPBAY_HOME=$S58H appbay init --container-runtime podman --project s58 --domain s58.local --yes" >/tmp/j-r3-init.log 2>&1
+ROOTLESS_STORE="$(su ubuntu -c 'podman info --format "{{.Store.GraphRoot}}"' 2>/dev/null)"
+RECORDED="$(sed -n 's/^container_store: //p' "$S58H/project.yaml" 2>/dev/null)"
+
+if [ -n "$RECORDED" ] && [ "$RECORDED" = "$ROOTLESS_STORE" ]; then
+  r "R3a ok unprivileged-init-records-the-store-it-bound-to ($RECORDED)"
 else
-  r "R3 fail unprivileged init bound to the ROOTLESS store silently on a rootful host — no warning, nothing recorded (#58 open decision)"
+  r "R3a fail project.yaml records container_store='$RECORDED', expected the rootless store '$ROOTLESS_STORE'"
 fi
+
+# The mismatch, seen from root: same install, different store.
+R3DOC="$(APPBAY_HOME=$S58H appbay doctor 2>&1)"
+ROOTFUL_STORE="$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null)"
+if printf '%s' "$R3DOC" | grep -q '✗ store binding' \
+   && printf '%s' "$R3DOC" | grep -q "$ROOTLESS_STORE" \
+   && printf '%s' "$R3DOC" | grep -q "$ROOTFUL_STORE"; then
+  r "R3b ok rootful-invocation-refuses-and-names-both-stores"
+else
+  r "R3b fail a rootful command did not refuse a rootless-bound install :: $(printf '%s' "$R3DOC" | grep -i 'store binding' | head -1)"
+fi
+su ubuntu -c "rm -rf $S58H" >/dev/null 2>&1
 
 # --- R4: the app path works under podman -----------------------------------------------
 podman rm -f appbay.whoami.whoami >/dev/null 2>&1
