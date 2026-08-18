@@ -47,6 +47,14 @@ LOCAL_ONLY="s25-caddy-modules s25-caddy-tree-validate s25-control-plane-rebuild
 # Needs a pristine host with no install and no credentials; a sweep host has both.
 NEEDS_FRESH_VM="s27-journey-public-install"
 
+# Only meaningful on a PODMAN sweep; running them on the Docker VM does not test
+# the journey, it tests that a podman-only journey can fail for the wrong reason.
+# s28-journey-rootful-podman walks the rootful Podman contract end to end — R0
+# itself requires `container_runtime: podman` on disk, which a Docker install never
+# has, so every later step fails on the wrong basis and the sweep reports a defect
+# that does not exist.
+PODMAN_ONLY="s28-journey-rootful-podman"
+
 is_excluded() {
   # ⚠️ Normalise whitespace FIRST. The lists are multi-line for readability, so a name
   # sitting at the end of a line is followed by a NEWLINE, and the pattern *" $1 "* —
@@ -54,9 +62,11 @@ is_excluded() {
   # sweep ran `s25-control-plane-rebuild` (a local-only script that refuses without
   # APPBAY_HOME) and reported it as a runtime FAILURE. An exclusion list that quietly
   # excludes less than it says is worse than no list.
-  local all
-  all="$(printf '%s %s' "$LOCAL_ONLY" "$NEEDS_FRESH_VM" | tr -s '[:space:]' ' ')"
-  case " $all " in *" $1 "*) return 0 ;; esac
+  local always
+  always="$(printf '%s %s' "$LOCAL_ONLY" "$NEEDS_FRESH_VM" | tr -s '[:space:]' ' ')"
+  case " $always " in *" $1 "*) return 0 ;; esac
+  # PODMAN_ONLY is runtime-dependent, not universally excluded.
+  if [ "$CBIN" != "podman" ] && [[ " $PODMAN_ONLY " == *" $1 "* ]]; then return 0; fi
   return 1
 }
 
