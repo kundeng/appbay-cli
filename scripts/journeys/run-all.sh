@@ -14,7 +14,7 @@
 # in $OUTDIR.
 #
 #   ./run-all.sh                                              # Docker, default VM
-#   VM=appbay-podman PRIV=sudo CBIN=podman HOME_DIR=/root/.appbay ./run-all.sh   # rootful
+#   VM=appbay-rhel PRIV=sudo CBIN=podman HOME_DIR=/home/ubuntu/.appbay ./run-all.sh   # rootful
 #   ONLY='compile lifecycle' ./run-all.sh                     # substring filter
 #
 # Exit is non-zero if any journey fails, so this is usable as a gate.

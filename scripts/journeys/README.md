@@ -76,7 +76,11 @@ manifest on one VM, which is exactly how `tests/bdd/` went months with no passin
 |---|---|---|
 | `appbay-docker` | Ubuntu 24.04, Docker 29.1.3 | supported |
 | `appbay-rhel` | Fedora 43, **SELinux Enforcing**, rootful podman 5.6.2 + podman-compose 1.5.0 | supported |
-| `appbay-podman` | Ubuntu, rootful podman 4.9.3 + **podman-compose 1.0.6** | ❌ **cannot run AppBay** — 1.0.6 cannot parse the long-form `env_file` AppBay emits. `doctor` correctly refuses it. Kept only as proof the version floor is real. |
+
+The fleet is these two VMs. The **pristine** journeys (`s27-journey-public-install`,
+`s28-journey-install-integrity`) launch an ephemeral multipass VM of their own and tear it
+down on exit, so they no longer pin a named "fresh" box — a standing fresh VM stops being
+fresh after its first run.
 
 ## What each journey proves
 

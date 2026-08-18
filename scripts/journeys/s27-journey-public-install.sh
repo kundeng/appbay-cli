@@ -20,19 +20,56 @@
 # usable auth — an inherited GITHUB_TOKEN or a cached gh login would make every check below
 # pass while telling us nothing about a stranger. That control runs first and aborts.
 #
-#   VM=appbay-public-test ./s27-journey-public-install.sh
+#   ./s27-journey-public-install.sh
 #   PUBLIC_REPO=kundeng/appbay-cli CATALOG_REPO=kundeng/appbay-catalog ./s27-journey-public-install.sh
 #
 # Use a FRESH VM. A host that already has ~/.appbay, a binary on PATH, or a warm image
 # cannot distinguish "install worked" from "install was already here".
+#
+# 🚨 THIS JOURNEY NOW PROVISIONS ITS OWN EPHEMERAL VM. The 2026-08-18 consolidation
+# cut the fleet to two VMs; the "pristine stranger" VMs were deleted because a
+# standing fresh box stops being fresh the first time it runs. A journey whose whole
+# property is "one clean sitting" must not depend on a named box that other work
+# reuses — it launches one, and DELETE_VM tears it down. Set DELETE_VM=0 to inspect
+# the host afterwards.
 
 set -uo pipefail
-VM="${VM:-appbay-public-test}"
+VM="${VM:-appbay-public-journey-$$}"
+DELETE_VM="${DELETE_VM:-1}"
+# Ephemeral VM launched for this run when the named VM does not already exist.
+EPHEMERAL=0
 PRIV="${PRIV:-env}"
 PUBLIC_REPO="${PUBLIC_REPO:-kundeng/appbay-cli}"
 CATALOG_REPO="${CATALOG_REPO:-kundeng/appbay-catalog}"
 BRANCH="${BRANCH:-main}"
 HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
+
+# --- ephemeral-VM bootstrap: runs on the VM you're about to sweep, deleted on exit ------
+if ! multipass info "$VM" >/dev/null 2>&1; then
+  echo "-- launching an ephemeral VM: $VM"
+  multipass launch --name "$VM" --cpus 2 --mem 3G --disk 10G >/dev/null 2>&1 \
+    || { echo "❌ could not launch multipass VM $VM"; exit 1; }
+  EPHEMERAL=1
+fi
+# Pristine is the point: a freshly-launched VM carries the image's state and nothing more.
+if [ "$EPHEMERAL" -eq 0 ] && [ -n "${FORCE_LAUNCH:-}" ]; then
+  multipass delete "$VM" --purge >/dev/null 2>&1 || true
+  multipass launch --name "$VM" --cpus 2 --mem 3G --disk 10G >/dev/null 2>&1 \
+    || { echo "❌ could not relaunch multipass VM $VM"; exit 1; }
+  EPHEMERAL=1
+fi
+cleanup_vm() {
+  if [ "$EPHEMERAL" -eq 1 ] && [ "$DELETE_VM" = "1" ]; then
+    multipass delete "$VM" --purge >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_vm EXIT
+# Wait for SSH/network to be ready before `multipass exec`.
+for _ in $(seq 1 30); do
+  multipass exec "$VM" -- true >/dev/null 2>&1 && break
+  sleep 2
+done
+# --- end ephemeral bootstrap -------------------------------------------------------------
 
 # 🚨 The binary does NOT live under APPBAY_HOME. `install.sh` picks /usr/local/bin when
 # writable and falls back to ~/.local/bin; APPBAY_HOME holds DATA. This journey asserted

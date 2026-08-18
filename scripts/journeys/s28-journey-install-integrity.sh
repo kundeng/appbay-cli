@@ -18,7 +18,10 @@
 # APPBAY_INSTALL_DIR into a scratch directory and never touches the real one.
 
 set -uo pipefail
-VM="${VM:-appbay-public-test}"
+VM="${VM:-appbay-integrity-journey-$$}"
+DELETE_VM="${DELETE_VM:-1}"
+# Ephemeral VM launched for this run when the named VM does not already exist.
+EPHEMERAL=0
 PRIV="${PRIV:-env}"
 REPO="${REPO:-kundeng/appbay-cli}"
 BRANCH="${BRANCH:-main}"
@@ -29,6 +32,26 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
+
+# --- ephemeral-VM bootstrap: the fresh host this journey's whole point needs ------------
+if ! multipass info "$VM" >/dev/null 2>&1; then
+  echo "-- launching an ephemeral VM: $VM"
+  multipass launch --name "$VM" --cpus 2 --mem 3G --disk 10G >/dev/null 2>&1 \
+    || { echo "❌ could not launch multipass VM $VM"; exit 1; }
+  EPHEMERAL=1
+fi
+cleanup_vm() {
+  if [ "$EPHEMERAL" -eq 1 ] && [ "$DELETE_VM" = "1" ]; then
+    multipass delete "$VM" --purge >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_vm EXIT
+# Wait for SSH/network to be ready before `multipass exec`.
+for _ in $(seq 1 30); do
+  multipass exec "$VM" -- true >/dev/null 2>&1 && break
+  sleep 2
+done
+# --- end ephemeral bootstrap -------------------------------------------------------------
 
 echo "== S28 install-integrity journey =="
 echo "   VM=$VM  repo=$REPO"

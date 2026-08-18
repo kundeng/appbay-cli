@@ -18,7 +18,7 @@
 # stopped": AppBay is, for the duration, not installed.
 #
 # Usage:  VM=appbay-docker ./s25-interface-optionality.sh                 # self-provisioning
-#         VM=appbay-podman PRIV=sudo CBIN=podman ./s25-interface-optionality.sh
+#         VM=appbay-rhel PRIV=sudo CBIN=podman ./s25-interface-optionality.sh
 #         HOST=whoami.test.local ./s25-interface-optionality.sh          # probe an existing app
 #
 # ⭐ SELF-PROVISIONING, because a journey that needs a hand-seeded host cannot satisfy the

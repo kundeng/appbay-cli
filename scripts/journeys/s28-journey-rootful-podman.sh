@@ -13,13 +13,13 @@
 # `Executable not found in $PATH: "docker"`. R0 asserts the key is on disk before anything
 # downstream is allowed to mean anything.
 #
-#   VM=appbay-podman ./s28-journey-rootful-podman.sh
+#   VM=appbay-rhel ./s28-journey-rootful-podman.sh
 #
 # Requires podman-compose >= 1.5.0 in the VM (1.0.6 cannot parse `configs.content`).
 # The install is created under /root and removed on exit.
 
 set -uo pipefail
-VM="${VM:-appbay-podman}"
+VM="${VM:-appbay-rhel}"
 
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
