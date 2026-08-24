@@ -11,8 +11,48 @@ Before installing Appbay, make sure you have the following on your system:
 |-------------|----------------|---------------|
 | Docker **or** Podman | Docker 24.0+ / Podman 4.9+ | `docker --version` / `podman --version` |
 | Compose v2 | v2.23.1+ | `docker compose version` / `podman compose version` |
+| SELinux (RHEL-family only) | **Permissive or Disabled** | `getenforce` |
 
 Compose v2.23.1 or later is required because Appbay uses the `configs` resource with inline `content`, which was introduced in that release.
+
+### SELinux must not be Enforcing
+
+On RHEL-family hosts (Fedora, RHEL, Rocky, Alma), **AppBay requires SELinux to be Permissive
+or Disabled.** This is a prerequisite, not a recommendation — an Enforcing host can start the
+control plane and serve the UI, and then fail every deploy made from it.
+
+```bash
+getenforce                       # must print Permissive or Disabled
+sudo setenforce 0                # until the next reboot
+```
+
+To make it durable, set `SELINUX=permissive` in `/etc/selinux/config` and reboot.
+
+The cause is not something a relabel can fix. The control-plane container reaches the
+container runtime through a unix socket, and the denial is SELinux's `unix_stream_socket
+connectto` check against the API service's own process label. Measured on Fedora 43 with
+rootful podman 5.6.2:
+
+| SELinux mode | Socket label | Result |
+|---|---|---|
+| Enforcing | `var_run_t` | permission denied |
+| Enforcing | `container_file_t` (relabelled with `:z`) | permission denied — **a relabel is not enough** |
+| Permissive | either | works |
+
+A per-container escape hatch also exists if you cannot change the host mode — see
+[the RHEL-family notes below](#rhel-family-hosts-three-things-that-stop-appbay-before-it-starts)
+for `control_plane_selinux: unconfined`, which disables confinement for the control-plane
+container only rather than for the host.
+
+::: {.callout-note}
+## Why AppBay does not ship an SELinux policy module
+
+A policy module granting just `connectto` would keep confinement, and was considered. It is
+**not planned**: it means shipping, versioning and supporting a compiled policy per
+distribution for a control plane that is already the most privileged container AppBay runs.
+Requiring Permissive is the honest trade, and stating it up front beats an install that looks
+healthy and cannot deploy.
+:::
 
 ### Running on Podman
 

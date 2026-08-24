@@ -138,8 +138,14 @@ export const InstanceConfigSchema = z.object({
    * ⚠️ `unconfined` DISABLES SELinux confinement for the most privileged container in the
    * system. That is a real reduction in security posture, it is why `confined` is the
    * default, and it is why this is an explicit setting rather than something Appbay decides
-   * for an operator. The durable alternative is a policy module granting just `connectto`,
-   * which keeps confinement; that is tracked separately (issue #58).
+   * for an operator.
+   *
+   * 🚦 THE SUPPORTED POSTURE IS A PERMISSIVE HOST. Owner decision, 2026-08-21: SELinux
+   * Permissive/Disabled is a documented PREREQUISITE on RHEL-family hosts (see
+   * docs/guide/quickstart.qmd). A policy module granting just `connectto` would keep
+   * confinement and was considered — it is NOT planned, because it means shipping and
+   * versioning a compiled policy per distribution for this one socket. This key remains as
+   * a per-container escape hatch for operators who cannot change the host mode.
    *
    * Absent means `confined` — an installation that predates this key has not opted out.
    */
