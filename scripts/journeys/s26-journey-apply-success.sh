@@ -4,9 +4,15 @@
 # ⭐ "REAL" IS THE OPERATIVE WORD. Progress output that always prints the same thing, and a
 # history row written whether or not anything happened, both look identical to working ones
 # in a screenshot. So this journey does not check that output EXISTS — it checks that the
-# output CHANGES WITH REALITY: a first deploy must report [NEW], an unchanged redeploy must
-# report [UNCHANGED], and an edited app must report [CHANGED]. A reporter that cannot tell
+# output CHANGES WITH REALITY: a first deploy must report NEW, an unchanged redeploy must
+# report UNCHANGED, and an edited app must report CHANGED. A reporter that cannot tell
 # those apart is decoration.
+#
+# ⚠️ The label is `[plan: X]`, not a bare `[X]`, since appbay-cli#4. It is a verdict about
+# the COMPILED ARTIFACT, and while it was printed bare it was also being summed into
+# "N deployed" — so an unchanged plan whose container had been deleted reported
+# `0 deployed` for a converge that started a container. This journey still asserts the plan
+# verdict tracks reality; s29-journey-deploy-reporting asserts the deploy verdict does.
 #
 # 🚨 HISTORY IS READ FROM THE DATABASE, NOT FROM THE COMMAND'S OWN OUTPUT. Asking the tool
 # whether it recorded something, and believing its answer, is not evidence.
@@ -74,7 +80,7 @@ EOF" >/dev/null 2>&1
 
 echo "── First deploy must report NEW and actually start the container"
 OUT=$(ab "up $APP")
-echo "$OUT" | grep -qi "\[NEW\]" && ok "first deploy reported [NEW]" || { bad "first deploy did not report [NEW]"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
+echo "$OUT" | grep -qi "\[plan: NEW\]" && ok "first deploy reported [plan: NEW]" || { bad "first deploy did not report [plan: NEW]"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
 echo "$OUT" | grep -qE "1 deployed" && ok "summary counts one deploy" || bad "summary did not count the deploy"
 STATE=$(vm "$CBIN inspect appbay.$APP.app --format '{{.State.Status}}' 2>/dev/null || echo absent" | tr -d '[:space:]')
 [ "$STATE" = "running" ] && ok "the container is genuinely running" || { bad "nothing is running — the report was fiction"; exit 1; }
@@ -83,13 +89,13 @@ echo "── An unchanged redeploy must say UNCHANGED, not NEW again"
 # 🚨 This is what separates a real reporter from a template. A tool that prints [NEW] every
 # time is right once and wrong forever after, and looks identical in a screenshot.
 OUT=$(ab "up $APP")
-echo "$OUT" | grep -qi "\[UNCHANGED\]" && ok "redeploy reported [UNCHANGED]" \
-                                       || { bad "redeploy did not report [UNCHANGED] — progress does not track reality"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
+echo "$OUT" | grep -qi "\[plan: UNCHANGED\]" && ok "redeploy reported [plan: UNCHANGED]" \
+                                       || { bad "redeploy did not report [plan: UNCHANGED] — progress does not track reality"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
 
 echo "── An edited app must say CHANGED"
 vm "sed -i 's|\"600\"|\"900\"|' $HOME_DIR/etc/apps/$APP/docker-compose.yml" >/dev/null 2>&1
 OUT=$(ab "up $APP")
-echo "$OUT" | grep -qiE "\[CHANGED\]|\[NEW\]" && ok "edited app reported a change" \
+echo "$OUT" | grep -qiE "\[plan: CHANGED\]|\[plan: NEW\]" && ok "edited app reported a change" \
                                               || { bad "an edited app was reported as unchanged"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
 
 echo "── Deploy history"

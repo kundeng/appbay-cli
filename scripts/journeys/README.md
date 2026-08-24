@@ -95,7 +95,7 @@ fresh after its first run.
 | `s26-credential-boundaries.sh` | the three credential domains are independent — exactly one store moves per reset |
 | `s26-legacy-user-migration.sh` | the legacy SQLite→`users.yaml` export runs **once**, at mode 0600 |
 | `s26-journey-compile.sh` | compile determinism (byte-identical recompile) and compile-failure diagnostics |
-| `s26-journey-apply-success.sh` | progress output tracks reality: `[NEW]` → `[UNCHANGED]` → `[CHANGED]` |
+| `s26-journey-apply-success.sh` | progress output tracks reality: `[plan: NEW]` → `[plan: UNCHANGED]` → `[plan: CHANGED]` |
 | `s26-journey-aux-transactional.sh` | a rejected deploy rolls back **and leaves the bystander untouched** |
 | `s26-journey-lifecycle.sh` | start/stop/restart, verified by `StartedAt`, plus out-of-band stop detection |
 | `s26-journey-logs.sh` | logs are the container's **real** output, cross-checked against the runtime |
@@ -109,6 +109,7 @@ fresh after its first run.
 | `s28-journey-install-integrity.sh` | the installer **refuses** a corrupted or truncated download. Includes a control that must still install, or "refused" would be indistinguishable from a broken harness |
 | `s28-journey-build-rebuild.sh` | a source edit rebuilds, asserted on the **running container** with the image tag held constant — same name, different bytes |
 | `s28-journey-rootful-podman.sh` | the rootful Podman contract end to end: runtime-aware doctor, one provider-neutral server compose, healthy control plane, login, data surviving a converge |
+| `s29-journey-deploy-reporting.sh` | the summary counts the **deployment**, not the compiled artifact (appbay-cli#4), and a validator that cannot run does not return a verdict (appbay-cli#5). Carries two controls: an idempotent converge must still report `0 deployed`, and the plan must still be UNCHANGED on the run that must report a deployment |
 
 ⚠️ **This table is hand-maintained and it silently stopped being an index.** Audited
 2026-08-16: it listed 19 of 23 scripts — `s27-journey-public-install.sh` had been missing
@@ -171,6 +172,23 @@ heredoc then silently ended the *outer* heredoc at the inner `PY`. Both are fixe
 way: the comparator is its own file under `lib/`, and it prints `OK|…` / `BAD|…` lines that
 the shell only has to classify. Note the first version was **green** — rule 3 is what found
 this, not the passing run.
+
+**8. A journey may not leave SHARED state broken — and "shared" includes things it did not
+create.** Rule 7 covers cleaning up what you made. This is the other half: what you
+*borrowed*. `s29-journey-deploy-reporting` needed an install whose edge was not deployed, and
+its first version got there with `rm -f appbay.caddy`. That container belongs to the host
+install. The next sweep opened with **three unrelated journeys red** — `s25-edge-authz`
+(`landed chrome-error://chromewebdata/`), `s25-interface-optionality` (`returned 000`) and
+`s26-journey-aux-transactional` (`the good app produced no artifact`) — every one of which
+reads like a product defect, and none of which was.
+
+Prefer the **reversible** form of the condition you need: `stop` the edge and start it again,
+rather than removing it. Record what you found before you change it, and restore exactly
+that. Where the condition genuinely requires a pristine host, launch an ephemeral VM instead
+— see `s27-journey-public-install` and `s28-journey-install-integrity`.
+
+⚠️ The tell is a sweep whose failures cluster on one shared dependency. That is rule 3
+("suspect the harness first") applied across scripts rather than within one.
 
 Fixtures must be **self-provisioning** and must clean up after themselves — including
 anything they created that the install did not have before. A suite that needs a

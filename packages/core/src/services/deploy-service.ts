@@ -67,37 +67,188 @@ export type DockerComposeRunner = (
  *
  * @returns a human-readable description of the dead services, or null when all is well.
  */
+/** One container row, normalised across the two compose providers. */
+interface ComposePsRow {
+  name: string;
+  id: string;
+  service: string;
+  state: string;
+  exitCode: number;
+}
+
+/**
+ * List the containers compose knows about for one project, on EITHER provider.
+ *
+ * 🚨 `ps -a` IS REJECTED BY podman-compose, AND THAT MADE THE CRASH DETECTOR VACUOUS.
+ * Measured on appbay-rhel (podman-compose 1.5.0):
+ *
+ *     $ podman compose ps -a --format json
+ *     podman-compose: error: unrecognized arguments: -a       (exit 2)
+ *
+ * Every caller treated a non-zero exit as "cannot inspect — do not invent a failure" and
+ * returned null, so on every Podman host findCrashedServices() reported "nothing crashed"
+ * without ever looking. The `-a` was added to Docker's form precisely so exited containers
+ * would be listed; podman-compose's plain `ps` already lists them (verified: a stopped
+ * container appears with State "exited", ExitCode 137).
+ *
+ * The two providers also disagree on field names — Docker emits `Name`/`ID`, podman-compose
+ * emits `Names` (an ARRAY) and `Id`, and carries the service in a compose label.
+ *
+ * @returns normalised rows, or null when neither form could be run.
+ */
+function composePs(
+  runDockerCompose: DockerComposeRunner,
+  composePath: string,
+  env: Record<string, string>,
+): ComposePsRow[] | null {
+  let ps = runDockerCompose(["ps", "-a", "--format", "json"], composePath, env);
+  if (ps.exitCode !== 0) {
+    // podman-compose: no `-a`, and none needed.
+    ps = runDockerCompose(["ps", "--format", "json"], composePath, env);
+  }
+  if (ps.exitCode !== 0) return null; // Cannot inspect — do not invent a verdict.
+
+  const rows: ComposePsRow[] = [];
+  for (const row of parseComposePsJson(ps.output)) {
+    const r = row as {
+      ID?: string; Id?: string;
+      Name?: string; Names?: string[];
+      Service?: string; State?: string; ExitCode?: number;
+      Labels?: Record<string, string>;
+    };
+    const name = r.Name ?? (Array.isArray(r.Names) ? r.Names[0] : undefined) ?? r.Service;
+    if (!name) continue;
+    rows.push({
+      name,
+      id: r.ID ?? r.Id ?? "",
+      service: r.Service ?? r.Labels?.["com.docker.compose.service"] ?? name,
+      state: (r.State ?? "").toLowerCase(),
+      exitCode: typeof r.ExitCode === "number" ? r.ExitCode : 0,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Pull the container rows out of a `compose ps --format json` run, on either provider.
+ *
+ * 🚨 THE TWO PROVIDERS DO NOT EMIT THE SAME DOCUMENT, AND ASSUMING THEY DID MADE THIS
+ * CHECK SILENTLY EMPTY ON PODMAN. Docker Compose emits NDJSON — one object per line.
+ * podman-compose PRETTY-PRINTS a single array across many lines, behind a banner:
+ *
+ *     >>>> Executing external compose provider "/usr/sbin/podman-compose" ... <<<<
+ *     [
+ *       {
+ *         "Names": [ "psprobe_probe_1" ],
+ *
+ * Parsing that line-by-line yields nothing that is valid JSON, so the row list came back
+ * EMPTY rather than failing — and an empty list reads as "no containers", which is a
+ * verdict, not the absence of one. That is how the converge check reported
+ * "already running" for a container it had just created (appbay-cli#4, caught on the
+ * SECOND runtime after passing 10/10 on Docker).
+ */
+function parseComposePsJson(output: string): unknown[] {
+  // Whole-document first, starting at the first structural character so any provider
+  // banner ahead of it is skipped.
+  const start = output.search(/[[{]/);
+  if (start >= 0) {
+    try {
+      const parsed: unknown = JSON.parse(output.slice(start));
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      // Not one document — fall through to NDJSON.
+    }
+  }
+
+  const rows: unknown[] = [];
+  for (const line of output.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      for (const row of Array.isArray(parsed) ? parsed : [parsed]) rows.push(row);
+    } catch {
+      continue;
+    }
+  }
+  return rows;
+}
+
 function findCrashedServices(
   runDockerCompose: DockerComposeRunner,
   composePath: string,
   env: Record<string, string>,
 ): string | null {
-  // `--format json` is supported by compose v2 and by podman's provider alike; `-a` is
-  // required or exited containers are simply not listed, which would make this check
-  // silently vacuous — the exact failure mode it exists to prevent.
-  const ps = runDockerCompose(["ps", "-a", "--format", "json"], composePath, env);
-  if (ps.exitCode !== 0) return null; // Cannot inspect — do not invent a failure.
+  const rows = composePs(runDockerCompose, composePath, env);
+  if (rows === null) return null; // Cannot inspect — do not invent a failure.
 
   const dead: string[] = [];
-  for (const line of ps.output.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    let rows: unknown;
-    try {
-      rows = JSON.parse(trimmed);
-    } catch {
-      continue; // Some providers emit one object per line, others a single array.
-    }
-    for (const row of Array.isArray(rows) ? rows : [rows]) {
-      const r = row as { Service?: string; Name?: string; State?: string; ExitCode?: number };
-      const exit = typeof r.ExitCode === "number" ? r.ExitCode : 0;
-      const state = (r.State ?? "").toLowerCase();
-      if (state === "exited" && exit !== 0) {
-        dead.push(`${r.Service ?? r.Name ?? "?"} exited ${String(exit)}`);
-      }
+  for (const r of rows) {
+    if (r.state === "exited" && r.exitCode !== 0) {
+      dead.push(`${r.service} exited ${String(r.exitCode)}`);
     }
   }
   return dead.length > 0 ? dead.join(", ") : null;
+}
+
+/** One container's identity and run state, as compose reports it. */
+interface ContainerState {
+  id: string;
+  running: boolean;
+}
+
+/**
+ * Snapshot the containers compose knows about for one project, keyed by container name.
+ *
+ * @returns the snapshot, or null when compose could not be asked — the caller must treat
+ *          null as "unknown", never as "nothing running".
+ */
+function snapshotContainers(
+  runDockerCompose: DockerComposeRunner,
+  composePath: string,
+  env: Record<string, string>,
+): Map<string, ContainerState> | null {
+  // Stopped containers MUST be in this list: a container about to be STARTED is exactly a
+  // stopped one, and missing it would make every start look like "already running".
+  const rows = composePs(runDockerCompose, composePath, env);
+  if (rows === null) return null;
+
+  const snapshot = new Map<string, ContainerState>();
+  for (const r of rows) {
+    snapshot.set(r.name, { id: r.id, running: r.state === "running" });
+  }
+  return snapshot;
+}
+
+/**
+ * Did `compose up -d` actually change the running world?
+ *
+ * 🚨 THIS EXISTS BECAUSE `[UNCHANGED]` IS A VERDICT ABOUT THE COMPILED ARTIFACT AND WAS
+ * BEING SUMMED AS THOUGH IT WERE A VERDICT ABOUT THE DEPLOYMENT (appbay-cli#4). The two
+ * questions disagree exactly when it matters most: the rendered compose is byte-identical
+ * to last time, and the container it describes is gone. Measured with the container
+ * removed first, `appbay up whoami` created and started it and then reported
+ * `0 deployed, 1 unchanged`.
+ *
+ * A converge counts as a deployment when a container is CREATED, RECREATED (same name, new
+ * id) or STARTED (same id, was not running). "Already running, nothing to do" is the only
+ * case that is genuinely unchanged.
+ *
+ * @returns true/false when both snapshots are known, and null when either could not be
+ *          taken — an unknown must not be reported as either verdict.
+ */
+function didConverge(
+  before: Map<string, ContainerState> | null,
+  after: Map<string, ContainerState> | null,
+): boolean | null {
+  if (!before || !after) return null;
+  for (const [name, now] of after) {
+    const was = before.get(name);
+    if (!was) return true;                        // created
+    if (was.id !== now.id) return true;           // recreated under the same name
+    if (!was.running && now.running) return true; // started
+  }
+  return false;
 }
 
 /** Callback for discovering currently running apps. */
@@ -106,9 +257,25 @@ export type RunningAppsDiscoverer = () => Set<string>;
 /** Per-app deploy result in the shepherd pipeline. */
 export interface AppDeployResult {
   appName: string;
+  /**
+   * What happened to the DEPLOYMENT. Distinct from `planStatus`, which is what happened to
+   * the compiled artifact — see didConverge() and appbay-cli#4.
+   */
   status: "deployed" | "unchanged" | "failed";
   isSystem: boolean;
+  /** What happened to the COMPILED ARTIFACT. Never a statement about containers. */
   planStatus: "new" | "changed" | "unchanged";
+  /**
+   * Why the deployment moved: what the converge did to the running containers. `undefined`
+   * on the new/changed path (the converge is the point) and when compose could not be
+   * asked — in which case the honest answer is that we do not know.
+   */
+  convergeAction?: "started" | "already-running" | "unknown";
+  /**
+   * The app's container is up but its edge routes did not land — it is running and
+   * unreachable. A partial converge, not a total failure (appbay-cli#5).
+   */
+  containerStartedWithoutRoutes?: boolean;
   error?: string;
   shepherdErrors?: string[];
   hookResult?: { ran: boolean; error?: string };
@@ -120,6 +287,12 @@ export interface DeployResult {
   deployed: number;
   unchanged: number;
   failed: number;
+  /**
+   * Apps whose own container is running but whose edge routes did NOT land — a PARTIAL
+   * converge. Counted separately because neither `deployed` nor `failed` is honest on its
+   * own: the app is up, and it is unreachable (appbay-cli#5).
+   */
+  startedButUnrouted: number;
   compileErrors: Array<{ appName?: string; stage: string; message: string }>;
   warnings?: string[];
 }
@@ -214,24 +387,54 @@ export function isCaddyConfigPath(path: string): boolean {
     path.startsWith("etc/apps/caddy/config/security/policies/");
 }
 
-function runCaddyCommand(appbayHome: string, args: string[]): { ok: boolean; detail: string } {
+/**
+ * The three answers a validator can give. `unavailable` is NOT a kind of `rejected`.
+ *
+ * 🚨 THESE WERE ONE BOOLEAN AND IT MISDIAGNOSED THE OPERATOR (appbay-cli#5). With the edge
+ * not deployed, `no such object: appbay.caddy` — the ENGINE saying the container to exec
+ * into does not exist — was returned as `ok: false` and rendered as "Caddy configuration
+ * rejected". Caddy was never asked. The message pointed at a perfectly good ingress trait
+ * and said nothing about the edge being down, which is the thing that was actually wrong.
+ *
+ * The rule this project keeps relearning: a check that could not run must not return a
+ * verdict. #71 was the same class (a web doctor reporting "Docker daemon is not reachable"
+ * on a healthy Podman host).
+ */
+type CaddyCommandStatus = "ok" | "rejected" | "unavailable";
+
+function runCaddyCommand(
+  appbayHome: string,
+  args: string[],
+): { status: CaddyCommandStatus; detail: string } {
   const runtime = containerBin(appbayHome);
-  let missing = "Caddy container is not running.";
+  let missing = "the Caddy edge container does not exist";
   for (const container of ["appbay.caddy.caddy", "appbay.caddy"]) {
-    const inspect = spawnSync(runtime, ["inspect", container], {
+    // ⚠️ ASK WHETHER IT IS RUNNING, NOT MERELY WHETHER IT EXISTS. A STOPPED container
+    // passes a bare `inspect`, so the old check went on to `exec` — which fails with
+    // "container state improper" — and that was classified as the CONFIGURATION being
+    // rejected. Same lie as the missing-container case (appbay-cli#5), one state along.
+    const inspect = spawnSync(runtime, ["inspect", "--format", "{{.State.Running}}", container], {
       stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
     });
     if (inspect.status !== 0) {
-      missing = String(inspect.stderr || missing).trim();
+      missing = `the Caddy edge container does not exist (${String(inspect.stderr || "").trim()})`;
       continue;
+    }
+    if (String(inspect.stdout ?? "").trim() !== "true") {
+      return {
+        status: "unavailable",
+        detail: `the Caddy edge container "${container}" exists but is not running`,
+      };
     }
     const result = spawnSync(runtime, ["exec", container, "caddy", ...args], {
       stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
     });
     const detail = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-    return { ok: result.status === 0, detail };
+    return { status: result.status === 0 ? "ok" : "rejected", detail };
   }
-  return { ok: false, detail: missing };
+  // Every candidate container was absent — Caddy was never reached, so there is no verdict
+  // about the configuration to report.
+  return { status: "unavailable", detail: missing };
 }
 
 /**
@@ -242,7 +445,7 @@ function runCaddyCommand(appbayHome: string, args: string[]): { ok: boolean; det
 export async function installCaddyConfig(
   app: Pick<AppCompileResult, "auxiliaryFiles">,
   appbayHome: string,
-): Promise<{ ok: boolean; detail?: string }> {
+): Promise<{ ok: boolean; reason?: "rejected" | "unavailable"; detail?: string }> {
   const files = app.auxiliaryFiles.filter((aux) => isCaddyConfigPath(aux.path));
   if (files.length === 0) return { ok: true };
 
@@ -257,21 +460,50 @@ export async function installCaddyConfig(
   let activation = runCaddyCommand(appbayHome, [
     "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
   ]);
-  if (activation.ok) {
+  if (activation.status === "ok") {
     activation = runCaddyCommand(appbayHome, [
       "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
     ]);
-    if (activation.ok) return { ok: true };
+    if (activation.status === "ok") return { ok: true };
   }
 
   for (const [path, content] of previous) {
     if (content === null) await unlink(path).catch(() => undefined);
     else await writeFile(path, content, "utf-8");
   }
-  runCaddyCommand(appbayHome, [
-    "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
-  ]);
-  return { ok: false, detail: activation.detail || "Caddy rejected the generated configuration." };
+  // Only worth attempting when there is a Caddy to reload; on `unavailable` this is a
+  // second no-op against a container that does not exist.
+  if (activation.status === "rejected") {
+    runCaddyCommand(appbayHome, [
+      "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
+    ]);
+  }
+  return {
+    ok: false,
+    reason: activation.status === "unavailable" ? "unavailable" : "rejected",
+    detail: activation.detail || "Caddy rejected the generated configuration.",
+  };
+}
+
+/**
+ * Turn a failed Caddy install into a sentence that names what is actually wrong.
+ *
+ * ⚠️ ONE HELPER, TWO CALL SITES, ON PURPOSE. `installCaddyConfig` is called from both the
+ * new/changed and the unchanged deploy paths, and this repo's dominant defect shape is a
+ * fix applied to one of two identical-looking paths (CLAUDE.md records three in one day).
+ */
+function describeCaddyFailure(
+  appName: string,
+  install: { reason?: "rejected" | "unavailable"; detail?: string },
+): string {
+  if (install.reason === "unavailable") {
+    return (
+      `edge routes NOT installed — the Caddy edge container is not running, so its ` +
+      `configuration was never checked (${install.detail}). ${appName}'s own container is ` +
+      `up, but it is not reachable through the edge. Deploy the edge first: \`appbay up caddy\`.`
+    );
+  }
+  return `Caddy rejected the generated configuration; generated files rolled back: ${install.detail}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +586,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         apps: [],
         deployed: 0,
         unchanged: 0,
+        startedButUnrouted: 0,
         failed: 0,
         compileErrors: [{ stage: "collection", message: `No apps found in collection "${options.collection}"` }],
       };
@@ -394,6 +627,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       apps: [],
       deployed: 0,
       unchanged: 0,
+      startedButUnrouted: 0,
       failed: 0,
       compileErrors: [{ stage: "compile", message: err instanceof Error ? err.message : String(err) }],
     };
@@ -403,6 +637,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     apps: [],
     deployed: 0,
     unchanged: 0,
+    startedButUnrouted: 0,
     failed: 0,
     compileErrors: compileResult.errors.map((e) => ({
       appName: e.appName,
@@ -600,7 +835,12 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       const caddyInstall = await installCaddyConfig(app, appbayHome);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
-        appResult.error = `Caddy configuration rejected; generated files rolled back: ${caddyInstall.detail}`;
+        appResult.error = describeCaddyFailure(app.appName, caddyInstall);
+        // The compose converge already succeeded to reach this line, so the app's own
+        // container is running while its routes are not installed. Recording it as a plain
+        // failure reported a PARTIAL converge as a total one (appbay-cli#5).
+        appResult.containerStartedWithoutRoutes = true;
+        result.startedButUnrouted++;
         result.apps.push(appResult);
         result.failed++;
         continue;
@@ -693,7 +933,16 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       // Ensure container is running
       const existingComposePath = join(rendersDir, app.appName, "docker-compose.rendered.yml");
       if (existsSync(existingComposePath)) {
+        // Snapshot BEFORE the converge. An unchanged artifact says nothing about whether
+        // the container it describes still exists (appbay-cli#4).
+        const before = snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv);
         const dcResult = runDockerCompose(["up", "-d"], existingComposePath, unchangedSecretEnv);
+        const after = dcResult.exitCode === 0
+          ? snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv)
+          : null;
+        const converged = didConverge(before, after);
+        appResult.convergeAction =
+          converged === null ? "unknown" : converged ? "started" : "already-running";
         const crashedUnchanged = dcResult.exitCode === 0
           ? findCrashedServices(runDockerCompose, existingComposePath, unchangedSecretEnv)
           : null;
@@ -716,13 +965,29 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       const caddyInstall = await installCaddyConfig(app, appbayHome);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
-        appResult.error = `Caddy configuration rejected; generated files rolled back: ${caddyInstall.detail}`;
+        appResult.error = describeCaddyFailure(app.appName, caddyInstall);
+        // The compose converge already succeeded to reach this line, so the app's own
+        // container is running while its routes are not installed. Recording it as a plain
+        // failure reported a PARTIAL converge as a total one (appbay-cli#5).
+        appResult.containerStartedWithoutRoutes = true;
+        result.startedButUnrouted++;
         result.apps.push(appResult);
         result.failed++;
         continue;
       }
 
-      result.unchanged++;
+      // Count what happened to the DEPLOYMENT, not to the artifact (appbay-cli#4). A
+      // converge that created, recreated or started a container is a deployment, however
+      // byte-identical the rendered compose was.
+      //
+      // "unknown" is counted as unchanged rather than deployed: compose could not be
+      // asked, and inventing a deployment is the same error in the other direction.
+      if (appResult.convergeAction === "started") {
+        appResult.status = "deployed";
+        result.deployed++;
+      } else {
+        result.unchanged++;
+      }
     }
 
     result.apps.push(appResult);

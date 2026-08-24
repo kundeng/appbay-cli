@@ -81,6 +81,12 @@ export const upCommand = new Command("up")
     }
 
     // Report per-app results
+    //
+    // 🚨 The bracket is prefixed `plan:` because it is a verdict about the COMPILED
+    // ARTIFACT, and a bare `[UNCHANGED]` was read — by operators and by this command's own
+    // summary — as a verdict about the deployment (appbay-cli#4). They disagree exactly
+    // when it matters: an unchanged plan whose container is gone. What the converge did to
+    // the containers is now said separately, in words, on its own line.
     for (const app of result.apps) {
       const statusLabel = app.planStatus === "new" ? "NEW"
         : app.planStatus === "changed" ? "CHANGED"
@@ -88,8 +94,12 @@ export const upCommand = new Command("up")
       const sysTag = app.isSystem ? " (system)" : "";
 
       if (app.status === "deployed") {
-        console.log(`  ${pad(app.appName, 14)} [${statusLabel}]${sysTag}`);
-        console.log(`  Started ${app.appName}`);
+        console.log(`  ${pad(app.appName, 14)} [plan: ${statusLabel}]${sysTag}`);
+        console.log(
+          app.convergeAction === "started"
+            ? `  Started ${app.appName} — the plan was unchanged, the container was not`
+            : `  Started ${app.appName}`,
+        );
 
         if (app.hookResult?.ran && app.hookResult.error) {
           console.error(`  Post-deploy hook failed for ${app.appName}: ${app.hookResult.error}`);
@@ -99,7 +109,12 @@ export const upCommand = new Command("up")
       } else if (app.status === "failed") {
         console.error(`  Failed: ${app.appName} — ${app.error}`);
       } else {
-        console.log(`  - ${pad(app.appName, 14)} [${statusLabel}]`);
+        // `unknown` means compose could not be asked what it did — say so rather than
+        // let silence read as "already running".
+        const note = app.convergeAction === "unknown"
+          ? "  (could not read container state)"
+          : "";
+        console.log(`  - ${pad(app.appName, 14)} [plan: ${statusLabel}]${note}`);
       }
     }
 
@@ -127,6 +142,17 @@ export const upCommand = new Command("up")
     console.log(
       `\n${result.deployed} deployed, ${result.unchanged} unchanged, ${errorCount} error(s)`,
     );
+
+    // A PARTIAL converge gets its own line rather than being folded into either count
+    // (appbay-cli#5). Counting it as `deployed` would call an unreachable app a success;
+    // counting it only as an error hid the fact that a container is running — which is
+    // what the operator has to clean up.
+    if (result.startedButUnrouted > 0) {
+      console.log(
+        `  ⚠ ${result.startedButUnrouted} app(s) STARTED but are NOT reachable through the ` +
+          `edge — their containers are running and their routes are not installed.`,
+      );
+    }
 
     const hasFailures = result.failed > 0 || result.compileErrors.length > 0;
 
