@@ -46,9 +46,14 @@ HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 LIVE="${LIVE:-$HOME_DIR/etc/apps/caddy/config}"
 STAGE="/tmp/appbay-acme-validate"
 
-pass=0; fail=0
-ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
-bad() { echo "  ❌ $1"; fail=$((fail+1)); }
+pass=0; fail=0; skipped=0
+ok()   { echo "  ✅ $1"; pass=$((pass+1)); }
+bad()  { echo "  ❌ $1"; fail=$((fail+1)); }
+# 🚨 A SKIP IS NOT A PASS AND MUST NOT BE COUNTED AS ONE. The round-trip stage below cannot
+# run without owner-supplied credentials; folding that into `pass` would make an unproven
+# step read as a proven one in every summary, which is the exact accounting error #75 exists
+# to prevent.
+skip() { echo "  ⏭ SKIPPED: $1"; skipped=$((skipped+1)); }
 # ⚠️ PRIV applies to EVERY command, not just the container runs. On a rootful install parts
 # of the edge config tree are root-owned, so an unprivileged `cp -r` stages an INCOMPLETE
 # copy — and the baseline then fails for a reason that has nothing to do with ACME.
@@ -100,8 +105,88 @@ vm "rm -rf $STAGE" >/dev/null 2>&1
 GONE=$(vm "test -d $STAGE && echo present || echo gone" | tr -d '[:space:]')
 [ "$GONE" = "gone" ] && ok "staging copy removed" || bad "staging copy left behind at $STAGE"
 
+# =======================================================================================
+# The CA round-trip (issue #75) — the one step everything above leaves unproven.
+#
+# ⭐ THIS STAGE IS WIRED BUT HAS NEVER RUN. The credentials are owner-supplied and are
+# genuinely absent from this machine (re-checked 2026-08-21: `env | grep -iE
+# "acme|eab|cloudflare"` empty; ~/.cloudflared, ~/.cloudflare, ~/.config/cloudflare,
+# ~/.secrets, $APPBAY_HOME/var/lib/vault.enc all absent). It exists so that the evidence
+# runs the moment they arrive, instead of the issue being rediscovered and re-triaged.
+#
+# ⚠️ Treat the assertions below as UNEXERCISED until this has produced a real certificate
+# once. They are written from the acceptance criteria, not from a run — which is exactly
+# the standard this repo distrusts, and is why the summary reports them as skipped rather
+# than as passing.
+# =======================================================================================
+echo "── The CA round-trip (issue #75)"
+MISSING=""
+for v in ACME_DIRECTORY_URL ACME_EAB_KID ACME_EAB_HMAC ACME_DOMAIN ACME_EXPECTED_ISSUER; do
+  [ -z "$(eval "printf '%s' \"\${$v:-}\"")" ] && MISSING="$MISSING $v"
+done
+
+if [ -n "$MISSING" ]; then
+  skip "the CA round-trip — missing:$MISSING"
+  echo "       These are owner-supplied. Set them and re-run; nothing else is needed."
+  echo "       ACME_EXPECTED_ISSUER is the issuer CN you require, so that a staging CA"
+  echo "       silently substituted for the production one still FAILS this journey."
+else
+  RT="/tmp/appbay-acme-roundtrip"
+  vm "rm -rf $RT && mkdir -p $RT" >/dev/null 2>&1
+
+  # 🚨 NEGATIVE CONTROL FIRST. If a deliberately wrong EAB key still 'succeeds', the
+  # positive result below proves nothing — it would mean we are not reaching the CA at all.
+  # EAB is verified at ACCOUNT REGISTRATION, so this fails fast and needs no domain.
+  BADRC=$(vm "$CBIN run --rm \
+    -e ACME_EMAIL=roundtrip@$ACME_DOMAIN \
+    -e ACME_CA=$ACME_DIRECTORY_URL \
+    -e ACME_EAB_KID=$ACME_EAB_KID \
+    -e ACME_EAB_HMAC=$(printf '%s' 'deliberately-wrong-hmac' | base64 -w0) \
+    $IMAGE caddy trust >/dev/null 2>&1; echo rc=\$?" | tr -d '[:space:]')
+  [ "$BADRC" != "rc=0" ] && ok "CONTROL a wrong EAB HMAC is refused at registration" \
+                         || bad "a WRONG EAB HMAC was accepted — this journey is not reaching the CA"
+
+  # The real round-trip, against the live edge with real credentials.
+  vm "cd $HOME_DIR && ACME_DIRECTORY_URL=$ACME_DIRECTORY_URL ACME_EAB_KID=$ACME_EAB_KID \
+      ACME_EAB_HMAC=$ACME_EAB_HMAC CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-} \
+      appbay up caddy" >"$RT.log" 2>&1
+
+  # Poll for a served certificate — issuance is not instant and DNS-01 adds propagation.
+  CHAIN=""
+  for _ in $(seq 1 30); do
+    CHAIN=$(vm "echo | openssl s_client -connect $ACME_DOMAIN:443 -servername $ACME_DOMAIN 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null")
+    [ -n "$CHAIN" ] && break
+    sleep 10
+  done
+
+  if [ -n "$CHAIN" ]; then
+    ok "the edge served a certificate for $ACME_DOMAIN"
+  else
+    bad "no certificate was served for $ACME_DOMAIN after 5 minutes"
+  fi
+
+  # ⚠️ "A certificate exists" is NOT the acceptance criterion. Caddy's INTERNAL issuer will
+  # happily produce one and the edge looks perfectly healthy — an install can run for weeks
+  # having never spoken to a real CA. Assert the issuer.
+  case "$CHAIN" in
+    *"Caddy Local Authority"*)
+      bad "the certificate is SELF-SIGNED (Caddy internal issuer) — no CA was involved: $CHAIN" ;;
+    *"$ACME_EXPECTED_ISSUER"*)
+      ok "issuer matches ACME_EXPECTED_ISSUER: $CHAIN" ;;
+    *)
+      bad "issuer is NOT the expected CA (wanted '$ACME_EXPECTED_ISSUER'): $CHAIN" ;;
+  esac
+
+  skip "renewal — not exercised. Recorded explicitly per #75 rather than assumed to work."
+  vm "rm -rf $RT" >/dev/null 2>&1
+fi
+
 echo
-echo "──────── $pass passed, $fail failed ────────"
-echo "  NOT proven here: the CA round-trip. That needs ACME_EAB_KID / ACME_EAB_HMAC and a"
-echo "  public domain — absent from env and disk on this workstation."
+echo "──────── $pass passed, $fail failed, $skipped skipped ────────"
+if [ "$skipped" -gt 0 ]; then
+  echo "  ⚠️ A SKIP IS NOT A PASS. The CA round-trip is the last unproven step in the TLS"
+  echo "     story (#75); everything beneath it is verified. Until the skip count is 0 with"
+  echo "     real credentials, 'AppBay does institutional TLS' rests on the config being"
+  echo "     SHAPED correctly, not on a certificate existing."
+fi
 [ "$fail" -eq 0 ] || exit 1
