@@ -8,15 +8,22 @@ tests/bdd/
 ├── features/                         # WHAT: Gherkin feature files (human-readable)
 │   ├── app_lifecycle.feature         # Deploy, compile, validate, eject
 │   ├── secrets_management.feature    # Vault CRUD, injection, scan, import
-│   ├── auth_management.feature       # Authentik SSO, per-app auth, users
-│   ├── ingress_routing.feature       # Traefik routing, exposure modes
+│   ├── auth_management.feature       # Edge sign-in, per-app auth, users
+│   ├── ingress_routing.feature       # Ingress routing, exposure modes
 │   ├── system_health.feature         # Doctor, rebuild-cache, system info
 │   └── traits_and_overlays.feature   # Trait system, overlays, scoped vars
 │
+├── fixtures.resource                 # Shared setup/teardown keywords
 ├── cli_smoke.robot                   # HOW: CLI smoke (8 tests, fast)
 ├── secrets_lifecycle.robot           # HOW: Secrets integration (6 tests)
-└── deploy_lifecycle.robot            # HOW: Deploy integration (8 tests)
+├── deploy_lifecycle.robot            # HOW: Deploy integration (8 tests)
+└── traits_and_overlays.robot         # HOW: Traits and overlays (9 tests)
 ```
+
+⚠️ **`auth_management.feature` says "SSO", not a product name.** This line named **Authentik**
+until 2026-08-21 — a stack removed in S19, replaced by Authelia, which S25 then replaced with
+the integrated **Caddy Security** edge. Nothing named Authentik has existed for six sprints.
+`appbay auth` and `appbay authelia` are retired stubs that exit non-zero.
 
 ## Two layers, one purpose
 
@@ -45,18 +52,30 @@ are the target; the suites grow toward them.
 ```bash
 # All suites against the VM
 cd ~/Dropbox/Projects/aitester-bdd
-uv run robot ~/Dropbox/Projects/appbay/tests/bdd/
+uv run robot ~/Projects/appbay-cli/tests/bdd/
 
 # Just the smoke suite (fastest)
-uv run robot ~/Dropbox/Projects/appbay/tests/bdd/cli_smoke.robot
+uv run robot ~/Projects/appbay-cli/tests/bdd/cli_smoke.robot
 
-# Just secrets
-uv run robot ~/Dropbox/Projects/appbay/tests/bdd/secrets_lifecycle.robot
+# The second runtime — rootful Podman. Both are required; one is half a result.
+uv run robot --variable VM:appbay-rhel --variable PRIV:sudo \
+             --variable CONTAINER_BIN:podman ~/Projects/appbay-cli/tests/bdd/
 ```
+
+⚠️ **The checkout is `~/Projects/`, not the Dropbox copy.** These paths read
+`~/Dropbox/Projects/appbay/tests/bdd/` until 2026-08-21 — a checkout that no longer holds the
+work. Only the *runner* (`aitester-bdd`) lives in Dropbox.
 
 ## Prerequisites
 
-- multipass VM `appbay-test` running with appbay installed
+- A multipass VM from the fleet, with appbay installed and initialised:
+  **`appbay-docker`** (Docker) or **`appbay-rhel`** (rootful Podman, Fedora 43).
+  The suites default to `appbay-docker` and take `${VM}` / `${PRIV}` / `${CONTAINER_BIN}`.
+  🚨 **`appbay-test` is RETIRED and does not exist.** This file required it until
+  2026-08-21; a suite pinned to it runs against nothing, which is how `tests/bdd/` went
+  months with no recorded passing run. Check `multipass list` rather than a name from memory.
+- The VM's binary must be the one under test — see the binary-sync note in
+  `scripts/journeys/README.md`. A VM carrying an older build silently tests older code.
 - aitester-bdd project at `~/Dropbox/Projects/aitester-bdd`
 - Robot Framework (installed via aitester-bdd's uv environment)
 

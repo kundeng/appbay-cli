@@ -386,6 +386,17 @@ Restart running apps (down then up for each).
 - **Input:** `{ apps: string[] }`
 - **Output:** `{ success: boolean, errors: string[] }`
 
+### `deployments.fullDeploy`
+
+Run the whole compile → write → deploy pipeline for a selection of apps, emitting
+`deploy.status` events over SSE as it goes. This is what the Deploy screen drives; the
+narrower procedures above act on already-rendered output.
+
+- **Type:** mutation
+- **Input:** `{ apps?: string[], collection?: string }` — omit both to deploy everything
+- **Output:** the deploy result, including per-app status and a `deployId` correlating the
+  emitted events
+
 ### `deployments.list`
 
 List deployment history.
@@ -435,6 +446,62 @@ Delete a config preset by name.
 - **Type:** mutation
 - **Input:** `{ name: string }`
 - **Output:** void
+
+::: {.callout-note}
+## Presets and per-app configuration are two different things in one router
+
+Everything above operates on **saved presets** (named app selections in
+`$APPBAY_HOME/etc/configs/`). Everything below operates on **one app's own configuration** —
+its `appbay.yaml` values and its `.env` variables. They share a router and nothing else.
+:::
+
+### `configs.getAppConfig`
+
+Read an app's whole `appbay.yaml` configuration.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ found: boolean, config: object | null, path: string | null }`
+
+### `configs.getAppConfigValue`
+
+Read a single configuration value from an app's `appbay.yaml`.
+
+- **Type:** query
+- **Input:** `{ appName: string, key: string }`
+- **Output:** the resolved value
+
+### `configs.setAppConfigValue`
+
+Write a single configuration value into an app's `appbay.yaml`.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, key: string, value: string }`
+
+### `configs.getAppEnv`
+
+Read an app's environment variables, with the upstream values and the local overrides
+reported separately rather than merged.
+
+- **Type:** query
+- **Input:** `{ appName: string }`
+- **Output:** `{ vars, path, upstream, overrides, overridePath }` — `vars` is the effective
+  result; `upstream` is what the app's own `.env` declares and `overrides` is what
+  `.env.local` changes.
+
+### `configs.setAppEnv`
+
+Set one environment variable for an app, written to `.env.local`.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, key: string, value: string }`
+
+### `configs.deleteAppEnv`
+
+Remove one environment variable override from an app's `.env.local`.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, key: string }`
 
 ## secrets
 
@@ -545,3 +612,21 @@ Enqueue an `eject` job. Compiles all user apps and writes rendered compose YAML 
 - **Type:** mutation
 - **Input:** none
 - **Output:** `{ success: boolean, jobId: string | null }`
+
+### `jobs.runBackup`
+
+Enqueue a backup job for one app's volumes.
+
+- **Type:** mutation
+- **Input:** `{ appName: string, volumes?: string[], retention?: number }` — `retention`
+  defaults to 7 days; omit `volumes` to back up all of the app's volumes
+- **Output:** `{ success: boolean, jobId: string | null }`
+
+::: {.callout-warning}
+## The `backup` trait does not schedule anything on its own
+
+Declaring a `backup` trait emits **metadata only** — it records `schedule` and `retention`
+and does not create a recurring job. Backups run when something calls this procedure, which
+requires the control plane to be running. An app with a backup trait and no control plane is
+**not being backed up**, and nothing errors to say so.
+:::

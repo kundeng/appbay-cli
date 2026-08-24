@@ -503,6 +503,23 @@ Reset a Caddy Security local edge user's password.
 appbay edge users reset-password username
 ```
 
+### `appbay admin reset-password`
+
+Reset the password for an account that signs in to **AppBay itself** — a control-plane
+account in `etc/control-plane/users.yaml`.
+
+```bash
+appbay admin reset-password alice
+```
+
+::: {.callout-important}
+## Two credential domains, and this is the other one
+
+`appbay admin` manages who can sign in to **AppBay's own control plane**. `appbay edge users`
+manages who can sign in to your **deployed apps**, through the Caddy Security edge. They are
+separate stores and are never synchronised — resetting one has no effect on the other.
+:::
+
 ### `appbay rebuild-cache`
 
 Regenerate the SQLite metadata cache from filesystem state.
@@ -751,6 +768,142 @@ appbay fixfs jellyfin --dry-run
 | `--dry-run` | Show what would change without applying |
 
 **Exit codes:** 0 = success.
+
+## Inspection and diagnostics
+
+### `appbay stats`
+
+Resource usage for running containers. Streams by default.
+
+```bash
+appbay stats
+appbay stats --no-stream     # one snapshot, then exit
+```
+
+| Flag | Description |
+|---|---|
+| `--no-stream` | Print a single snapshot instead of streaming |
+
+### `appbay dive`
+
+Inspect an image's layers and where its disk usage goes.
+
+```bash
+appbay dive ollama              # by app name
+appbay dive nginx:latest        # by image reference
+```
+
+### `appbay smi`
+
+Show NVIDIA GPU information, as seen by the host.
+
+```bash
+appbay smi
+```
+
+Useful before adding a `gpu` trait — see [Traits](../guide/traits.qmd). A host with no NVIDIA
+GPU reports that plainly rather than failing obscurely.
+
+## AI models
+
+### `appbay models`
+
+Manage models held by the Ollama system app.
+
+```bash
+appbay models ls
+appbay models rm llama3
+```
+
+| Subcommand | Description |
+|---|---|
+| `ls` | List downloaded models |
+| `rm <model>` | Remove a model |
+
+### `appbay ollama`
+
+Run the Ollama CLI **inside** the Ollama container, passing arguments through unchanged.
+
+```bash
+appbay ollama list
+appbay ollama run llama3
+appbay ollama show llama3
+```
+
+## Configuration profiles
+
+### `appbay profile`
+
+Save and restore named configuration profiles.
+
+```bash
+appbay profile save homelab
+appbay profile ls
+appbay profile set homelab
+appbay profile rm homelab
+```
+
+| Subcommand | Description |
+|---|---|
+| `save <name>` | Save the current configuration under a name |
+| `set <name>` | Restore a saved profile |
+| `ls` | List saved profiles |
+| `rm <name>` | Delete a saved profile |
+
+## Public tunnels
+
+### `appbay tunnel`
+
+Create a Cloudflare quick tunnel exposing a local app publicly, without touching your edge
+or DNS.
+
+```bash
+appbay tunnel jellyfin
+appbay tunnel jellyfin --port 8096
+```
+
+| Flag | Description |
+|---|---|
+| `--port <port>` | Override the port to tunnel |
+
+::: {.callout-warning}
+## A quick tunnel is public and unauthenticated
+
+It publishes the app on a Cloudflare-generated hostname that anyone with the URL can reach.
+It does **not** pass through the Caddy Security edge, so an `auth` trait on the app does not
+apply to traffic arriving this way. Use it for a demo or a temporary share, not as a way to
+publish something permanently.
+:::
+
+### `appbay tunnel-down`
+
+Stop all running Cloudflare tunnels.
+
+```bash
+appbay tunnel-down
+```
+
+## MCP
+
+### `appbay mcp inspector`
+
+Launch the MCP inspector for debugging Model Context Protocol servers.
+
+```bash
+appbay mcp inspector
+appbay mcp inspector http://localhost:3001
+```
+
+## Retired commands
+
+`appbay auth` and `appbay authelia` still exist as **stubs that exit non-zero**. They print
+what replaced them and change nothing.
+
+Authelia was AppBay's authentication edge until S25 replaced it with the integrated Caddy
+Security edge. Authentication now lives in `appbay edge` (users who sign in to your deployed
+apps) and `appbay admin` (accounts that sign in to AppBay itself).
+
+## Shell integration
 
 ### `appbay completion`
 
