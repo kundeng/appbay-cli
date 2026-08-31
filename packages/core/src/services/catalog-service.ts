@@ -333,6 +333,15 @@ async function saveSourcesConfig(appbayHome: string, config: CatalogSourceConfig
   await writeFile(configPath, stringifyYaml(config), "utf-8");
 }
 
+/** True when `path` names an existing directory — i.e. a local catalog rather than a URL. */
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export async function catalogAddSource(
   appbayHome: string,
   name: string,
@@ -349,14 +358,31 @@ export async function catalogAddSource(
   }
 
   await mkdir(sourcesDir, { recursive: true });
-  const result = spawnSync("git", ["clone", "--depth", "1", url, targetDir], {
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: 60_000,
-  });
 
-  if (result.status !== 0) {
-    const err = result.stderr ? String(result.stderr).trim() : "unknown error";
-    return { success: false, message: `Failed to clone: ${err}` };
+  // A source may be a LOCAL DIRECTORY, not only a git URL. RFC-001 §6.1 makes
+  // `appbay init --catalog <path>` equivalent to adding a source, and the consuming
+  // project passes a path (`provision-appbay.yml`: `--catalog /app/llm-stack-catalog`),
+  // so a clone-only implementation would reject exactly the caller that needs this.
+  // Symlink so `catalog update-source` and an out-of-band edit both stay live; copy when
+  // the filesystem refuses a link.
+  if (await isDirectory(url)) {
+    try {
+      const { symlink } = await import("node:fs/promises");
+      await symlink(url, targetDir);
+    } catch {
+      await mkdir(targetDir, { recursive: true });
+      await cp(url, targetDir, { recursive: true });
+    }
+  } else {
+    const result = spawnSync("git", ["clone", "--depth", "1", url, targetDir], {
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 60_000,
+    });
+
+    if (result.status !== 0) {
+      const err = result.stderr ? String(result.stderr).trim() : "unknown error";
+      return { success: false, message: `Failed to clone: ${err}` };
+    }
   }
 
   let entryCount = 0;

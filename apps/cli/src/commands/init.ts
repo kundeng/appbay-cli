@@ -35,6 +35,7 @@ import {
   resolveIngressProvider,
   type ContainerRuntime,
   inspectEdgePorts,
+  catalogAddSource,
 } from "@appbay/core";
 import { resolveAppbayHome, saveAppbayHome } from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
@@ -56,6 +57,14 @@ const SCAFFOLD_DIRS = [
 
 const BAKED_CATALOG_PATH = "/opt/appbay/catalog";
 const DEFAULT_CATALOG_URL = "https://github.com/kundeng/appbay-catalog";
+
+/**
+ * Source name that `appbay init --catalog <path|url>` registers under.
+ *
+ * RFC-001 §6.1: an operator-supplied catalog is a source, not `bundled`. The name is fixed
+ * so a re-run of `init` finds and reports the same one rather than accumulating copies.
+ */
+const OPERATOR_SOURCE_NAME = "local";
 
 function resolveCatalogSource(explicit?: string): string {
   return explicit ?? process.env.APPBAY_CATALOG_SOURCE ?? DEFAULT_CATALOG_URL;
@@ -402,7 +411,7 @@ async function writeServerCompose(appbayHome: string): Promise<boolean> {
  *
  * Skips if the bundled catalog dir already has content.
  */
-async function seedCatalog(appbayHome: string, catalogSource: string): Promise<"baked" | "cloned" | "linked" | "copied" | "exists" | "skipped"> {
+async function seedCatalog(appbayHome: string): Promise<"baked" | "cloned" | "exists" | "skipped"> {
   const bundledDir = join(appbayHome, "var", "lib", "catalog", "bundled");
 
   // Already seeded?
@@ -422,25 +431,15 @@ async function seedCatalog(appbayHome: string, catalogSource: string): Promise<"
     return "baked";
   }
 
-  // Local path: symlink or copy
-  if (await dirExists(catalogSource)) {
-    await mkdir(dirname(bundledDir), { recursive: true });
-    const { symlink } = await import("node:fs/promises");
-    try {
-      await symlink(catalogSource, bundledDir);
-      return "linked";
-    } catch {
-      const { cp } = await import("node:fs/promises");
-      await mkdir(bundledDir, { recursive: true });
-      await cp(catalogSource, bundledDir, { recursive: true });
-      return "copied";
-    }
-  }
-
-  // Git URL: clone
+  // Git clone of the SHIPPED catalog. RFC-001 §6.1: `bundled` is only ever written from the
+  // baked path or the default catalog, never from an operator's `--catalog`. It used to
+  // symlink whatever `--catalog` pointed at directly into `bundled`, and because
+  // `seedCatalog` short-circuits on "already has content", that one decision meant appbay's
+  // own 150-app catalog was then NEVER installed — the operator's five apps held the slot
+  // and every one of them reported `SOURCE: bundled`. An operator catalog is a *source*.
   const result = spawnSync(
     "git",
-    ["clone", "--depth", "1", catalogSource, bundledDir],
+    ["clone", "--depth", "1", DEFAULT_CATALOG_URL, bundledDir],
     { stdio: ["pipe", "pipe", "pipe"], timeout: 30_000 },
   );
   if (result.status === 0) return "cloned";
@@ -863,27 +862,48 @@ export const initCommand = new Command("init")
       // Stage 4: Seed catalog.
       step(4, 6, "Seeding catalog");
       const catalogSrc = resolveCatalogSource(options.catalog);
-      const catalogResult = await seedCatalog(appbayHome, catalogSrc);
+      const catalogResult = await seedCatalog(appbayHome);
       switch (catalogResult) {
         case "baked":
           console.log("  Seeded catalog from bundled data.");
           break;
         case "cloned":
-          console.log("  Cloned catalog from " + catalogSrc);
-          break;
-        case "linked":
-          console.log("  Linked catalog from " + catalogSrc);
-          break;
-        case "copied":
-          console.log("  Copied catalog from " + catalogSrc);
+          console.log("  Cloned catalog from " + DEFAULT_CATALOG_URL);
           break;
         case "exists":
           console.log("  Catalog already present.");
           break;
         case "skipped":
-          console.log("  Catalog not seeded (source unavailable: " + catalogSrc + ")");
-          console.log("  You can add it later: appbay init --catalog /path/to/catalog");
+          console.log("  Catalog not seeded (unavailable: " + DEFAULT_CATALOG_URL + ")");
           break;
+      }
+
+      // An operator-supplied catalog is a SOURCE, never `bundled` — RFC-001 §6.1.
+      //
+      // ⚠️ This runs regardless of what `seedCatalog` returned, which is the point of §6.4:
+      // `--catalog` used to be swallowed whole on an already-seeded home ("Catalog already
+      // present.") while `appbay init --catalog …` was simultaneously advertised as the
+      // remediation for a missing catalog. It was a silent no-op that read as success.
+      const operatorCatalog = options.catalog ?? process.env.APPBAY_CATALOG_SOURCE;
+      if (operatorCatalog) {
+        const added = await catalogAddSource(appbayHome, OPERATOR_SOURCE_NAME, operatorCatalog);
+        if (added.success) {
+          console.log(`  ${added.message}`);
+        } else if (added.message.includes("already exists")) {
+          // ⚠️ Name a real remediation. There is no `catalog rm-source`, and pointing at a
+          // command that does not exist is the same defect as the `--project-vars` /
+          // `--env-vars` suggestion RFC-001 §4.8 exists to delete.
+          const sourceDir = join(appbayHome, "var", "lib", "catalog", "sources", OPERATOR_SOURCE_NAME);
+          console.log(
+            `  Source "${OPERATOR_SOURCE_NAME}" already registered — leaving it as is.`,
+          );
+          console.log(`    To repoint it:  rm -rf ${sourceDir}`);
+          console.log(
+            `                    appbay catalog add-source ${OPERATOR_SOURCE_NAME} ${operatorCatalog}`,
+          );
+        } else {
+          console.log(`  ⚠ Could not add catalog source: ${added.message}`);
+        }
       }
 
       // Stage 5: Write server compose file.
