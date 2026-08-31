@@ -22,19 +22,38 @@
  * ⚠️ LOCAL ONLY — it needs both clones, so it cannot run in CI, which checks out one repo.
  * Run it before claiming the trees are in sync.
  *
+ * ⚠️ COMPARES THE INDEX, NOT THE WORKING TREE. An uncommitted, unstaged edit is invisible
+ * here — which is correct for the failure this guards (a commit that reached one tree and
+ * not the other) and wrong if you expect it to police a dirty checkout. Stage or commit
+ * first, or it will tell you the trees agree while your editor says otherwise.
+ *
  * Usage:  node scripts/check-subset.mjs [--other ../appbay]
  */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
+
+/**
+ * The sibling clone, derived from THIS repo's name rather than a fixed relative path.
+ *
+ * ⚠️ A hardcoded `../appbay` default resolves to the repo itself when run from `appbay`,
+ * so the check compared a tree to itself and printed ✓ — a false pass, which is worse than
+ * an error because it answers the question wrongly instead of declining to answer.
+ */
 const otherIdx = process.argv.indexOf("--other");
+const sibling = basename(REPO) === "appbay-cli" ? "appbay" : "appbay-cli";
 const OTHER = resolve(
-  otherIdx > -1 ? process.argv[otherIdx + 1] : join(REPO, "..", "appbay"),
+  otherIdx > -1 ? process.argv[otherIdx + 1] : join(REPO, "..", sibling),
 );
+
+if (OTHER === REPO) {
+  console.error(`  ✖ --other resolves to this repo (${REPO}); nothing to compare`);
+  process.exit(2);
+}
 
 if (!existsSync(join(OTHER, ".git"))) {
   console.log(`  – skipped: no sibling clone at ${OTHER} (this check is local-only)`);
@@ -44,20 +63,34 @@ if (!existsSync(join(OTHER, ".git"))) {
 /** Which of the two is the public subset? The one without `apps/web`. */
 const [pub, priv] = existsSync(join(REPO, "apps/web")) ? [OTHER, REPO] : [REPO, OTHER];
 
-const tracked = (repo) =>
-  new Set(
-    execFileSync("git", ["-C", repo, "ls-files"], { encoding: "utf-8" })
+/**
+ * path -> "<mode> <blob-sha>", straight from the index.
+ *
+ * ⚠️ Compare git's own hashes rather than reading files. `.agents/skills/*` are SYMLINKS
+ * (mode 120000) pointing at a macOS path that does not exist here, so `readFileSync` raised
+ * EISDIR and killed the run. Modes also make the check stricter for free: a file that became
+ * a symlink, or lost its executable bit, differs even when the bytes match.
+ */
+const indexOf = (repo) =>
+  new Map(
+    execFileSync("git", ["-C", repo, "ls-files", "-s"], { encoding: "utf-8" })
       .split("\n")
-      .filter(Boolean),
+      .filter(Boolean)
+      .map((line) => {
+        const [meta, path] = line.split("\t");
+        const [mode, sha] = meta.split(" ");
+        return [path, `${mode} ${sha}`];
+      }),
   );
 
-const publicFiles = tracked(pub);
-const privateFiles = tracked(priv);
+const publicIndex = indexOf(pub);
+const privateIndex = indexOf(priv);
+const publicFiles = new Set(publicIndex.keys());
+const privateFiles = new Set(privateIndex.keys());
 
 const orphaned = [...publicFiles].filter((f) => !privateFiles.has(f)).sort();
 const diverged = [...publicFiles]
-  .filter((f) => privateFiles.has(f))
-  .filter((f) => !readFileSync(join(pub, f)).equals(readFileSync(join(priv, f))))
+  .filter((f) => privateFiles.has(f) && publicIndex.get(f) !== privateIndex.get(f))
   .sort();
 
 console.log(`  public:  ${pub}  (${publicFiles.size} tracked)`);
