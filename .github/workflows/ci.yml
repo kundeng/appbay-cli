@@ -82,6 +82,11 @@ jobs:
       - name: Docs do not show a manifest the schema rejects
         run: pnpm check:docs-manifests
 
+      # The harness previously described a socket-proxy service deleted two sprints earlier,
+      # so CI smoke-tested a topology no installation ran — and passed.
+      - name: The build harness matches the compose an install actually gets
+        run: pnpm check:server-compose
+
   docs:
     runs-on: ubuntu-latest
     needs: test

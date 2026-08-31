@@ -187,8 +187,21 @@ services:
     image: \${APPBAY_SERVER_IMAGE:-ghcr.io/kundeng/appbay-server:latest}
     user: "\${APPBAY_UID:-1000}:\${APPBAY_GID:-1000}"
     restart: unless-stopped
+    # 🚨 THIS PORT IS THE CONTROL PLANE'S ONLY AUTHENTICATION BOUNDARY TODAY. The web UI
+    # checks a password itself; RFC-001 §1 replaces that with the edge's identity, which is
+    # only sound once the edge is the ONLY route in. Until then this stays reachable, because
+    # binding it to loopback before an edge route exists locks operators out with nothing in
+    # its place.
+    #
+    # ⚠️ APPBAY_BIND=127.0.0.1 is the switch that closes it, and it is a PRECONDITION of
+    # RFC-001 §1's cutover — with the port open on every interface, trusting the identity the
+    # edge forwards in a header means anyone who can reach 3000 sets that header themselves.
+    #
+    # The default was previously the literal 3000:3000, so an installation could not change
+    # the port at all even though the build harness honoured APPBAY_PORT. The two copies had
+    # drifted; scripts/check-server-compose.mjs now compares them.
     ports:
-      - "3000:3000"
+      - "\${APPBAY_BIND:-0.0.0.0}:\${APPBAY_PORT:-3000}:3000"
     environment:
       - APPBAY_HOME=/appbay
       # The server image deliberately ships one client. On Podman hosts that Docker client
