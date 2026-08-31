@@ -370,6 +370,22 @@ mechanically guarded — `pnpm check:docs-manifests` fails on a documented manif
 rejects. `overlays.qmd` had documented §5.2's defect as the intended design; `scope-model.qmd`
 described two variable stores that never existed.
 
+**Test pillar (2026-08-31) — the §3.1 module had no direct tests, and my first attempt at
+one was theatre.** `secrets/keepassxc-cli.ts` was covered only by `kdbx-crud.test.ts`, which
+`describe.skipIf`s away without the binary — so on CI and on any machine without keepassxc,
+the code that exists to keep secrets out of argv was untested. Now 10 tests using a fake
+`keepassxc-cli` on PATH; no binary needed.
+
+🚨 **The first version passed with the shell reintroduced.** It asserted on the fake's own
+argv, which is IDENTICAL under both implementations because the original quoting was correct.
+That is §3.1's finding restated: escaping was never the defect, the secret being in the
+SHELL's argv was — so a test that inspects the child proves nothing. The assertion that
+actually pins it reads `/proc/$PPID/cmdline` from inside the fake, the same file a local user
+would read. Verified by reintroducing the defect correctly-quoted: exactly one test fails,
+and it is that one.
+
+⇒ **A security test must assert on the process that would leak, not the one that receives.**
+
 **Docs pillar (2026-08-31, third pass) — the remaining three were checked and were wrong.**
 `traits.qmd`, `secrets.qmd` and `web-ui.qmd` passed the manifest guard because their yaml is
 valid; their PROSE taught two variable stores that do not exist. `secrets.qmd` had an entire
