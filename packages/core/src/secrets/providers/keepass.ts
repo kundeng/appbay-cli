@@ -25,6 +25,7 @@ import { runKeepassxc, stdinLines } from "../keepassxc-cli.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CheckResult, SecretProvider } from "../types.js";
+import { resolveMasterPassword } from "../master-password.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,41 +87,6 @@ function resolveDbPath(): string {
   return join(appbayHome, "var", "lib", DEFAULT_DB_NAME);
 }
 
-function resolveDbPassword(): string {
-  // 1. Dedicated KeePass env var
-  if (process.env.APPBAY_KEEPASS_PASSWORD) {
-    return process.env.APPBAY_KEEPASS_PASSWORD;
-  }
-
-  // 2. Dedicated KeePass password file ($APPBAY_HOME/etc/kdbx-password)
-  const appbayHome =
-    process.env.APPBAY_HOME ??
-    join(process.env.HOME ?? "/root", ".appbay");
-  const kdbxPasswordPath = join(appbayHome, "etc", "kdbx-password");
-  try {
-    const filePassword = readFileSync(kdbxPasswordPath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist — fall through
-  }
-
-  // 3. Shared vault password env var (fallback)
-  if (process.env.APPBAY_VAULT_PASSWORD) {
-    return process.env.APPBAY_VAULT_PASSWORD;
-  }
-
-  // 4. Shared vault password file (fallback)
-  const vaultPasswordPath = join(appbayHome, "etc", "vault-password");
-  try {
-    const filePassword = readFileSync(vaultPasswordPath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist
-  }
-
-  return "";
-}
-
 // ---------------------------------------------------------------------------
 // keepassxc-cli invocation
 // ---------------------------------------------------------------------------
@@ -172,7 +138,7 @@ export class KeePassSecretProvider implements SecretProvider {
   async resolve(uri: string): Promise<string> {
     const parsed = parseKeePassUri(uri);
     const dbPath = resolveDbPath();
-    const password = resolveDbPassword();
+    const password = resolveMasterPassword();
 
     if (!existsSync(dbPath)) {
       throw new Error(
@@ -208,7 +174,7 @@ export class KeePassSecretProvider implements SecretProvider {
         return { uri, ok: false, error: "keepassxc-cli not found" };
       }
 
-      const password = resolveDbPassword();
+      const password = resolveMasterPassword();
       await cliShow(
         dbPath,
         password,

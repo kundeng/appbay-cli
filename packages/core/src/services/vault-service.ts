@@ -23,6 +23,11 @@ import { randomBytes } from "node:crypto";
 import { Vault } from "../secrets/providers/vault.js";
 import { runKeepassxc, stdinLines } from "../secrets/keepassxc-cli.js";
 import { discoverApps, type DiscoveredApp } from "../compiler/index.js";
+import {
+  resolveMasterPassword,
+  persistMasterPassword,
+  MASTER_PASSWORD_REL,
+} from "../secrets/master-password.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,73 +92,23 @@ export interface ScanResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the vault master password from env var or password file.
+ * @deprecated Call `resolveMasterPassword` directly. Kept so existing callers keep compiling.
  *
- * Priority: APPBAY_VAULT_PASSWORD env var > $APPBAY_HOME/etc/vault-password file.
- * Throws if neither is available.
+ * RFC-001 §2.2: one password opens whichever store the installation uses, resolved in one
+ * place. This and `resolveKdbxPassword` were separate two- and four-tier ladders; they are
+ * now the same function under two names.
  */
 export function resolveVaultPassword(appbayHome: string): string {
-  const envPassword = process.env.APPBAY_VAULT_PASSWORD;
-  if (envPassword) return envPassword;
-
-  const passwordFilePath = join(appbayHome, "etc", "vault-password");
-  try {
-    const filePassword = readFileSync(passwordFilePath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist
-  }
-
-  throw new Error(
-    "Vault password required. Set APPBAY_VAULT_PASSWORD or run 'appbay secrets init'.",
-  );
+  return resolveMasterPassword(appbayHome);
 }
 
 // ---------------------------------------------------------------------------
 // KeePass password resolution
 // ---------------------------------------------------------------------------
 
-/**
- * Resolve the KeePass database master password.
- *
- * Priority:
- *   1. APPBAY_KEEPASS_PASSWORD env var
- *   2. $APPBAY_HOME/etc/kdbx-password file
- *   3. APPBAY_VAULT_PASSWORD env var (fallback — shared password)
- *   4. $APPBAY_HOME/etc/vault-password file (fallback — shared password)
- *
- * Throws if none available.
- */
+/** @deprecated Call `resolveMasterPassword` directly — see `resolveVaultPassword`. */
 export function resolveKdbxPassword(appbayHome: string): string {
-  // 1. Dedicated KeePass env var
-  const keepassEnv = process.env.APPBAY_KEEPASS_PASSWORD;
-  if (keepassEnv) return keepassEnv;
-
-  // 2. Dedicated KeePass password file
-  const kdbxPasswordPath = join(appbayHome, "etc", "kdbx-password");
-  try {
-    const filePassword = readFileSync(kdbxPasswordPath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist — fall through
-  }
-
-  // 3. Shared vault password env var
-  const vaultEnv = process.env.APPBAY_VAULT_PASSWORD;
-  if (vaultEnv) return vaultEnv;
-
-  // 4. Shared vault password file
-  const vaultPasswordPath = join(appbayHome, "etc", "vault-password");
-  try {
-    const filePassword = readFileSync(vaultPasswordPath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist
-  }
-
-  throw new Error(
-    "KeePass password required. Set APPBAY_KEEPASS_PASSWORD or run 'appbay secrets init-kdbx'.",
-  );
+  return resolveMasterPassword(appbayHome);
 }
 
 /**
@@ -181,29 +136,21 @@ export function initVault(
   password?: string,
 ): VaultInitResult {
   const vaultPath = join(appbayHome, "var", "lib", "vault.enc");
-  const passwordFilePath = join(appbayHome, "etc", "vault-password");
+  const passwordFilePath = join(appbayHome, MASTER_PASSWORD_REL);
 
   if (existsSync(vaultPath)) {
     return { vaultPath, passwordPath: passwordFilePath, generated: false };
   }
 
-  // Resolve password: explicit > env var > auto-generate
-  let finalPassword = password ?? process.env.APPBAY_VAULT_PASSWORD;
-  let generated = false;
-
-  if (!finalPassword) {
-    finalPassword = randomBytes(24).toString("base64url");
-    generated = true;
-  }
-
-  // Store password file (chmod 600)
-  mkdirSync(join(appbayHome, "etc"), { recursive: true });
-  writeFileSync(passwordFilePath, finalPassword, { mode: 0o600 });
-  try {
-    chmodSync(passwordFilePath, 0o600);
-  } catch {
-    // chmod may fail on some filesystems
-  }
+  // ⚠️ Writes to var/lib/secrets/master-password, NOT etc/vault-password. RFC-001 §2.2
+  // consolidates the credential; reads still fall back to the legacy path for one release,
+  // but a resolver that prefers the new location while writes go to the old one improves
+  // nothing. An existing install keeps working because the fallback finds its old file.
+  const generated = password === undefined && !process.env.APPBAY_MASTER_PASSWORD;
+  const finalPassword = persistMasterPassword(
+    appbayHome,
+    password ?? process.env.APPBAY_MASTER_PASSWORD ?? undefined,
+  );
 
   // Create the vault (write+delete a sentinel to force file creation)
   mkdirSync(join(appbayHome, "var", "lib"), { recursive: true });

@@ -32,6 +32,7 @@ import {
   scryptSync,
 } from "node:crypto";
 import type { CheckResult, SecretProvider } from "../types.js";
+import { resolveMasterPassword } from "../master-password.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -305,28 +306,6 @@ function resolveVaultPath(): string {
  *   2. $APPBAY_HOME/etc/vault-password file (set during appbay init)
  *   3. Error — user must set one of the above
  */
-function resolvePassword(): string {
-  // 1. Environment variable (highest priority)
-  const envPassword = process.env.APPBAY_VAULT_PASSWORD;
-  if (envPassword) return envPassword;
-
-  // 2. Password file (created during appbay init or appbay secrets init)
-  const appbayHome =
-    process.env.APPBAY_HOME ??
-    join(process.env.HOME ?? "/root", ".appbay");
-  const passwordFilePath = join(appbayHome, "etc", "vault-password");
-  try {
-    const filePassword = readFileSync(passwordFilePath, "utf-8").trim();
-    if (filePassword) return filePassword;
-  } catch {
-    // File doesn't exist — fall through
-  }
-
-  throw new Error(
-    "Vault password required. Set APPBAY_VAULT_PASSWORD or run 'appbay secrets init'.",
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -343,7 +322,7 @@ export class VaultSecretProvider implements SecretProvider {
   async resolve(uri: string): Promise<string> {
     const parsed = parseVaultUri(uri);
     const dbPath = resolveVaultPath();
-    const password = resolvePassword();
+    const password = resolveMasterPassword();
     const vault = new Vault(dbPath, password);
 
     const existing = vault.get(parsed.key, parsed.scope);
@@ -377,7 +356,7 @@ export class VaultSecretProvider implements SecretProvider {
         return { uri, ok: false, error: "Vault not initialized" };
       }
 
-      const password = resolvePassword();
+      const password = resolveMasterPassword();
       const vault = new Vault(dbPath, password);
       // Vault secrets always resolve due to auto-generation.
       return { uri, ok: true };
