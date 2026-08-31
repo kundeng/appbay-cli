@@ -15,11 +15,17 @@ All API endpoints are tRPC procedures served at `/api/trpc/`. Except where noted
 
 ## auth
 
-Current user and setup state. All procedures in this router are **public** (no auth required) except `auth.rotateSession`.
+Who the Caddy Security edge says you are, and whether this server is behind one at all. Both
+procedures are **public** — they have to be, since they are what the UI calls to find out
+whether anybody is authenticated.
+
+⚠️ AppBay has no accounts of its own since RFC-001 §1. There is no login, no signup and no
+first-run setup here; identity is resolved from the edge's `Remote-User` header on every
+request. See [Credentials](../guide/credentials.qmd).
 
 ### `auth.me`
 
-Return the currently authenticated user, or `null` if not logged in. Safe to call without a session -- no error is thrown.
+Return the identity the edge asserted, or `null`. Safe to call without one — no error is thrown.
 
 - **Type:** query
 - **Input:** none
@@ -41,11 +47,26 @@ wrong; disabled means the server is not behind an edge, cannot authenticate anyo
 refusing to serve.
 
 ::: {.callout-note}
+<!-- removed: auth.setupRequired, auth.rotateSession -->
 ## `auth.setupRequired` and `auth.rotateSession` were removed
 
 RFC-001 §1 deleted AppBay's own accounts, so there is no first-run setup to report and no
 control-plane session to rotate. Identity is resolved from the edge on every request.
 :::
+
+## edge
+
+Protected router. Edge identities are the accounts the Caddy Security portal accepts — for your
+**deployed apps**, and since RFC-001 §1 for the AppBay control plane too, which is a stack
+behind the same edge.
+
+It has a CLI counterpart (`appbay edge users`), and that is **not** a second authentication
+configuration path: both drive the same `EdgeIdentityStore` in `@appbay/core`. One store, one
+hasher, one reload — the interfaces differ only in how input is collected.
+
+⚠️ Reaching the control plane additionally requires the `authp/admin` role. Its edge route
+carries an admin-only policy, narrower than an app's default, because it is the one stack that
+can reach the container runtime socket.
 
 ### `edge.listUsers`
 

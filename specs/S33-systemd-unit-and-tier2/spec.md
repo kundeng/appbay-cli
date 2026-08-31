@@ -132,7 +132,7 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
     - Also found: appbay ships no unit at all, and `owner`/`service_user` are write-only.
     - **Pillar**: Design, Test · **Evidence**: `docs/rfc/evidence/probe-86-*.yaml`
 
-- [ ] 1. Say what is true about systemd today
+- [x] 1. Say what is true about systemd today
   - [x] 1.1 Fix `init-system.ts`'s "installs systemd units" — it enables the runtime's unit
     - It writes none of its own; the only unit touched is `podman.socket` / `docker`, and it is
       enabled rather than written. The claim mattered because a reader could conclude RFC 2.7's
@@ -162,9 +162,27 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
   - [x] 2.3 Sweep the docs the §1 cutover left behind
     - Found while checking this: `production.qmd` still told operators to harden "the admin
       account created during first-run setup", and `api-endpoints.qmd` documented
-      `auth.setupRequired` and `auth.rotateSession`, both deleted. `check-docs-cli` verifies
-      routers, not procedures, so neither was caught.
+      `auth.setupRequired` and `auth.rotateSession`, both deleted.
+    - ⚠️ **This task was marked done and was not.** A close-out audit found the auth router's
+      INTRO sentence still naming `auth.rotateSession` — my sweep had matched `### ` headings
+      and missed prose — and, worse, that the Python slice which removed those two sections had
+      also deleted the whole `## edge` section.
+    - 🚨 **And I had validated it in the wrong tree.** `check-docs-cli`'s router check is
+      guarded by `existsSync("apps/web/…")`, which is PRIVATE-only, so running it from the
+      public tree skips it entirely and reports ✓. Same false-pass shape as S32 task 3.1's
+      stale `packages/core/dist`. Gates that are inert in one tree must be run in the other.
     - **Pillar**: Docs
+  - [x] 2.4 Make the gate catch it, since a manual sweep missed the same thing twice
+    - `check-docs-cli` compared ROUTERS only: a documented procedure that no longer exists
+      sailed through. It now checks that direction too, matching anywhere in the prose rather
+      than only in `### ` headings — restricting it to headings is exactly how the second
+      occurrence got through.
+    - A tombstone may still name what it buries, via an explicit
+      `<!-- removed: auth.rotateSession -->`. Deliberately noisy, so "documented" and
+      "documented as gone" cannot be confused, and deleting the tombstone re-arms the check.
+    - Proven to discriminate both ways: naming a nonexistent procedure fails it; removing the
+      tombstone marker re-arms it on the two real removals; restoring passes.
+    - **Pillar**: Test, Docs
 
 - [x] 3. Ship the unit, on its own merits
   - [x] 3.1 An `appbay-server.service` unit with `Environment=APPBAY_HOME=`, installed by

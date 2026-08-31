@@ -140,6 +140,7 @@ for (const file of files) {
 // S25, and neither appeared in the API reference; nothing failed, because nothing compared
 // the two lists. A reader of the reference would conclude those endpoints do not exist.
 const missingRouter = [];
+const missingProc = [];
 const appRouterPath = "apps/web/src/server/routers/_app.ts";
 const apiDocPath = "docs/reference/api-endpoints.qmd";
 if (existsSync(appRouterPath) && existsSync(apiDocPath)) {
@@ -147,11 +148,48 @@ if (existsSync(appRouterPath) && existsSync(apiDocPath)) {
   const body = appSrc.slice(appSrc.indexOf("appRouter = router({"));
   const routers = [...body.matchAll(/^\s{2}([a-zA-Z][a-zA-Z0-9]*):\s*[a-zA-Z]+Router,/gm)].map((m) => m[1]);
   const docSrc = readFileSync(apiDocPath, "utf-8");
+  const tombstoned = new Set(
+    [...docSrc.matchAll(/<!--\s*removed:\s*([^>]+?)\s*-->/g)]
+      .flatMap((m) => m[1].split(",").map((x) => x.trim()))
+      .filter(Boolean),
+  );
   const documented = new Set([...docSrc.matchAll(/^## ([a-zA-Z][a-zA-Z0-9]*)\s*$/gm)].map((m) => m[1]));
   for (const r of routers) {
     if (!documented.has(r)) missingRouter.push(`docs/reference/api-endpoints.qmd  missing "## ${r}"`);
   }
   console.log(`  routers: ${routers.length} registered, ${routers.length - missingRouter.length} documented`);
+
+  // 🚨 AND THE OTHER DIRECTION, FOR PROCEDURES. The check above compares ROUTERS, so a
+  // documented procedure that no longer exists sails through. That happened twice in one
+  // sprint: RFC-001 §1 deleted `auth.setupRequired` and `auth.rotateSession`, and both
+  // survived a manual sweep — first as their own `###` sections, then, after those were
+  // removed, in the router's intro sentence. A reader following the reference calls an
+  // endpoint that answers 404.
+  //
+  // ⚠️ Matches ANYWHERE in the prose, not just headings. Restricting it to `### ` is exactly
+  // how the second occurrence got through.
+  for (const r of routers) {
+    const routerFile = `apps/web/src/server/routers/${r}.ts`;
+    if (!existsSync(routerFile)) continue;
+    const src = readFileSync(routerFile, "utf-8");
+    const open = src.indexOf("= router({");
+    if (open === -1) continue;
+    const defined = new Set(
+      [...src.slice(open).matchAll(/^  ([a-zA-Z][a-zA-Z0-9]*):/gm)].map((m) => m[1]),
+    );
+    const namedInDocs = new Set(
+      [...docSrc.matchAll(new RegExp(`\\\`${r}\\.([a-zA-Z][a-zA-Z0-9]*)\\\``, "g"))].map((m) => m[1]),
+    );
+    for (const proc of namedInDocs) {
+      // A tombstone must be able to name what it buries. `<!-- removed: auth.rotateSession -->`
+      // opts a name out explicitly — deliberately noisy, so "documented" and "documented as
+      // gone" cannot be confused, and so deleting the tombstone re-arms the check.
+      if (tombstoned.has(`${r}.${proc}`)) continue;
+      if (!defined.has(proc)) {
+        missingProc.push(`${apiDocPath}  names \`${r}.${proc}\`, which ${routerFile} does not define`);
+      }
+    }
+  }
 }
 
 console.log(`  binary: ${BIN}  (${commands.length} commands)`);
@@ -160,6 +198,11 @@ console.log(`  docs:   ${files.length} files scanned\n`);
 if (missingRouter.length) {
   console.log("  ❌ tRPC routers with no section in the API reference:");
   for (const x of [...new Set(missingRouter)]) console.log(`       ${x}`);
+}
+
+if (missingProc.length) {
+  console.log("  ❌ documented tRPC procedures that no longer exist:");
+  for (const x of [...new Set(missingProc)]) console.log(`       ${x}`);
 }
 
 if (missingCmd.length) {
@@ -171,7 +214,10 @@ if (missingFlag.length) {
   for (const x of [...new Set(missingFlag)]) console.log(`       ${x}`);
 }
 
-const failures = new Set([...missingCmd, ...missingFlag, ...missingRouter]).size;
-if (failures === 0) console.log("  ✅ every documented command and flag exists, and every router is documented");
+const failures = new Set([...missingCmd, ...missingFlag, ...missingRouter, ...missingProc]).size;
+if (failures === 0)
+  console.log(
+    "  ✅ every documented command, flag and tRPC procedure exists, and every router is documented",
+  );
 console.log(`\n  ════ ${failures} discrepanc${failures === 1 ? "y" : "ies"} ════`);
 process.exit(failures === 0 ? 0 : 1);
