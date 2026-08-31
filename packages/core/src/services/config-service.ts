@@ -15,10 +15,39 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 // ---------------------------------------------------------------------------
 
 /**
+ * Key segments that must never be traversed or written.
+ *
+ * 🚨 `setByPath` walks a dotted path and CREATES missing objects as it goes, and the path is
+ * raw operator input — `appbay config <app> <key> <value>` passes the key straight through.
+ * `__proto__` is present on every object and is an object, so the walk stepped INTO
+ * `Object.prototype` and wrote there: `appbay config myapp __proto__.polluted yes` made
+ * `({}).polluted === "yes"` for every object in the process. Verified before the guard, and
+ * asserted against in config-service.test.ts.
+ *
+ * `constructor` and `prototype` are blocked for the same reason even though the walk did not
+ * reach through them today — that only held because `typeof current.constructor === "function"`
+ * made the code replace it, which is an accident of the type check rather than a defence.
+ */
+const UNSAFE_KEY_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Reject a dotted path containing a segment that could reach an object's internals. */
+function assertSafePath(key: string): void {
+  for (const part of key.split(".")) {
+    if (UNSAFE_KEY_SEGMENTS.has(part)) {
+      throw new Error(
+        `Refusing to use "${part}" as a config key segment (in "${key}") — it would reach ` +
+          `into an object's internals rather than its data.`,
+      );
+    }
+  }
+}
+
+/**
  * Resolve a dotted key path against a plain object.
  * e.g., getByPath(obj, "upstream.source") returns obj.upstream.source.
  */
 export function getByPath(obj: Record<string, unknown>, key: string): unknown {
+  assertSafePath(key);
   const parts = key.split(".");
   let current: unknown = obj;
   for (const part of parts) {
@@ -34,6 +63,7 @@ export function getByPath(obj: Record<string, unknown>, key: string): unknown {
  * Set a value at a dotted key path, creating intermediate objects as needed.
  */
 export function setByPath(obj: Record<string, unknown>, key: string, value: unknown): void {
+  assertSafePath(key);
   const parts = key.split(".");
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
