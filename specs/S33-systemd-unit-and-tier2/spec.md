@@ -1,18 +1,19 @@
 ---
 spec_id: S33-systemd-unit-and-tier2
-status: DRAFT
+status: ACTIVE
 closed_as: null
 since: 2026-08-31
+activated: 2026-08-31
 until: null
 epic: platform
-features: [systemd-unit, tier2-config-removal, system-config-merge]
+features: [systemd-unit, tier2-config-narrowing, system-config-merge]
 supersedes: []
 superseded_by: null
 depends_on: [S32-rfc-001-core]
 anchors: [data-architecture]
 ---
 
-# S33: the systemd unit, and the config tier that needs it
+# S33: the systemd unit, and the config tier that turns out not to need it
 
 <!-- DRAFT. Carrier for the two RFC-001 items S32 could not finish, both blocked on the same
      missing artifact: a systemd unit that exports APPBAY_HOME. -->
@@ -24,42 +25,79 @@ anchors: [data-architecture]
 S32 closed RFC-001 except for two items, and they are the same item twice. RFC-001 **2.7** says
 to delete `/etc/appbay/config` and `writeSystemConfig` **"after the systemd unit exports
 `APPBAY_HOME`"**, and RFC-001 **2.1** asks for `InstanceConfigSchema` and `SystemConfig` to
-become one file — but `SystemConfig` *is* `/etc/appbay/config`, so merging it away is the same
-deletion wearing a different hat.
+become one file — but `SystemConfig` *is* `/etc/appbay/config`.
 
-🚨 **Neither can land without writing the unit first, and that is not a formality.** The RFC is
-explicit that tier 2's real job is outranking a per-operator `~/.config` choice on a service
-install, and that `Environment=APPBAY_HOME=` in the unit covers it at tier 1. Delete the tier
-without the unit and a service install silently starts resolving the home from whichever
-account systemd happens to run as — a working mechanism removed with nothing in its place.
+## 🚨 The first thing this sprint did was disprove its own premise
 
-⚠️ S32 shipped the half of 2.1 that stands alone: the instance config moved to
-`etc/system.yaml`, one reader, `init` migrates the legacy file. What is carried here is only the
-`SystemConfig` merge.
+**RFC 2.7 is unsound as written, and the check that shows it is three commands** — probe-86,
+measured on `appbay-docker` (Ubuntu 24.04, systemd 255) with the real binary:
 
-**Read before starting:** `docs/rfc/RFC-001-consolidation.md` §2 (2.1 and 2.7),
-`specs/S32-rfc-001-core/spec.md` tasks 2.1 and 2.4, and `packages/core/src/schemas/instance.ts`,
-whose `home:` field exists to detect exactly the moved/copied-home failure this tier guards.
+| | sees `APPBAY_HOME` from a unit's `Environment=` |
+|---|---|
+| the **service** systemd starts | `/var/lib/appbay` |
+| an operator's **login shell** | `<unset>` |
+| a **non-login** shell | `<unset>` |
+
+A unit sets the environment of the processes *it* starts. Tier 2 exists for the opposite
+process tree — an operator typing `appbay …` — and it demonstrably does that job:
+
+```
+/etc/appbay/config    home: /var/lib/appbay
+~/.config/appbay/home       /home/ubuntu/appbay-personal
+
+appbay home  ->  /var/lib/appbay              # host truth wins
+sudo rm /etc/appbay/config
+appbay home  ->  /home/ubuntu/appbay-personal # ⇐ the exact failure tier 2 prevents
+```
+
+That last line is verbatim what the RFC says the tier is for: *"outranking a per-operator
+`~/.config` choice on a service install"*. The unit cannot substitute for it, so writing the
+unit does not license the deletion. **The sequencing in RFC 2.7 rests on the two being
+interchangeable, and they are not.**
+
+⇒ **This sprint keeps tier 2 and narrows it.** It still ships the unit, because running the
+control plane under systemd is right on its own merits — just not as the prerequisite for a
+deletion it cannot cover.
+
+## Two more things the audit turned up
+
+- **AppBay ships no systemd unit at all today.** `init-system` enables the *container
+  runtime's* unit (`podman.socket`, or `docker`) and writes none of its own. Its module header
+  claims it "installs systemd units" — stale, and the kind of claim that makes a reader think
+  the prerequisite already exists.
+- **`SystemConfig.owner` and `.service_user` are write-only.** `init-system` writes them;
+  `readSystemConfig()` has exactly two callers and both read only `.home`. The "handshake" the
+  module header describes — `init-system` records the decision, `init` reads it — does not
+  happen. The ownership decision still has real effects (chown, ACLs, the service account), but
+  they are applied at `init-system` time and recorded in the filesystem, not read back.
+
+**Read before starting:** `docs/rfc/evidence/probe-86-*.yaml`,
+`docs/rfc/RFC-001-consolidation.md` §2 (2.1 and 2.7), and
+`apps/cli/src/utils/appbay-home.ts`, which is the resolution order itself.
 
 ## Requirements
 
-### Requirement 1: a service install resolves its home from the unit
+### Requirement 1: the control plane runs under systemd
 
 1.1 THE project SHALL ship a systemd unit for the control plane that sets
-    `Environment=APPBAY_HOME=<path>`.
-1.2 WHEN the unit is installed, THE resolution order SHALL reach the correct home at tier 1
-    without consulting `/etc/appbay/config`.
-1.3 THE unit SHALL be verified on a real service start, not by reading it — S32's record is
+    `Environment=APPBAY_HOME=<path>`, installed by `init-system`.
+1.2 THE unit SHALL be verified on a real service start, not by reading it — S32's record is
     that every defect beyond the RFC's list was invisible to reading and to `tsc`.
+1.3 THE unit SHALL NOT be described as making `/etc/appbay/config` removable (probe-86).
 
-### Requirement 2: tier 2 goes only once tier 1 covers it
+### Requirement 2: tier 2 stays, and carries only what is read
 
-2.1 THE system SHALL delete `/etc/appbay/config` and `writeSystemConfig` **after** 1.1 lands.
-2.2 THE `SystemConfig` type SHALL be merged into `InstanceConfigSchema` / `etc/system.yaml`, or
-    deleted outright if nothing survives the merge.
-2.3 WHEN an installation still has `/etc/appbay/config`, THE upgrade SHALL say what it read from
-    it and where that setting now lives — an operator whose home moves silently is the failure
-    this whole tier exists to prevent.
+2.1 THE system SHALL KEEP `/etc/appbay/config` in the resolution order. Requirement changed
+    from RFC 2.7 on the evidence in probe-86; the RFC's own justification for the tier is the
+    behaviour that breaks without it.
+2.2 THE system SHALL drop the write-only `owner` and `service_user` fields, OR give them a
+    reader. A field written and never read is a claim the code does not keep.
+2.3 WHEN `init-system` describes what it installs, THE description SHALL match what it does.
+
+### Requirement 3: RFC-001's record reflects what was measured
+
+3.1 THE RFC's 2.7 SHALL be annotated with probe-86's result rather than left as an open item a
+    later reader would try to implement.
 
 ### Non-Functional
 
@@ -84,16 +122,54 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
 
 # 3 · Tasks
 
-- [ ] 1. Write and verify the systemd unit
-  - [ ] 1.1 The unit file, with `Environment=APPBAY_HOME=`
-    - **Requirements**: 1.1, 1.2 · **Pillar**: Packaging, MVP
-  - [ ] 1.2 Verify on a real service start on a VM, including a home the invoking user does
-        not own — the case tier 2 was protecting
-    - **Depends**: 1.1 · **Requirements**: 1.3 · **Pillar**: Test
-- [ ] 2. Retire tier 2
-  - [ ] 2.1 Delete `/etc/appbay/config` and `writeSystemConfig`
-    - **Depends**: 1.2 · **Requirements**: 2.1
-  - [ ] 2.2 Merge or delete `SystemConfig`
-    - **Depends**: 2.1 · **Requirements**: 2.2
-  - [ ] 2.3 Report what was read from a legacy tier-2 file and where it moved
+<!-- [ ] pending | [x] done | [!] BLOCKED: reason | [-] DROPPED: <reason> | [>] → <spec_id> -->
+
+- [x] 0. Check the design before building to it
+  - [x] 0.1 probe-86 — a unit's `Environment=` reaches the service and nothing else
+    - Disproves RFC 2.7's premise. Measured on appbay-docker with the real binary: service
+      `/var/lib/appbay`, operator login shell `<unset>`, and deleting `/etc/appbay/config`
+      makes the CLI resolve a personal `~/.config` path over the service install.
+    - Also found: appbay ships no unit at all, and `owner`/`service_user` are write-only.
+    - **Pillar**: Design, Test · **Evidence**: `docs/rfc/evidence/probe-86-*.yaml`
+
+- [ ] 1. Say what is true about systemd today
+  - [x] 1.1 Fix `init-system.ts`'s "installs systemd units" — it enables the runtime's unit
+    - It writes none of its own; the only unit touched is `podman.socket` / `docker`, and it is
+      enabled rather than written. The claim mattered because a reader could conclude RFC 2.7's
+      prerequisite already existed.
+    - **Depends**: 0.1 · **Requirements**: 2.3 · **Pillar**: Docs
+  - [x] 1.2 Annotate RFC-001 2.7 with probe-86 so a later reader does not implement it
+    - Struck through in the RFC with the measurement inline, not silently dropped — the RFC is
+      the decision record, and an item that looks open is one somebody will implement.
+    - **Depends**: 0.1 · **Requirements**: 3.1 · **Pillar**: Design, Docs
+
+- [x] 2. Narrow tier 2 to what is actually read
+  - [x] 2.1 Drop `owner` / `service_user` from `SystemConfig`
+    - Dropped rather than given a reader: the ownership decision's real record is the file
+      ownership and POSIX ACLs `init-system` sets on the tree, where it is observable and
+      cannot drift. A second copy in /etc could only disagree with the filesystem, and a stale
+      one is worse than none.
+    - 🚨 **A live bug fell out.** `owner` was VALIDATED on read — an unrecognised value made
+      the whole file parse to `null`, so the CLI fell through to the per-operator
+      `~/.config/appbay/home` and silently resolved a different installation. A typo in a field
+      nothing consumed could move an operator's entire tree. Unknown keys are now ignored.
+    - Backward compatible by construction: every host that ran the older `init-system` still
+      has `owner:`/`service_user:` lines, and they must keep resolving. Pinned by two tests,
+      including the `owner: bogus` case that used to return null.
+    - **Depends**: 0.1 · **Requirements**: 2.2 · **Pillar**: MVP, Test
+  - [x] 2.2 Correct `system-config.ts`'s header — it described a handshake that does not happen
     - **Depends**: 2.1 · **Requirements**: 2.3 · **Pillar**: Docs
+  - [x] 2.3 Sweep the docs the §1 cutover left behind
+    - Found while checking this: `production.qmd` still told operators to harden "the admin
+      account created during first-run setup", and `api-endpoints.qmd` documented
+      `auth.setupRequired` and `auth.rotateSession`, both deleted. `check-docs-cli` verifies
+      routers, not procedures, so neither was caught.
+    - **Pillar**: Docs
+
+- [ ] 3. Ship the unit, on its own merits
+  - [ ] 3.1 An `appbay-server.service` unit with `Environment=APPBAY_HOME=`, installed by
+        `init-system`
+    - **Depends**: 1.1 · **Requirements**: 1.1, 1.3 · **Pillar**: Packaging, MVP
+  - [ ] 3.2 Verify on a real service start on a VM, including a home the invoking user does
+        not own
+    - **Depends**: 3.1 · **Requirements**: 1.2 · **Pillar**: Test

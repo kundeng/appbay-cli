@@ -142,9 +142,23 @@ credentials and a publicly resolvable domain.
 
 ## Security hardening
 
-### Change the default admin password
+### The control plane has no password of its own
 
-The admin account created during first-run setup should use a strong password. There is no password complexity enforcement in v1 -- this is your responsibility.
+RFC-001 §1 removed AppBay's own accounts. The UI sits behind the Caddy Security edge and the
+person signing in is whoever the edge identifies, so there is no first-run admin and no separate
+password to harden. Harden the **edge** account instead:
+
+```bash
+appbay edge users reset-password alice --generate --reveal
+```
+
+⚠️ Only members of `authp/admin` reach the control plane — its route carries an admin-only
+policy, narrower than an app's default, because it is the one stack that can reach the container
+runtime socket. Grant that role deliberately.
+
+⚠️ `appbay server start` binds port 3000 to loopback whenever it wrote an edge route, so the
+edge is the only way in. Do not set `APPBAY_BIND=0.0.0.0` in production: with the port reachable,
+the identity header the UI trusts can be set by anyone who can reach it.
 
 ### Disable dev auth
 

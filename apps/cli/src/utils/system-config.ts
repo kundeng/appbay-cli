@@ -1,18 +1,28 @@
 /**
- * System-level Appbay config, written by `appbay init-system` and read by
- * `appbay init` (and `doctor`) so the ownership model and home path are decided
- * in ONE place.
+ * System-level Appbay config: where the appbay tree lives on THIS HOST.
  *
- * Why this exists: `init-system` decides WHO owns the appbay tree (operator vs
- * a no-login service account) and WHERE it lives. `init` scaffolds that tree.
- * If the two disagree — e.g. `init-system` created a service account but `init`
- * put the tree in `~/appbay` (the operator's home) — the service account cannot
- * own it. This file is the handshake: `init-system` records the decision here,
- * `init` reads it.
+ * ⭐ WHY A FILE IN /etc AND NOT A SYSTEMD UNIT. Measured, because RFC-001 2.7 proposed
+ * replacing this with `Environment=APPBAY_HOME=` in a unit — see probe-86. A unit sets the
+ * environment of the processes systemd starts and nothing else: on a real host the service saw
+ * `/var/lib/appbay` and an operator login shell on the same box saw nothing. This file serves
+ * the opposite process tree — an operator typing `appbay …` — which is exactly where it
+ * matters, because that is the invocation a per-operator `~/.config/appbay/home` would
+ * otherwise win. Deleting this tier made the CLI resolve a personal path over a service
+ * install. The two are not interchangeable, so 2.7 is refuted rather than pending.
  *
- * The file lives at `/etc/appbay/config` (system-level, not under any user's
- * home) because the decision is a host property, not a per-operator one. It is
- * plain `key: value` lines, not a schema — the same shape as project.yaml.
+ * ⚠️ IT RECORDS THE HOME AND NOTHING ELSE, SINCE RFC-001 S33. It used to carry `owner` and
+ * `service_user` as well — a "handshake" between `init-system` and `init` that never happened:
+ * `readSystemConfig()` has two callers and both read `.home`. The ownership decision has real
+ * effects, but they are applied at `init-system` time and are observable where they actually
+ * live — file ownership and POSIX ACLs on the tree. A second record of them here could only
+ * drift from the filesystem, and a stale one is worse than none.
+ *
+ * 🚨 That drift already had teeth. `owner` was VALIDATED on read: an unrecognised value made
+ * the whole file parse to `null`, so the CLI fell through to the per-operator choice and
+ * silently resolved a different home — over a field nothing consumed. A typo in a dead field
+ * could move an operator's entire installation.
+ *
+ * Plain `key: value` lines, not a schema — the same shape as the installation config.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -23,24 +33,21 @@ export const SYSTEM_CONFIG_DIR = "/etc/appbay";
 /** The config file itself. */
 export const SYSTEM_CONFIG_FILE = join(SYSTEM_CONFIG_DIR, "config");
 
-/** The ownership model decided by `init-system`. */
-export type OwnerModel = "operator" | "service";
-
 /** Parsed system-level config. */
 export interface SystemConfig {
-  /** Who owns the appbay tree. */
-  owner: OwnerModel;
-  /** Service account name (only when owner === "service"). */
-  serviceUser?: string;
-  /** The resolved APPBAY_HOME path. */
+  /** The resolved APPBAY_HOME path for this host. */
   home: string;
 }
 
 /**
  * Read the system-level config.
  *
- * Returns null when the file does not exist (no `init-system` run yet, or a
- * personal install that never needed one).
+ * Returns null when the file does not exist (no `init-system` run yet, or a personal install
+ * that never needed one) or when it names no home.
+ *
+ * ⚠️ Unknown keys are IGNORED, not rejected. A file written by an older appbay still carries
+ * `owner:` and `service_user:`, and must keep resolving — the home is the only thing read, and
+ * refusing the file over a field nothing consumes is the bug described in the header.
  *
  * @param filePath override the config path (tests use a temp dir).
  */
@@ -48,19 +55,9 @@ export function readSystemConfig(filePath: string = SYSTEM_CONFIG_FILE): SystemC
   if (!existsSync(filePath)) return null;
   try {
     const text = readFileSync(filePath, "utf-8");
-    const get = (key: string): string | undefined => {
-      const m = text.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
-      return m?.[1]?.trim();
-    };
-    const owner = get("owner");
-    const home = get("home");
-    if (owner !== "operator" && owner !== "service") return null;
+    const home = text.match(/^home:\s*(.+)$/m)?.[1]?.trim();
     if (!home) return null;
-    return {
-      owner,
-      serviceUser: get("service_user"),
-      home,
-    };
+    return { home };
   } catch {
     return null;
   }
@@ -69,17 +66,12 @@ export function readSystemConfig(filePath: string = SYSTEM_CONFIG_FILE): SystemC
 /**
  * Write the system-level config.
  *
- * Requires root (the file lives under /etc). `init-system` runs with sudo, so
- * this is called from there.
+ * Requires root (the file lives under /etc). `init-system` runs with sudo, so this is called
+ * from there.
  *
  * @param filePath override the config path (tests use a temp dir).
  */
 export function writeSystemConfig(config: SystemConfig, filePath: string = SYSTEM_CONFIG_FILE): void {
   mkdirSync(dirname(filePath), { recursive: true });
-  const lines = [
-    `owner: ${config.owner}`,
-    ...(config.serviceUser ? [`service_user: ${config.serviceUser}`] : []),
-    `home: ${config.home}`,
-  ];
-  writeFileSync(filePath, lines.join("\n") + "\n", "utf-8");
+  writeFileSync(filePath, `home: ${config.home}\n`, "utf-8");
 }

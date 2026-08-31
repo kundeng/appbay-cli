@@ -194,8 +194,21 @@ at tier 1, so the deletion needs the unit, not just the deletion.
 - **2.6** ~~Fix the doc comment at `vault.ts:8-11`.~~ **WITHDRAWN** — it already says
   *"encrypted JSON file"* and *"the decrypted contents are a JSON object"*; `yaml` appears zero
   times in the file [F43].
-- **2.7** Delete `/etc/appbay/config` and `writeSystemConfig`, after the systemd unit exports
-  `APPBAY_HOME`.
+- **2.7** ~~Delete `/etc/appbay/config` and `writeSystemConfig`, after the systemd unit exports
+  `APPBAY_HOME`.~~ 🚨 **REFUTED by measurement — do not implement as written** [probe-86].
+  A unit's `Environment=` reaches the processes systemd starts and nothing else: on
+  appbay-docker the service saw `/var/lib/appbay` and an operator login shell on the same host
+  saw `<unset>`. Tier 2 serves the opposite process tree — an operator typing `appbay …` — and
+  it does the job this RFC credits it with: with the file present the CLI resolved
+  `/var/lib/appbay` over a personal `~/.config/appbay/home`; with it deleted the CLI resolved
+  the personal path, which is verbatim the failure "outranking a per-operator `~/.config`
+  choice on a service install" describes. The unit is not a substitute, so writing it does not
+  license the deletion.
+
+  ⇒ What survives of 2.7, carried by S33: keep the tier, narrow it to `home`. `owner` and
+  `service_user` are WRITE-ONLY — `readSystemConfig()` has two callers and both read `.home` —
+  so the fields go, not the file. Ship the unit too, because running the control plane under
+  systemd is right on its own merits, just not as this prerequisite.
 
 ---
 

@@ -5,7 +5,15 @@
  * SAME way the DGX fleet does (D-6 model): a dedicated no-login SYSTEM service
  * account, correct ownership, and group access via POSIX default ACLs. It
  * installs Docker (RHEL-family first), creates the service account + group,
- * sets ownership + ACLs on APPBAY_HOME, and installs systemd units.
+ * sets ownership + ACLs on APPBAY_HOME, and ENABLES the container runtime's
+ * systemd unit.
+ *
+ * ⚠️ It does NOT install a systemd unit of appbay's own — this said "installs
+ * systemd units", which reads as though appbay ships one. It does not: the only
+ * unit touched is the runtime's (`podman.socket`, or `docker`), and it is
+ * enabled, not written. The distinction matters because RFC-001 2.7 proposes
+ * deleting `/etc/appbay/config` "after the systemd unit exports APPBAY_HOME",
+ * and a reader could reasonably conclude that unit already exists here.
  *
  * ⚠️ BOUNDARY: this is a convenience for a single binary on a fresh host with
  * NO Ansible. For the DGX fleet, ansible remains authoritative — `init-system`
@@ -507,18 +515,17 @@ export function planSystemBootstrap(opts?: {
     });
   }
 
-  // 7. Record the decision in system-level config so `appbay init` (and every
-  // other command) resolves the same home + ownership model. Written via sudo
+  // 7. Record the home in system-level config so `appbay init` (and every other command,
+  // including an operator's interactive invocation) resolves the same tree. Written via sudo
   // because /etc/appbay is root-owned and this process runs as the operator.
   // `mkdir -p` first — the dir does not exist on a fresh host.
-  const configContent = [
-    `owner: ${owner}`,
-    ...(owner === "service" ? [`service_user: ${serviceUser}`] : []),
-    `home: ${home}`,
-  ].join("\n") + "\n";
+  // ⚠️ ONLY the home. `owner` and `service_user` used to be written here and were read by
+  // nothing — the ownership decision's real record is the file ownership and ACLs set in the
+  // steps above, which is where it is observable and cannot drift. See utils/system-config.ts.
+  const configContent = `home: ${home}\n`;
   actions.push({
     id: "write-config",
-    label: `Record ownership model in ${SYSTEM_CONFIG_FILE}`,
+    label: `Record the appbay home in ${SYSTEM_CONFIG_FILE}`,
     wouldChange: true,
     command: ["sh", "-c", `mkdir -p ${SYSTEM_CONFIG_DIR} && tee ${SYSTEM_CONFIG_FILE}`],
     // The content is piped to sudo tee by the executor, not passed as argv.

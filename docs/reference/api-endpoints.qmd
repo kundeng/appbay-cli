@@ -26,50 +26,26 @@ Return the currently authenticated user, or `null` if not logged in. Safe to cal
 - **Output:** `{ user: { id: string, username: string } | null }`
 - **Auth:** none
 
-### `auth.setupRequired`
+### `auth.edgeAuth`
 
-Check whether first-run setup is needed.
+Whether this server is behind the Caddy Security edge at all.
 
 - **Type:** query
 - **Input:** none
-- **Output:** `{ setupRequired: boolean }` (true when zero users exist in the database)
+- **Output:** `{ enabled: boolean }`
 - **Auth:** none
 
-### `auth.rotateSession`
+Not a permission check — it lets the UI tell two very different "no user" states apart. Enabled
+with no user means the edge is there but injected no identity, so its authorization policy is
+wrong; disabled means the server is not behind an edge, cannot authenticate anyone, and is
+refusing to serve.
 
-Invalidate all active sessions globally, forcing all clients to re-authenticate.
+::: {.callout-note}
+## `auth.setupRequired` and `auth.rotateSession` were removed
 
-- **Type:** mutation
-- **Input:** none
-- **Output:** `{ rotated: boolean }`
-
-Application ingress authentication belongs to the integrated Caddy Security edge and is
-declared in appbay manifests. Edge-user administration has a web surface (`edge`, below) as
-well as a CLI (`appbay edge users`) — but that is **not** a second authentication
-configuration path: both drive the same `EdgeIdentityStore` in `@appbay/core`. One store,
-one hasher, one reload.
-
-::: {.callout-important}
-## Two credential domains, never synchronized
-
-`auth` owns **AppBay control-plane sessions** — who signs in to AppBay itself, stored in
-`etc/control-plane/users.yaml` and managed offline with `appbay admin`.
-
-`edge` owns **edge identities** — who signs in to your *deployed apps*, stored in Caddy
-Security's `users.json` and managed with `appbay edge users`.
-
-They are separate domains. Resetting one does not affect the other.
+RFC-001 §1 deleted AppBay's own accounts, so there is no first-run setup to report and no
+control-plane session to rotate. Identity is resolved from the edge on every request.
 :::
-
-## edge
-
-Protected router. Edge identities are the accounts the Caddy Security portal accepts for
-**deployed apps**; they are not AppBay accounts.
-
-Every mutation writes `users.json` and then restarts the edge, because a Caddy config
-reload does **not** rebuild AuthCrunch's in-memory identity store — without the restart the
-file on disk and the identities Caddy authenticates against diverge. `edgeRestarted: false`
-means the edge was not running, which is not a failure: the store is read at startup.
 
 ### `edge.listUsers`
 

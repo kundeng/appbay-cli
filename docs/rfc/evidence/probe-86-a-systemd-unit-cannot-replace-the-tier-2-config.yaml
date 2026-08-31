@@ -1,0 +1,73 @@
+record: probe-86-a-systemd-unit-cannot-replace-the-tier-2-config
+type: probe
+title: a-systemd-unit-cannot-replace-the-tier-2-config
+timestamp: "2026-08-31T12:05:00-04:00"
+claim: "RFC-001 2.7 — /etc/appbay/config can be deleted once the systemd unit exports APPBAY_HOME"
+verdict: 'refutes'
+key_evidence: 'Measured on appbay-docker (Ubuntu 24.04, systemd 255) with the real binary. A
+  unit`s `Environment=APPBAY_HOME=` reaches the SERVICE and nothing else: the service printed
+  `/var/lib/appbay`, an operator login shell on the same host printed `<unset>`. Tier 2 exists
+  for the OPPOSITE process tree — an operator typing `appbay …` — and it does that job: with
+  /etc/appbay/config present the CLI resolved /var/lib/appbay over a personal
+  ~/.config/appbay/home of /home/ubuntu/appbay-personal; with it deleted the CLI resolved
+  /home/ubuntu/appbay-personal, which is exactly the failure the tier prevents. So the unit is
+  not a replacement for the tier, and writing it does not make the deletion safe — the two
+  cover different process trees. Separately: appbay ships NO unit of its own today
+  (init-system only enables the runtime`s podman.socket/docker, and its module header claim
+  "installs systemd units" is false), and SystemConfig`s `owner`/`service_user` fields are
+  WRITE-ONLY — readSystemConfig() has two callers and both use `.home`.'
+exit_code: 0
+duration_s: 240
+command: >-
+  multipass exec appbay-docker -- systemctl start appbay-probe.service;
+  multipass exec appbay-docker -- bash -lc 'echo ${APPBAY_HOME:-<unset>}';
+  multipass exec appbay-docker -- bash -lc '/tmp/appbay home'
+output_kind: text
+output:
+  text: |
+    host: appbay-docker (multipass), Ubuntu 24.04, systemd 255 (255.4-1ubuntu8.17)
+    binary: appbay 0.1.0-dev, built from 1bf946c
+
+    == 1. what `Environment=` in a unit actually reaches ==
+      unit:  [Service]
+             Environment=APPBAY_HOME=/var/lib/appbay
+             ExecStart=/usr/local/bin/appbay-probe.sh
+
+      the SERVICE           SERVICE_SEES=/var/lib/appbay
+      an operator's shell   <unset>            (bash -lc, same host, same boot)
+      a non-login shell     <unset>
+
+    ⇒ A unit sets the environment of the processes IT starts. It cannot answer
+      "where does appbay live" for an operator typing a command.
+
+    == 2. what tier 2 does, with the real binary ==
+      /etc/appbay/config       home: /var/lib/appbay
+      ~/.config/appbay/home    /home/ubuntu/appbay-personal
+
+      $ appbay home        ->  /var/lib/appbay            <- host truth wins
+
+    == 3. what happens if 2.7 is applied ==
+      $ sudo rm /etc/appbay/config
+      $ appbay home        ->  /home/ubuntu/appbay-personal
+
+      The operator's personal choice now outranks the service install. That is
+      verbatim the failure the RFC says tier 2 exists to prevent:
+
+          "tier 2's real job is outranking a per-operator ~/.config choice on a
+           service install"
+
+      and the unit cannot substitute, because the shell never sees it.
+
+    == 4. two related facts found while checking ==
+      - appbay ships NO systemd unit of its own. `init-system` enables the
+        CONTAINER RUNTIME's unit (podman.socket, or docker) and writes none.
+        Its module header says "installs systemd units" — that is stale.
+      - SystemConfig.owner and .service_user are WRITE-ONLY. init-system writes
+        them; readSystemConfig() has exactly two callers and both read only
+        `.home`. The "handshake" the module header describes does not happen.
+
+    ⇒ RECOMMENDATION: keep tier 2, narrow it to `home`. Ship a unit for the
+      SERVER because that is the right way to run the control plane, but do not
+      book it as the prerequisite for a deletion it cannot cover. The RFC's
+      sequencing ("delete after the unit exports APPBAY_HOME") rests on the two
+      being interchangeable, and they are not.

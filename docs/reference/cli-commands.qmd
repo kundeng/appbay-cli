@@ -40,8 +40,9 @@ appbay setup --status
 | `--reset` | — | Tear down system apps and remove generated configs |
 
 ⚠️ The administrator `setup` creates is the **edge** administrator, which guards apps behind
-the reverse proxy. The web control plane asks you to create its own administrator the first
-time you open it. See [Credentials](../guide/credentials.qmd) — the two are deliberately
+the reverse proxy — and since RFC-001 §1 that is the SAME account that signs in to the web
+control plane, which no longer has one of its own. It needs the `authp/admin` role to reach
+the control plane. See [Credentials](../guide/credentials.qmd) — the two are deliberately
 separate and are never synchronised.
 
 **Exit codes:** 0 = success, 1 = a step failed.
@@ -724,9 +725,19 @@ Bare `appbay home` prints only the path, so `cd $(appbay home)/etc/apps` keeps w
 | # | Tier | Set by |
 |---|---|---|
 | 1 | `$APPBAY_HOME` | the environment; a runtime override that always wins |
-| 2 | `/etc/appbay/config` | `appbay init-system` (a host-level decision) |
+| 2 | `/etc/appbay/config` | `appbay init-system` (a host-level decision) — holds `home:` and nothing else |
 | 3 | `~/.config/appbay/home` | `appbay init --dir`, or `appbay home set` |
 | 4 | `~/.appbay` | built-in default |
+
+::: {.callout-note}
+## Why tier 2 is a file and not a systemd unit
+
+RFC-001 proposed replacing it with `Environment=APPBAY_HOME=` in a unit. Measured on a real
+host, a unit's environment reaches the processes systemd starts and nothing else: the service
+saw the home, an operator's login shell saw nothing. Tier 2 serves that second case — an
+operator typing `appbay …` — which is precisely where a per-operator `~/.config/appbay/home`
+would otherwise win. Deleting it made the CLI resolve a personal path over a service install.
+:::
 
 `--explain` prints all four with the winner marked, and warns when the resolved path
 does not exist, has no `etc/` (never initialised), or is a saved pointer under a temp
