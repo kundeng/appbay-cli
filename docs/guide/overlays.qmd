@@ -5,9 +5,23 @@ description: "Declarative cross-app wiring with when clauses"
 
 ## What are overlays?
 
-Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The most common condition is "when a peer app is active" -- enabling automatic cross-app wiring without manual configuration.
+Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The condition is **which apps are installed** -- enabling automatic cross-app wiring without manual configuration.
 
-For example, Open WebUI can connect to Ollama when Ollama is running, and fall back to a standalone configuration when it is not. This is declared once and evaluated automatically at compile time.
+For example, Open WebUI can connect to Ollama when Ollama is installed alongside it, and fall back to a standalone configuration when it is not. This is declared once and evaluated automatically at compile time.
+
+::: {.callout-important}
+## `when:` means installed, not running
+
+A `when` clause asks whether a peer app is **declared in this installation** -- a fact about
+your desired state. It does not ask the container runtime anything, so it is the same answer
+whether Docker is up, down, or absent, and whether the peer is healthy, restarting or
+stopped.
+
+This changed in `v0.0.1-alpha.12`. Overlays previously evaluated against a `docker ps`
+snapshot taken at compile time, which meant a restart-looping peer satisfied a clause, a
+stopped peer silently removed configuration, and a compile on a host with no Docker daemon
+deactivated every overlay while still reporting success.
+:::
 
 ## Basic syntax
 
@@ -23,11 +37,17 @@ overlays:
           - OLLAMA_BASE_URL=http://ollama_web:11434
 ```
 
-The `when` clause specifies which apps must be active. The `services` block is a standard Compose fragment that gets merged into the app's rendered output.
+The `when` clause specifies which apps must be installed. The `services` block is a standard Compose fragment that gets merged into the app's rendered output.
 
 ### How service names work in overlays
 
 When referencing a service from another app in an overlay, use the shared network alias format: `<app>_<service>` (underscore). In the example above, `ollama_web` refers to the `web` service of the `ollama` app, as aliased on the shared network.
+
+If the app declares a `namespace:`, the alias gains it as a leading segment --
+`<namespace>_<app>_<service>` -- and any dots in the namespace become hyphens, because a dot
+separates labels in DNS and would split the alias into two names that resolve to nothing. So
+an app in namespace `uom.sim` publishes `uom-sim_litellm_web`. Apps without a namespace, which
+is the default, are unaffected: the alias stays `<app>_<service>`.
 
 This is because each app runs in its own Compose project with an internal network. Cross-app communication happens through the shared network, where exposed services are aliased with their app name prefix.
 
@@ -35,7 +55,7 @@ This is because each app runs in its own Compose project with an internal networ
 
 ### AND condition (array)
 
-A plain array means all listed apps must be active:
+A plain array means all listed apps must be installed:
 
 ```yaml
 overlays:
@@ -47,11 +67,11 @@ overlays:
           - TTS_URL=http://tts_web:5000
 ```
 
-This overlay only applies when both `ollama` and `tts` are in the active app set.
+This overlay only applies when both `ollama` and `tts` are installed.
 
 ### OR condition ({any: []})
 
-Use the `any` key for OR logic -- the overlay applies when at least one of the listed apps is active:
+Use the `any` key for OR logic -- the overlay applies when at least one of the listed apps is installed:
 
 ```yaml
 overlays:
@@ -63,7 +83,7 @@ overlays:
           - LLM_AVAILABLE=true
 ```
 
-This overlay applies when any of `ollama`, `llamacpp`, or `vllm` is active.
+This overlay applies when any of `ollama`, `llamacpp`, or `vllm` is installed.
 
 ### Combining conditions with multiple overlays
 
@@ -71,14 +91,14 @@ This overlay applies when any of `ollama`, `llamacpp`, or `vllm` is active.
 
 ```yaml
 overlays:
-  # Requires caddy (the auth edge) to be active
+  # Requires caddy (the auth edge) to be installed
   - when: [caddy]
     services:
       web:
         environment:
           - AUTH_ENABLED=true
 
-  # Requires at least one LLM backend to be active
+  # Requires at least one LLM backend to be installed
   - when:
       any: [ollama, llamacpp]
     services:
@@ -87,21 +107,30 @@ overlays:
           - LLM_AVAILABLE=true
 ```
 
-Both overlays are evaluated independently. If only `caddy` is active, only `AUTH_ENABLED` is injected. If both conditions are met, both fragments are merged.
+Both overlays are evaluated independently. If only `caddy` is installed, only `AUTH_ENABLED` is injected. If both conditions are met, both fragments are merged.
 
 ## Overlay evaluation
 
 Overlays are evaluated during the compile step, before traits are applied. The evaluation follows these rules:
 
-1. **Active app set** is determined from CLI arguments (`appbay up ollama webui`) or collection selection (`--collection ai-stack`).
-2. For each app being compiled, its overlays are checked against the active set.
+1. **The installed app set** is every app declared in this installation -- the full contents
+   of `$APPBAY_HOME/etc/apps`. It is *not* narrowed by the apps you name on the command line.
+2. For each app being compiled, its overlays are checked against that set.
 3. If a `when` clause is satisfied, the `services` fragment is deep-merged into the app's Compose model.
 4. Multiple matching overlays are applied in declaration order.
 5. After all overlays are merged, traits are applied on top.
 
+::: {.callout-note}
+## Targeting an app does not change what it renders
+
+`appbay up webui` and `appbay up` produce the **same** rendered output for `webui`, because
+the installed set is the whole installation either way. Narrowing the command line narrows
+what gets deployed, never what gets compiled into it.
+:::
+
 ```{mermaid}
 flowchart TD
-    A[Determine active apps] --> B[For each app]
+    A[Read installed apps] --> B[For each app]
     B --> C{Check when clause}
     C -->|satisfied| D[Deep-merge services fragment]
     C -->|not satisfied| E[Skip overlay]
@@ -135,7 +164,7 @@ overlays:
           - AUDIO_TTS_OPENAI_API_BASE_URL=http://tts_web:8000/v1
 ```
 
-When both Ollama and TTS are active, both overlays apply and the WebUI is wired to both services.
+When both Ollama and TTS are installed, both overlays apply and the WebUI is wired to both services.
 
 ### Authentication for multiple apps
 
@@ -184,7 +213,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://localhost:11434   # default fallback
 
-# Overlay (when ollama is active)
+# Overlay (when ollama is installed)
 services:
   web:
     environment:
@@ -221,7 +250,7 @@ overlays:
           - AUDIO_STT_ENGINE=openai
 ```
 
-If all three conditions are met, all three fragments are merged. If only Ollama is active, only the first overlay applies.
+If all three conditions are met, all three fragments are merged. If only Ollama is installed, only the first overlay applies.
 
 ## Inspecting overlay state
 
@@ -240,11 +269,11 @@ The output lists declared overlays and which services each affects:
     - when any: [whisper, faster-whisper] -> services: web
 ```
 
-`appbay status` is offline-capable -- it reads from the `appbay.yaml` definition and does not require the server to be running. Because it does not know which apps are currently deployed, it lists all declared overlays without an active/inactive distinction.
+`appbay status` is offline-capable -- it reads from the `appbay.yaml` definition and does not require the server to be running. It lists all declared overlays without an active/inactive distinction.
 
 ### Web UI
 
-The App Detail screen shows overlay activation state in the overlays panel, with visual indicators for active (green) and inactive (gray) overlays. The web UI has access to runtime state and can show which overlays are currently satisfied.
+The App Detail screen shows overlay activation state in the overlays panel, with visual indicators for active (green) and inactive (gray) overlays. It evaluates the same installed set the compiler does, so the panel and the rendered output always agree.
 
 ## Best practices
 
@@ -254,4 +283,4 @@ The App Detail screen shows overlay activation state in the overlays panel, with
 
 **Name services consistently.** Since shared network aliases follow the `<app>_<service>` pattern (underscore), use predictable service names like `web`, `api`, `db` to make cross-app references readable.
 
-**Test without overlays.** Run `appbay compile myapp` with no peer apps active to verify the base configuration works standalone.
+**Test without overlays.** Compile `myapp` in an installation where its peers are not installed to verify the base configuration works standalone. Stopping a peer's containers will not do it -- the peer is still installed, so the overlay still applies.
