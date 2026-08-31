@@ -249,6 +249,12 @@ const startCommand = new Command("start")
       APPBAY_RUNTIME_SOCKET: resolveRuntimeSocket(),
       APPBAY_SERVER_CONTAINER_RUNTIME: "docker",
       APPBAY_BIND: bind,
+      // 🚨 EDGE AUTH AND THE LOOPBACK BIND ARE ONE DECISION. The web UI trusts the edge's
+      // Remote-User header only when this is "1", and it is "1" only when the port is closed
+      // to the network. Setting one without the other is the bypass: with 3000 reachable,
+      // anyone who can reach it sets their own identity. Tying them here means neither can
+      // be enabled alone by accident.
+      APPBAY_EDGE_AUTH: bind === "127.0.0.1" ? "1" : "",
     });
 
     if (result.exitCode !== 0) {

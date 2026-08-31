@@ -207,6 +207,13 @@ services:
       # The server image deliberately ships one client. On Podman hosts that Docker client
       # speaks to the mounted Podman compatibility socket; app definitions remain unchanged.
       - APPBAY_CONTAINER_RUNTIME=\${APPBAY_SERVER_CONTAINER_RUNTIME:-docker}
+      # 🚨 THE WEB UI TRUSTS THE EDGE'S Remote-User HEADER ONLY WHEN THIS IS SET, and
+      # \`appbay server start\` sets it only when it also bound the port to loopback. The two
+      # are decided together on purpose: trusting a header while the port is open on every
+      # interface lets anyone who can reach 3000 set that header themselves.
+      # Empty means "not behind the edge", and the server then refuses to serve rather than
+      # serving unauthenticated.
+      - APPBAY_EDGE_AUTH=\${APPBAY_EDGE_AUTH:-}
       # The web server and offline appbay-admin recovery command share this
       # SQLite database. DATABASE_URL is not consumed by the current server.
       - APPBAY_DB=/appbay/var/lib/appbay.db
