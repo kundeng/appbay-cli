@@ -493,13 +493,19 @@ edit` has no `--password` option at all — the old command died with `Unknown o
     - **Depends**: 3.1 · **Requirements**: 2.2 · **Properties**: 2
   - [x] 3.3 `catalog/__tests__/discover.test.ts` — 8 tests, the module had none
     - **Depends**: 3.1, 3.2 · **Properties**: 2, 3 · **Pillar**: Test
-  - [ ] 3.4 RFC 6.1 — `--catalog` registers a source instead of writing `bundled`
-    - `seedCatalog()` (`init.ts:405-449`) symlinks the given tree into `bundled`, which is why
-      the UOM stack occupies the slot and appbay's own 150 apps never install.
-    - **Depends**: 3.1 · **Requirements**: 2.1
-  - [ ] 3.5 RFC 6.4 — `--catalog` on a seeded home must not silently no-op
-    - `init.ts:409-415` returns "exists" while `init.ts:885` advertises the flag as the fix.
-    - **Depends**: 3.4
+  - [x] 3.4 RFC 6.1 — `--catalog` registers a source instead of writing `bundled`
+    - `bundled` is now written only from the baked path or `DEFAULT_CATALOG_URL`; an operator
+      catalog registers as the source `local`. `catalogAddSource` gained local-path support —
+      it could only `git clone`, so the one caller that matters (a directory from
+      `provision-appbay.yml`) could not use it. Verified end to end against the real
+      fixtures: `bundled(150), local(5)`, all five UOM apps resolve to the operator's, both
+      collisions reported, and upstream's catalog installed for the first time.
+    - **Depends**: 3.1 · **Requirements**: 2.1 · **Pillar**: MVP
+  - [x] 3.5 RFC 6.4 — `--catalog` on a seeded home must not silently no-op
+    - Registration now runs regardless of the seed result. +5 tests covering local-path
+      registration, `bundled` left byte-untouched, no accumulation on re-run, and a
+      non-directory still treated as a URL.
+    - **Depends**: 3.4 · **Pillar**: Test
   - [ ] 3.6 RFC 6.7 — resolve `openwebui` vs `open-webui` explicitly
     - **Depends**: 3.4 · **Requirements**: 2.5
 
@@ -531,13 +537,13 @@ edit` has no `--password` option at all — the old command died with `Unknown o
       Private queue now has 0 ACTIVE. Not this sprint's work — done so the private queue is
       not left with an unattended ACTIVE.
     - **Depends**: 5.1
-  - [ ] 5.3 Commit the `docs/rfc/` corrections and this spec in `appbay-cli`
+  - [x] 5.3 Commit the `docs/rfc/` corrections and this spec in `appbay-cli`
     - **Depends**: 1.4, 5.1
-  - [ ] 5.4 Commit tasks 2 and 3 in the private tree as public-set commits; straddle exits 0
+  - [x] 5.4 Commit tasks 2 and 3 in the private tree as public-set commits; straddle exits 0
     - **Depends**: 2.5, 3.3
-  - [ ] 5.5 `git merge upstream/main` into the private tree so it carries the RFC
+  - [x] 5.5 `git merge upstream/main` into the private tree so it carries the RFC
     - **Depends**: 5.3
-  - [ ] 5.6 Cherry-pick the public-set code commits upstream
+  - [x] 5.6 Cherry-pick the public-set code commits upstream
     - **Depends**: 5.4, 5.5
   - [ ] 5.7 Open `S31-rfc-001-core` as DRAFT in `appbay-cli/specs/`, holding the deferred sections
     - Destination for every `[>]` in *Out of Scope*.
