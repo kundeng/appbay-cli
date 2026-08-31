@@ -125,10 +125,17 @@ A **project** is a variable scope namespace. It determines which `projects/<proj
 
 ```yaml
 # appbay.yaml
-project: homelab
+namespace: homelab
 ```
 
-Container names, volume names, and shared network names are derived from the **app name**, not the project. Containers are named `appbay.<app>.<service>`, volumes are prefixed `<app>_`, and apps join the `appbay_shared` network (or whatever `shared_network` specifies).
+Container, network and shared-alias names derive from the app name **and the namespace when
+one is declared**. Without a namespace — the default — containers are `appbay.<app>.<service>`,
+volumes are prefixed `<app>_`, and apps join `appbay_shared` (or whatever `shared_network`
+specifies). With `namespace: homelab`, the container becomes `appbay.homelab.<app>.<service>`
+and the shared alias `homelab_<app>_<service>`, so two namespaces of one app do not collide.
+
+Dots in a namespace become hyphens wherever the name reaches a hostname, because a dot
+separates labels in DNS: `namespace: uom.sim` publishes `uom-sim_<app>_<service>`.
 
 Use multiple projects when you need separate variable namespaces -- for example, `homelab` and `work-lab` can each have their own `DOMAIN`, `TZ`, and other project-level vars on the same host.
 
@@ -138,10 +145,13 @@ An **environment** is a deployment variant. It determines which variable values,
 
 ```yaml
 # appbay.yaml
-environment: prod
+namespace: prod
 ```
 
-Typical environments: `prod` (real domain, production certs), `dev` (localhost, staging certs), `staging` (staging domain, production-like data).
+`project` and `environment` were a single axis in disguise — every shipped manifest set both
+to `default` — so RFC-001 §4 collapsed them into one dot-delimited `namespace`. Typical
+values: `prod` (real domain, production certs), `dev` (localhost, staging certs), or a
+compound like `uom.sim`.
 
 The environment for an app is set in `appbay.yaml` via the `environment:` field. To deploy with a different environment, update `appbay.yaml` or maintain separate app directories per environment.
 

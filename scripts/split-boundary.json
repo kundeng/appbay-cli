@@ -35,6 +35,7 @@
     "scripts/install.sh",
     "scripts/generate-system-apps.mjs",
     "scripts/check-docs-cli.mjs",
+    "scripts/check-docs-manifests.mjs",
     "scripts/split-boundary.json",
     "scripts/check-straddle.mjs",
     "tools/",

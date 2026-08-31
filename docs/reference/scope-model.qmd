@@ -21,6 +21,7 @@ Collection is NOT part of variable resolution — it is a selector only.
 RFC-001 §4 collapsed the two scope fields into one. As of `v0.0.1-alpha.12`:
 
 ```yaml
+# check-docs-manifests: ignore
 # appbay.yaml -- before
 project: homelab
 environment: prod

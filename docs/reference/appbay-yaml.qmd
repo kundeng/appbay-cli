@@ -15,16 +15,16 @@ These fields control where the app belongs in the organizational model.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `project` | `string` | `"default"` | Scope namespace. Determines which `projects/<project>/project.yaml` variable file is loaded for scope resolution. |
-| `environment` | `string` | `"default"` | Deployment variant. Determines which variable values are used. |
+| `namespace` | `string` | (none) | Deployment identity, flat and dot-delimited (`uom.sim`). Enters container, network, DNS-alias and edge-fragment names. **No default** — absence means "decided at deploy time". |
+| ~~`project`~~ | — | — | **Removed** in RFC-001 §4 — use `namespace`. A non-default value is a parse error. |
+| ~~`environment`~~ | — | — | **Removed** in RFC-001 §4 — use `namespace`. ⚠️ `environment:` *inside a service* is Compose's own field and is unaffected. |
 | `collection` | `string[]` | (none) | Operational groupings for batch operations. Multi-valued. |
 | `operator` | `string` | (none) | Reserved for future multi-node placement. **Accepted and ignored in v1** — everything runs locally. |
 | `shared_network` | `string[]` | `["appbay_shared"]` | Shared network(s) that exposed services join. |
 | `tags` | `Record<string, string>` | (none) | Arbitrary key-value pairs for UI filtering and bulk operations. No scoping semantics. |
 
 ```yaml
-project: homelab
-environment: prod
+namespace: homelab.prod
 collection: [media, gpu-apps]
 operator: local
 shared_network: [appbay_shared]
@@ -256,8 +256,7 @@ policies:
 ## Complete example
 
 ```yaml
-project: homelab
-environment: prod
+namespace: homelab.prod
 collection: [media, gpu-apps]
 tags:
   tier: media
