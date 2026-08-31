@@ -200,7 +200,7 @@ for anything touching the runtime, a journey on both VMs.
       never true before 6.1 — appbay's own catalog had been displaced entirely.
     - **Depends**: — · **Pillar**: Test, Ship
 
-- [ ] 1. Namespace (§4) — first, while it is still a text edit
+- [x] 1. Namespace (§4) — first, while it is still a text edit
   - [x] 1.1 `namespace: z.string().optional()` replaces `project` + `environment`
     - `ScopeSchema` and `AppbayYamlSchema`. Measured before: `parse({}).project === "default"`,
       so `?? invocation` could never fire. Measured after: no-namespace manifest → invocation
@@ -304,7 +304,7 @@ for anything touching the runtime, a journey on both VMs.
       — that assertion is the one that fails if a future hint invents something again.
     - **Depends**: 1.1 · **Pillar**: MVP, Test
 
-- [ ] 2. System home (§2)
+- [x] 2. System home (§2)
   - [x] 2.1 Move the instance config to `etc/system.yaml` (merge with SystemConfig deferred)
     - One reader, `readInstanceConfigText()`, prefers `etc/system.yaml` and falls back to
       `project.yaml`; nine read sites route through it. `init` MOVES an existing legacy file
@@ -363,7 +363,7 @@ for anything touching the runtime, a journey on both VMs.
       confusion §2 exists to end.
     - **Depends**: — · **Requirements**: 1.3 · **Pillar**: MVP, Test
 
-- [ ] 3. Secrets remainder (§3)
+- [x] 3. Secrets remainder (§3)
   - [x] 3.1 Narrow the manifest `provider:` enum to `vault` and reject the other four
     - Both halves: the `provider:` field AND the `refs` values. Measured zero non-vault uses
       across both catalogs, the UOM fixtures and system-apps, so nothing real breaks; all 162
@@ -412,11 +412,40 @@ for anything touching the runtime, a journey on both VMs.
     - **Depends**: 4.1
 
 - [ ] 5. Identity (§1) — last, and as a migration
-  - [ ] 5.1 Wire `renderEdgeSecurityBlock` + `edgeSecretEnvMapping` with provider selection
-    - Complete and unreachable today: zero callers, zero tests, in BOTH trees.
-    - **Depends**: 2.1
+  - [x] 5.1a Make `renderEdgeSecurityBlock` faithful FIRST — it was not "complete"
+    - 🚨 **The spec's premise was wrong.** "Complete and unreachable" — it is unreachable and
+      INCOMPLETE. It is an earlier draft of the block that actually ships at
+      `system-apps/caddy/config/Caddyfile:109`, and wiring it as written would have broken a
+      working edge four ways, each of them SILENT (edge starts, config parses, nobody gets in):
+      1. `path /config/security/users.json` — wrong VOLUME. `./config/security` mounts at
+         `/etc/caddy/security`; `/config` is the separate anonymous `caddy-config` volume, so
+         the local store pointed at a file nothing writes.
+      2. portal named `appbay` — `auth.ts:57` emits `authenticate * with appbay_portal`, so
+         every per-app auth fragment would name a portal that does not exist.
+      3. no `crypto key sign-verify {$APPBAY_EDGE_TOKEN_SECRET}` — `auth.ts:42` emits the
+         matching `crypto key verify`, so the portal would sign with a per-start ephemeral key
+         and every per-app authorize check would reject a token the portal just issued.
+      4. no `import /etc/caddy/security/policies/*.caddy` — that import is the only way the
+         `authorize with <policy>` from `auth.ts:59` finds its policy.
+    - Also: the store NAME and the REALM are different identifiers (`appbay_local` vs `local`)
+      and the draft used the realm for both; and the block nests inside the global options
+      block, which the draft's top-level emission did not.
+    - Fix: the renderer now emits the shipped text VERBATIM for the default single-local
+      provider and only ADDS to it for ldap/oidc — the same "omit when default" discipline
+      that kept the §4 namespace out of existing container names.
+    - 12 tests, anchored on a **byte-for-byte** comparison against the shipped file. Proven to
+      discriminate: reintroducing defect 1 fails 2 tests, defect 3 fails 3. A `toContain`
+      suite would have passed against the broken draft.
+    - **Depends**: 2.1 · **Pillar**: MVP, Test
+  - [ ] 5.1b Wire it: a config source, the render step, and `edgeSecretEnvMapping` injection
+    - Now safe to do, because 5.1a proved the output is identical for every existing install.
+      Still missing: nothing LOADS an `EdgeIdentityConfig` — the schema exists and no reader
+      does. Needs a source (an `edge_identity:` key in `etc/system.yaml` is the natural one
+      after §2.1), the deploy-time render into the Caddyfile, and the env injection so
+      `{env.EDGE_LDAP_BIND_PASSWORD_*}` resolves through the normal secret path.
+    - **Depends**: 5.1a
   - [ ] 5.2 Cut `apps/web` over to the edge identity store
-    - **Depends**: 5.1 · **Requirements**: 4.1
+    - **Depends**: 5.1b · **Requirements**: 4.1
   - [ ] 5.3 Only now: delete `admin.ts`, the schema module, `hashControlPlanePassword`, the
         `retired.ts` branch, and the `passwordHash` column
     - **Depends**: 5.2 · **Requirements**: 4.1
