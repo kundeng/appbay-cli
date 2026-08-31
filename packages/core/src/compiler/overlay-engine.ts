@@ -1,6 +1,6 @@
 /**
  * Conditional overlay resolver -- evaluates `when` clauses against the set of
- * currently active apps and merges matching overlay fragments into compose
+ * INSTALLED apps and merges matching overlay fragments into compose
  * service definitions.
  *
  * Two clause shapes are supported:
@@ -43,7 +43,7 @@ export interface InactiveOverlay {
   reason: string;
 }
 
-/** Result of evaluating all overlays against the active app set. */
+/** Result of evaluating all overlays against the installed app set. */
 export interface OverlayResult {
   activeOverlays: ActiveOverlay[];
   inactiveOverlays: InactiveOverlay[];
@@ -61,7 +61,7 @@ function isAndClause(clause: WhenClause): clause is string[] {
 }
 
 /**
- * Evaluate a `when` clause against the active app set.
+ * Evaluate a `when` clause against the installed app set.
  *
  * @returns `null` when the clause is satisfied, or a human-readable reason
  *          string when it is not.
@@ -71,19 +71,19 @@ function evaluateClause(
   installedApps: Set<string>,
 ): string | null {
   if (isAndClause(clause)) {
-    // AND -- every listed app must be active.
+    // AND -- every listed app must be installed.
     const missing = clause.filter((app) => !installedApps.has(app));
     if (missing.length > 0) {
-      return `AND clause not met: missing app(s) ${missing.join(", ")}`;
+      return `AND clause not met: app(s) not installed: ${missing.join(", ")}`;
     }
     return null;
   }
 
-  // OR -- at least one of the listed apps must be active.
+  // OR -- at least one of the listed apps must be installed.
   const { any: apps } = clause;
   const found = apps.some((app) => installedApps.has(app));
   if (!found) {
-    return `OR clause not met: none of ${apps.join(", ")} are active`;
+    return `OR clause not met: none of ${apps.join(", ")} are installed`;
   }
   return null;
 }

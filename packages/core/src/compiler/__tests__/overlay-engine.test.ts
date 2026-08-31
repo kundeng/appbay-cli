@@ -10,7 +10,7 @@ import type { OverlayInput } from "../overlay-engine.js";
 // ---------------------------------------------------------------------------
 
 describe("selectActiveOverlays", () => {
-  it("selects overlay when AND clause is met (all apps active)", () => {
+  it("selects overlay when AND clause is met (all apps installed)", () => {
     const input: OverlayInput = {
       overlays: [
         {
@@ -31,10 +31,10 @@ describe("selectActiveOverlays", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 2. AND clause not met -- one app missing -> overlay excluded
+  // 2. AND clause not met -- one app not installed -> overlay excluded
   // -------------------------------------------------------------------------
 
-  it("excludes overlay when AND clause is not met (one app missing)", () => {
+  it("excludes overlay when AND clause is not met (one app not installed)", () => {
     const input: OverlayInput = {
       overlays: [
         {
@@ -58,7 +58,7 @@ describe("selectActiveOverlays", () => {
   // 3. OR clause met -- one of several active -> overlay selected
   // -------------------------------------------------------------------------
 
-  it("selects overlay when OR clause is met (one of several active)", () => {
+  it("selects overlay when OR clause is met (one of several installed)", () => {
     const input: OverlayInput = {
       overlays: [
         {
@@ -78,10 +78,10 @@ describe("selectActiveOverlays", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 4. OR clause not met -- none active -> overlay excluded
+  // 4. OR clause not met -- none installed -> overlay excluded
   // -------------------------------------------------------------------------
 
-  it("excludes overlay when OR clause is not met (none active)", () => {
+  it("excludes overlay when OR clause is not met (none installed)", () => {
     const input: OverlayInput = {
       overlays: [
         {
