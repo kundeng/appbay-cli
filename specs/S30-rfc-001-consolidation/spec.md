@@ -540,15 +540,19 @@ edit` has no `--password` option at all — the old command died with `Unknown o
       provisioning one. What was moved is the part that needed a VM: the package install and
       the external contract. Running the packaged binary in a VM is 4.4.
     - **Depends**: 2.5, 3.3 · **Pillar**: Test
-  - [>] 4.4 → S30 release · Verify a converge path end-to-end with `catalog add-source`
+  - [ ] 4.4 Verify a converge path end-to-end with the PACKAGED binary
     - The logic is verified end to end against the real fixtures through the real
-      registration path (4.2). What is left is the PACKAGED BINARY on a host: build a release
-      tag, point `appbay_release_tag` at it, re-converge, and read `appbay catalog list` back.
-      That is the release step the RFC already prescribes ("each landed group gets a release
-      tag"), not a code task — it cannot run until a tag exists.
+      registration path (4.2). What remains is the packaged binary on a host: cut a release
+      tag, point `appbay_release_tag` at it, re-converge, and read `appbay catalog list` back
+      expecting `bundled(150), local(5)` and the two override lines.
+    - ⚠️ Kept as a PENDING task in this sprint rather than deferred. It has no other spec to
+      go to — a `[>]` naming "the release" would be a dangling deferral (Rule 20) — and it is
+      the only thing standing between this sprint and CLOSED/SHIPPED. It cannot run until a
+      tag exists, which is the RFC's own release step ("each landed group gets a release
+      tag"), so this sprint stays ACTIVE until then.
     - **Depends**: 3.4, 4.3
 
-- [ ] 5. Land it
+- [x] 5. Land it
   - [x] 5.1 Establish `appbay-cli/specs/` as the CLI's sprint queue
     - `specs/` added to the `public` list in `scripts/split-boundary.json`, with a `$comment`
       paragraph explaining the `specs/`-public vs `.kiro/`-private split. Both repos' copies
@@ -583,6 +587,14 @@ compiles. Both functional bugs in task 2 were invisible to reading and to `tsc`,
 found only by executing the real command shapes.
 
 ## Log
+
+**2026-08-31 (c)** — Sprint work complete except 4.4. Landed as five commits across two
+repos, every one single-sided (`check-straddle.mjs` exit 0), and the two trees verified
+byte-identical on all eleven touched files. Suites green in both: private core 54/863, db
+2/27, cli 22/379, web 25/474; public core 54/863, db 2/27, cli 21/376 (the one fewer CLI file
+is `server-compose-sync.test.ts`, private by design per `CLAUDE.md:157`). Two modules that
+had ZERO tests now have 22 between them. Remaining: 4.4, which needs a release tag before it
+can run — this sprint stays ACTIVE until then rather than closing on an unverified converge.
 
 **2026-08-31 (b)** — Owner caught two placement errors. The sprint had been written into the
 private tree's `.kiro/specs/appbay-v1/`, where CLI work does not belong and where it collided
