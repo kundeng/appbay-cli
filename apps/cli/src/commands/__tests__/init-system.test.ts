@@ -50,6 +50,10 @@ describe("planSystemBootstrap", () => {
       "setgid-home",
       "acl-home",
       "write-config",
+      // The control-plane unit is written LAST, after the home it points at exists and after
+      // the account it runs as. Written, never enabled — starting a control plane at boot is
+      // the operator's decision, not a bootstrap command's.
+      "write-unit",
     ]);
   });
 

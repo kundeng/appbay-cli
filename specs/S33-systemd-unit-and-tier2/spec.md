@@ -166,10 +166,53 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
       routers, not procedures, so neither was caught.
     - **Pillar**: Docs
 
-- [ ] 3. Ship the unit, on its own merits
-  - [ ] 3.1 An `appbay-server.service` unit with `Environment=APPBAY_HOME=`, installed by
+- [x] 3. Ship the unit, on its own merits
+  - [x] 3.1 An `appbay-server.service` unit with `Environment=APPBAY_HOME=`, installed by
         `init-system`
+    - `Type=oneshot` + `RemainAfterExit=yes`, because `appbay server start` brings the stack up
+      and exits — `Type=simple` would restart it forever.
+    - Orders `After=`/`Wants=` the runtime, never `Requires=`: the latter propagates a stop, so
+      restarting docker would take the control plane down with it.
+    - `Environment=APPBAY_HOME=` is still load-bearing, for a different reason than the RFC
+      gave: systemd starts services with almost no environment, so without it the unit would
+      fall through the tiers to `~/.appbay` of whoever it runs as.
+    - Written, NOT enabled. Starting a control plane at boot is the operator's decision; the
+      summary prints the one command.
+    - 11 tests, each pinning a runtime failure mode rather than a format detail.
     - **Depends**: 1.1 · **Requirements**: 1.1, 1.3 · **Pillar**: Packaging, MVP
-  - [ ] 3.2 Verify on a real service start on a VM, including a home the invoking user does
-        not own
+  - [x] 3.2 Verify on a real service start on a VM
+    - On appbay-rhel (Fedora 43, systemd 258): `systemd-analyze verify` exits 0; the unit
+      correctly ordered after `podman.socket` and not a `podman.service` that does not exist;
+      `systemctl start` runs ExecStart and reports failure legibly in the journal, naming the
+      cause each time.
+    - ✅ Also verified the S33 premise on a second host and distro: `appbay home`, run from
+      `/tmp` by an ordinary user, resolved `/var/lib/appbay` through tier 2 — the property a
+      unit cannot provide.
+    - 🚨 **Found doing this: `appbay init` CRASHED for the service account `init-system`
+      itself creates** — unhandled `EACCES: mkdir '/home/appbay'` with a raw bun stack trace,
+      on the very step `init-system` prints as "Next". Fixed in task 3.3.
     - **Depends**: 3.1 · **Requirements**: 1.2 · **Pillar**: Test
+  - [x] 3.3 Stop `saveAppbayHome` crashing on an account with no writable `$HOME`
+    - `--owner service` creates the account `--no-create-home`, so `$HOME` is a `/home/<user>`
+      that does not exist and cannot be created. The documented bootstrap path was broken for
+      its own default ownership model.
+    - Not merely a try/catch: writing tier 3 there is also POINTLESS, because tier 2 already
+      records the home and outranks it. A per-operator copy could only be shadowed, or later
+      disagree. Returns `saved` | `unnecessary` | `failed`; `appbay home set` still fails hard,
+      because writing that pointer is the whole command.
+    - **Depends**: 3.2 · **Pillar**: MVP, Test
+
+- [ ] 4. 🚦 The D-6 service account cannot run podman — a design decision, not a bug fix
+  - [!] 4.1 BLOCKED on an owner decision. Proven, with commands and errors, in probe-87:
+    - `sudo -u appbay podman info` → `cannot resolve /home/appbay: lstat ... no such file`
+      (`--no-create-home`), and with `HOME` set → `no subuid ranges found for user "appbay"`
+      (`grep -c appbay /etc/subuid` = 0). Both are direct consequences of how `init-system`
+      creates the account.
+    - NOT a systemd problem: `appbay server start` by hand as that account fails the same way
+      (`EACCES: permission denied, posix_spawn 'podman'`).
+    - Docker hosts are likely unaffected — `init-system` adds the account to the `docker`
+      group. Rootful podman's socket is root-owned and has no equivalent.
+    - The choice is between giving the account subuid ranges and a home, granting it the
+      rootful podman socket, or running the unit as root — each changes what the D-6 model
+      means, so it is the owner's call rather than mine.
+    - **Depends**: 3.2 · **Evidence**: `docs/rfc/evidence/probe-87-*.yaml`

@@ -29,6 +29,7 @@
  */
 
 import { Command } from "commander";
+import { SYSTEM_CONFIG_FILE } from "../utils/system-config.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -157,8 +158,20 @@ const setCommand = new Command("set")
       console.log(`⚠️  ${target} has no etc/ — it does not look initialised`);
     }
 
-    saveAppbayHome(target);
-    console.log(`Saved ${target} to ${CONFIG_FILE}`);
+    // ⚠️ Report what actually happened. `appbay home set` exists to write this pointer, so a
+    // failure is the whole command failing — printing "Saved" over an EACCES would tell the
+    // operator the opposite of the truth, and the next command would resolve elsewhere.
+    const saved = saveAppbayHome(target);
+    if (saved === "failed") {
+      console.error(`Could not write ${CONFIG_FILE} — check permissions on its directory.`);
+      process.exit(1);
+    }
+    if (saved === "unnecessary") {
+      console.log(`${SYSTEM_CONFIG_FILE} already records ${target} for this host.`);
+      console.log(`Nothing written to ${CONFIG_FILE} — the host-level file outranks it anyway.`);
+    } else {
+      console.log(`Saved ${target} to ${CONFIG_FILE}`);
+    }
 
     if (shadows.length > 0) {
       console.log(

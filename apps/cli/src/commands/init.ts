@@ -51,6 +51,7 @@ import {
 import {
   resolveAppbayHome,
   saveAppbayHome,
+  type SaveHomeResult,
   APPBAY_HOME_FROM_ENV,
 } from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
@@ -331,6 +332,20 @@ function ensureDockerNetwork(): boolean {
   const errMsg = create.stderr ? String(create.stderr).trim() : "unknown error";
   console.error(`  Warning: could not create ${cliRuntimeProfile().displayName} network: ${errMsg}`);
   return false;
+}
+
+/**
+ * Say what happened to the per-operator home pointer, without ever failing the init.
+ *
+ * ⚠️ NOT SILENT ON FAILURE. `init` scaffolds a tree whether or not tier 3 could be written, so
+ * this must not abort — but an operator whose pointer did not get saved will find the next
+ * command resolving somewhere else, and needs to know why now rather than then.
+ */
+function reportHomePersistence(result: SaveHomeResult, home: string): void {
+  if (result === "failed") {
+    console.log(`  ⚠ Could not save the home pointer under $HOME — continuing.`);
+    console.log(`    Set APPBAY_HOME=${home}, or record it host-wide with "appbay init-system".`);
+  }
 }
 
 /**
@@ -892,8 +907,13 @@ export const initCommand = new Command("init")
         appbayHome = APPBAY_HOME_FROM_ENV;
       } else if (options.dir) {
         // Explicit --dir: use it and persist for future invocations.
+        //
+        // ⚠️ Persisting is best-effort. A no-login SERVICE ACCOUNT has no writable `~/.config`
+        // — this used to crash `init` with an unhandled EACCES on exactly the account
+        // `init-system --owner service` creates — and does not need one, because the
+        // host-level config already records the home and outranks it.
         appbayHome = options.dir;
-        saveAppbayHome(appbayHome);
+        reportHomePersistence(saveAppbayHome(appbayHome), appbayHome);
       } else {
         // No explicit path: ask on first interactive run, else use default.
         const defaultHome = join(homedir(), ".appbay");
@@ -901,7 +921,7 @@ export const initCommand = new Command("init")
           // First-ever run: give the user a chance to choose the data dir.
           console.log("Welcome to Appbay!\n");
           appbayHome = await ask("Where should Appbay store its data?", defaultHome);
-          saveAppbayHome(appbayHome);
+          reportHomePersistence(saveAppbayHome(appbayHome), appbayHome);
           console.log("");
         } else {
           // Re-init or non-interactive: resolveAppbayHome picks up the saved config.

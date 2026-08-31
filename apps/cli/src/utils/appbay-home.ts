@@ -32,15 +32,39 @@ export function readSavedAppbayHome(): string | null {
   return line || null;
 }
 
+/** What `saveAppbayHome` did. */
+export type SaveHomeResult =
+  /** Written to `~/.config/appbay/home`. */
+  | "saved"
+  /** Not written: the host-level config already records this home, and outranks tier 3. */
+  | "unnecessary"
+  /** Could not be written. The caller decides whether that matters. */
+  | "failed";
+
 /**
  * Persist an Appbay home path so future invocations remember it.
  *
- * Creates `~/.config/appbay/home` if it does not exist.
- * Overwrites on re-init so the user can change the location.
+ * 🚨 THIS MUST NOT THROW, AND IT USED TO. `mkdirSync` on `~/.config` raised an unhandled
+ * EACCES for a no-login SERVICE ACCOUNT — the one `appbay init-system --owner service` creates
+ * by default, with `--no-create-home`, so `$HOME` is a `/home/<user>` that does not exist and
+ * cannot be created. Measured on Fedora 43: `appbay init` crashed with a raw bun stack trace
+ * on the very step `init-system` prints as "Next". The documented bootstrap path was broken for
+ * its own default ownership model.
+ *
+ * ⚠️ It is also UNNECESSARY there, which is why this is not merely a try/catch. `~/.config` is
+ * tier 3 — a per-operator convenience — and `/etc/appbay/config` is tier 2, which outranks it.
+ * When the host-level file already names this home, writing a shadowed per-operator copy would
+ * only create something that can later disagree with it.
  */
-export function saveAppbayHome(homePath: string): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_FILE, homePath + "\n", "utf-8");
+export function saveAppbayHome(homePath: string): SaveHomeResult {
+  if (readSystemConfig()?.home === homePath) return "unnecessary";
+  try {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, homePath + "\n", "utf-8");
+    return "saved";
+  } catch {
+    return "failed";
+  }
 }
 
 /**

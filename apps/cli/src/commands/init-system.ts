@@ -42,6 +42,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { SYSTEM_CONFIG_FILE, SYSTEM_CONFIG_DIR } from "../utils/system-config.js";
+import { renderServerUnit, SERVER_UNIT_NAME, SERVER_UNIT_PATH } from "../utils/systemd-unit.js";
 import { cliContainerBin } from "../utils/docker.js";
 
 /** Default service account name. */
@@ -532,6 +533,32 @@ export function planSystemBootstrap(opts?: {
     stdin: configContent,
   });
 
+  // 8. Install the control-plane unit, so the server survives a reboot.
+  //
+  // ⚠️ WRITTEN, NOT ENABLED. Starting a control plane at boot is a decision an operator makes,
+  // not one a bootstrap command makes for them — `init-system` sets a host up to run appbay,
+  // and enabling this would also start deploying containers on every boot of a host that may
+  // have been bootstrapped for a dry run. The apply summary prints the one command to enable it.
+  //
+  // ⚠️ NOT a prerequisite for removing /etc/appbay/config. That was RFC-001 2.7's premise and
+  // probe-86 refuted it: this unit's Environment= reaches what systemd starts, and an
+  // operator's shell never sees it.
+  const binaryPath = process.execPath;
+  actions.push({
+    id: "write-unit",
+    label: `Install ${SERVER_UNIT_PATH} (not enabled — see the summary)`,
+    wouldChange: true,
+    command: ["sh", "-c", `tee ${SERVER_UNIT_PATH} >/dev/null && systemctl daemon-reload`],
+    stdin: renderServerUnit({
+      binaryPath,
+      home,
+      runtimeUnit,
+      // An operator install is owned by the invoking user, so the unit must run as them;
+      // a service install runs as the no-login account that owns the tree.
+      user: owner === "service" ? serviceUser : undefined,
+    }),
+  });
+
   return actions;
 }
 
@@ -625,6 +652,12 @@ export const initSystemCommand = new Command("init-system")
     }
 
     console.log("\n  Host bootstrap complete.");
-    console.log(`  Recorded in ${SYSTEM_CONFIG_FILE}: owner=${owner}, home=${home}`);
+    // The file records the home only — the ownership model's real record is the file
+    // ownership and ACLs set above, which is where it cannot drift from reality.
+    console.log(`  Recorded in ${SYSTEM_CONFIG_FILE}: home=${home}   (ownership model: ${owner})`);
     console.log("  Next: run \"appbay init\" to scaffold APPBAY_HOME, then \"appbay setup\".");
+    console.log("");
+    console.log(`  ${SERVER_UNIT_PATH} is installed but NOT enabled — starting a control`);
+    console.log("  plane at boot is your call, not a bootstrap command's. To enable it:");
+    console.log(`      sudo systemctl enable --now ${SERVER_UNIT_NAME}`);
   });

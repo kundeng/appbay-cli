@@ -89,7 +89,7 @@ describe("readSavedAppbayHome", () => {
 
 describe("saveAppbayHome", () => {
   it("creates the config directory and writes the path", () => {
-    saveAppbayHome("/opt/myappbay");
+    expect(saveAppbayHome("/opt/myappbay")).toBe("saved");
     expect(fs.mkdirSync).toHaveBeenCalledWith(
       join(homedir(), ".config", "appbay"),
       { recursive: true },
@@ -99,6 +99,39 @@ describe("saveAppbayHome", () => {
       "/opt/myappbay\n",
       "utf-8",
     );
+  });
+
+  it("🚨 does NOT throw when $HOME is not writable — it reports", () => {
+    // Measured on Fedora 43: `appbay init` crashed with a raw bun stack trace
+    // (EACCES, mkdir '/home/appbay') for the no-login SERVICE ACCOUNT that
+    // `appbay init-system --owner service` creates by default with --no-create-home. The
+    // documented next step of the documented bootstrap path was broken for its own default
+    // ownership model.
+    vi.mocked(fs.mkdirSync).mockImplementation(() => {
+      const err = new Error("EACCES: permission denied, mkdir '/home/appbay'");
+      throw err;
+    });
+    expect(() => saveAppbayHome("/var/lib/appbay")).not.toThrow();
+    expect(saveAppbayHome("/var/lib/appbay")).toBe("failed");
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("🚨 skips the write entirely when the HOST-LEVEL config already records it", () => {
+    // Tier 2 outranks tier 3, so a per-operator copy could only ever be shadowed — or, worse,
+    // later disagree with the host-level file. Not merely a try/catch: there is nothing here
+    // worth attempting.
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue("home: /var/lib/appbay\n" as never);
+    expect(saveAppbayHome("/var/lib/appbay")).toBe("unnecessary");
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("still writes when the host-level config names a DIFFERENT home", () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue("home: /var/lib/appbay\n" as never);
+    expect(saveAppbayHome("/opt/elsewhere")).toBe("saved");
+    expect(fs.writeFileSync).toHaveBeenCalled();
   });
 });
 
