@@ -16,8 +16,7 @@ describe("GeneratedValuesFileSchema", () => {
     values: [
       {
         key: {
-          project: "homelab",
-          environment: "prod",
+          namespace: "homelab",
           service: "jellyfin",
           varName: "DB_PASS",
         },
@@ -27,8 +26,7 @@ describe("GeneratedValuesFileSchema", () => {
       },
       {
         key: {
-          project: "homelab",
-          environment: "prod",
+          namespace: "homelab",
           service: "nextcloud",
           varName: "INSTANCE_ID",
         },
@@ -81,8 +79,7 @@ describe("GeneratedValuesFileSchema", () => {
   it("rejects a value with an invalid datetime", () => {
     const result = GeneratedValueSchema.safeParse({
       key: {
-        project: "test",
-        environment: "dev",
+        namespace: "test",
         service: "app",
         varName: "SECRET",
       },
@@ -106,28 +103,24 @@ describe("ActiveAppsSchema", () => {
       apps: [
         {
           name: "traefik",
-          project: "homelab",
-          environment: "prod",
+          namespace: "homelab",
           status: "running",
           lastDeploy: "2026-05-01T08:00:00Z",
         },
         {
           name: "jellyfin",
-          project: "homelab",
-          environment: "prod",
+          namespace: "homelab",
           status: "stopped",
         },
         {
           name: "nextcloud",
-          project: "homelab",
-          environment: "prod",
+          namespace: "homelab",
           status: "error",
           lastDeploy: "2026-04-30T22:15:00Z",
         },
         {
           name: "ollama",
-          project: "homelab",
-          environment: "dev",
+          namespace: "homelab",
           status: "unknown",
         },
       ],
@@ -150,8 +143,7 @@ describe("ActiveAppsSchema", () => {
       apps: [
         {
           name: "broken",
-          project: "test",
-          environment: "dev",
+          namespace: "test",
           status: "crashed",
         },
       ],

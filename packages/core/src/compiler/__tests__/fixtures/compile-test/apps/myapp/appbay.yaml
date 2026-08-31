@@ -1,5 +1,4 @@
-project: homelab
-environment: prod
+namespace: homelab
 shared_network:
   - appbay_shared
 upstream:

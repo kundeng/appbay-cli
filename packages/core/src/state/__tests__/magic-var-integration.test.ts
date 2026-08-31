@@ -22,7 +22,7 @@ describe("Magic variable persistence", () => {
     await mkdir(stateDir, { recursive: true });
     const store = new GeneratedValueStore(join(stateDir, "generated-values.yaml"));
 
-    const key = { project: "default", environment: "prod", service: "db", varName: "DB_PASSWORD" };
+    const key = { namespace: "default", service: "db", varName: "DB_PASSWORD" };
     const v1 = await store.getOrCreate(key, "password:16");
     const v2 = await store.getOrCreate(key, "password:16");
 
@@ -35,7 +35,7 @@ describe("Magic variable persistence", () => {
     await mkdir(stateDir, { recursive: true });
     const store = new GeneratedValueStore(join(stateDir, "generated-values.yaml"));
 
-    const key = { project: "default", environment: "prod", service: "app", varName: "APP_ID" };
+    const key = { namespace: "default", service: "app", varName: "APP_ID" };
     const v1 = await store.getOrCreate(key, "uuid");
     const v2 = await store.getOrCreate(key, "uuid");
 
@@ -50,7 +50,7 @@ describe("Magic variable persistence", () => {
 
     // Generate and flush
     const store1 = new GeneratedValueStore(filePath);
-    const key = { project: "homelab", environment: "prod", service: "web", varName: "SECRET" };
+    const key = { namespace: "homelab", service: "web", varName: "SECRET" };
     const original = await store1.getOrCreate(key, "password:20");
     await store1.flush();
 
@@ -69,7 +69,7 @@ describe("Magic variable persistence", () => {
 
     const store = new GeneratedValueStore(filePath);
     await store.getOrCreate(
-      { project: "test", environment: "dev", service: "api", varName: "TOKEN" },
+      { namespace: "test", service: "api", varName: "TOKEN" },
       "base64:32",
     );
     await store.flush();
@@ -96,11 +96,11 @@ describe("Magic variable persistence", () => {
     const store = new GeneratedValueStore(join(stateDir, "generated-values.yaml"));
 
     const v1 = await store.getOrCreate(
-      { project: "a", environment: "prod", service: "web", varName: "PW1" },
+      { namespace: "a", service: "web", varName: "PW1" },
       "password:16",
     );
     const v2 = await store.getOrCreate(
-      { project: "a", environment: "prod", service: "web", varName: "PW2" },
+      { namespace: "a", service: "web", varName: "PW2" },
       "password:16",
     );
 

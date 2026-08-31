@@ -12,8 +12,7 @@ function makeContext(
   gpuOverrides?: Partial<GpuFacts>,
 ): CompilerContext {
   return {
-    project: "default",
-    environment: "default",
+    namespace: "default",
     appName: "myapp",
     appsDir: "/tmp/apps",
     runtimeFacts: {

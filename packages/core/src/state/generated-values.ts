@@ -64,12 +64,11 @@ export function generateBase64(bytes: number): string {
  * Always produces the same output for the same inputs -- no persistence needed.
  */
 export function generateHash(
-  project: string,
-  environment: string,
+  namespace: string,
   service: string,
   key: string,
 ): string {
-  const input = [project, environment, service, key].join(":");
+  const input = [namespace, service, key].join(":");
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 
@@ -128,7 +127,7 @@ export function parseMagicVar(ref: string): ParsedMagicVar | null {
  * Uses a delimiter that is unlikely to appear in normal values.
  */
 function keyString(k: GeneratedValueKey): string {
-  return `${k.project}\0${k.environment}\0${k.service}\0${k.varName}`;
+  return `${k.namespace}\0${k.service}\0${k.varName}`;
 }
 
 /**
@@ -220,12 +219,7 @@ export class GeneratedValueStore {
 
     // Hash is deterministic -- no persistence needed.
     if (parsed.type === "hash") {
-      return generateHash(
-        key.project,
-        key.environment,
-        key.service,
-        key.varName,
-      );
+      return generateHash(key.namespace, key.service, key.varName);
     }
 
     // Check for existing cached value.

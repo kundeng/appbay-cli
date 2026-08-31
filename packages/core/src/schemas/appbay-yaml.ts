@@ -16,8 +16,16 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 export const ScopeSchema = z.object({
-  project: z.string().default("default"),
-  environment: z.string().default("default"),
+  /**
+   * Deployment namespace, flat and dot-delimited: `uom.sim`. RFC-001 §4.
+   *
+   * ⚠️ `.optional()`, NOT `.default("default")`, and that one word is the whole point.
+   * `project` and `environment` were declared with a default, so after parsing they were
+   * never `undefined` — which made `config?.project ?? invocationProject` in compile.ts
+   * return the manifest value every time and the invocation value unreachable. Absence has
+   * to be expressible for "decided at deploy time" to mean anything.
+   */
+  namespace: z.string().optional(),
   collection: z.array(z.string()).optional(),
   operator: z.string().optional(),
   shared_network: z.array(z.string()).default(["appbay_shared"]),
@@ -358,8 +366,8 @@ export type BuildSpec = z.infer<typeof BuildSpecSchema>;
 
 export const AppbayYamlSchema = z.object({
   // -- Scope --
-  project: z.string().default("default"),
-  environment: z.string().default("default"),
+  /** See ScopeSchema.namespace — optional so the invocation can win. RFC-001 §4. */
+  namespace: z.string().optional(),
   collection: z.array(z.string()).optional(),
   operator: z.string().optional(),
   shared_network: z.array(z.string()).default(["appbay_shared"]),

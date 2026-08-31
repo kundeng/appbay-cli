@@ -62,10 +62,8 @@ export interface CompileOptions {
   activeApps?: Set<string>;
   /** Runtime facts for trait context. */
   runtimeFacts?: RuntimeFacts;
-  /** Project name (default: "default"). */
-  project?: string;
-  /** Environment name (default: "default"). */
-  environment?: string;
+  /** Deployment namespace (default: "default"). RFC-001 §4. */
+  namespace?: string;
   /** Project-level variables for scope resolution. */
   projectVars?: Record<string, string>;
   /** Environment-level variables for scope resolution. */
@@ -170,8 +168,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     apps: requestedApps,
     activeApps = new Set<string>(),
     runtimeFacts = DEFAULT_RUNTIME_FACTS,
-    project = "default",
-    environment = "default",
+    namespace,
     projectVars = {},
     environmentVars = {},
   } = options;
@@ -247,8 +244,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
         runtimeFacts,
         registry,
         generatedValueStore,
-        project,
-        environment,
+        namespace,
         projectVars,
         environmentVars,
       });
@@ -343,8 +339,8 @@ interface CompileAppInput {
   runtimeFacts: RuntimeFacts;
   registry: TraitRegistry;
   generatedValueStore: GeneratedValueStore;
-  project: string;
-  environment: string;
+  /** Namespace from the invocation. Undefined means "the manifest decides". */
+  namespace: string | undefined;
   projectVars: Record<string, string>;
   environmentVars: Record<string, string>;
 }
@@ -367,8 +363,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     runtimeFacts,
     registry,
     generatedValueStore,
-    project: defaultProject,
-    environment: defaultEnvironment,
+    namespace: invocationNamespace,
     projectVars,
     environmentVars,
   } = input;
@@ -377,8 +372,10 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   const warnings: string[] = [];
 
   const config = app.appbayConfig;
-  const appProject = config?.project ?? defaultProject;
-  const appEnvironment = config?.environment ?? defaultEnvironment;
+  // Manifest wins when it pins one; otherwise the invocation decides. This `??` was
+  // already written this way and could never fire, because the fields carried a Zod
+  // default. Making the schema field `.optional()` is what makes it correct.
+  const appNamespace = config?.namespace ?? invocationNamespace ?? "default";
   const sharedNetworks = config?.shared_network ?? ["appbay_shared"];
 
   let compose: Record<string, unknown> = { ...app.composeContent };
@@ -443,8 +440,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   compose = await resolveMagicVars(
     compose,
     generatedValueStore,
-    appProject,
-    appEnvironment,
+    appNamespace,
     app.name,
   );
 
@@ -552,8 +548,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       serviceTraits,
       registry,
       context: {
-        project: appProject,
-        environment: appEnvironment,
+        namespace: appNamespace,
         appName: app.name,
         appsDir,
         runtimeFacts,
@@ -945,8 +940,7 @@ function buildLogicalChanges(params: {
 async function resolveMagicVars(
   compose: Record<string, unknown>,
   store: GeneratedValueStore,
-  project: string,
-  environment: string,
+  namespace: string,
   appName: string,
 ): Promise<Record<string, unknown>> {
   const result = structuredClone(compose);
@@ -973,7 +967,7 @@ async function resolveMagicVars(
       }
 
       // Resolve the magic variable
-      const storeKey = { project, environment, service: svcName, varName: key };
+      const storeKey = { namespace, service: svcName, varName: key };
       const resolved = await store.getOrCreate(storeKey, `${parsed.type}${parsed.arg ? `:${parsed.arg}` : ""}`);
       resolvedEnv.push(`${key}=${resolved}`);
     }

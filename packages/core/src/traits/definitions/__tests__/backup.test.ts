@@ -9,8 +9,7 @@ import type { BackupTrait } from "../../../schemas/appbay-yaml.js";
 
 function makeContext(overrides?: Partial<CompilerContext>): CompilerContext {
   return {
-    project: "default",
-    environment: "default",
+    namespace: "default",
     appName: "myapp",
     appsDir: "/tmp/apps",
     runtimeFacts: {

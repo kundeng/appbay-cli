@@ -26,8 +26,7 @@ describe("discoverApps", () => {
     );
     expect(validApp!.composeContent).toHaveProperty("services");
     expect(validApp!.appbayConfig).not.toBeNull();
-    expect(validApp!.appbayConfig!.project).toBe("homelab");
-    expect(validApp!.appbayConfig!.environment).toBe("prod");
+    expect(validApp!.appbayConfig!.namespace).toBe("homelab");
     expect(validApp!.appbayConfig!.collection).toEqual(["web-stack"]);
     expect(validApp!.errors).toHaveLength(0);
   });

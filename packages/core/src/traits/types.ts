@@ -28,10 +28,8 @@ export type TraitCategory = "core" | "extension";
 
 /** Context passed to trait transforms during compilation. */
 export interface CompilerContext {
-  /** Project name from appbay.yaml scope. */
-  project: string;
-  /** Environment name from appbay.yaml scope. */
-  environment: string;
+  /** Deployment namespace from appbay.yaml scope, or "default". RFC-001 §4. */
+  namespace: string;
   /** App name (directory name). */
   appName: string;
   /** Path to the apps directory ($APPBAY_HOME/etc/apps). */

@@ -25,8 +25,7 @@ async function makeTmpDir(): Promise<string> {
 /** Build a test key with convenient defaults. */
 function makeKey(overrides: Partial<GeneratedValueKey> = {}): GeneratedValueKey {
   return {
-    project: "homelab",
-    environment: "prod",
+    namespace: "homelab",
     service: "jellyfin",
     varName: "DB_PASSWORD",
     ...overrides,
@@ -111,8 +110,8 @@ describe("Generator functions", () => {
   // -------------------------------------------------------------------------
 
   it("generateHash is deterministic -- same inputs always produce same output", () => {
-    const hash1 = generateHash("homelab", "prod", "jellyfin", "DB_PASSWORD");
-    const hash2 = generateHash("homelab", "prod", "jellyfin", "DB_PASSWORD");
+    const hash1 = generateHash("homelab", "jellyfin", "DB_PASSWORD");
+    const hash2 = generateHash("homelab", "jellyfin", "DB_PASSWORD");
 
     expect(hash1).toBe(hash2);
     // SHA-256 hex is 64 chars
@@ -125,13 +124,17 @@ describe("Generator functions", () => {
   // -------------------------------------------------------------------------
 
   it("generateHash produces different output for different inputs", () => {
-    const hash1 = generateHash("homelab", "prod", "jellyfin", "DB_PASSWORD");
-    const hash2 = generateHash("homelab", "dev", "jellyfin", "DB_PASSWORD");
-    const hash3 = generateHash("homelab", "prod", "nextcloud", "DB_PASSWORD");
+    // One component differs per pair: namespace, then service, then varName.
+    const hash1 = generateHash("homelab", "jellyfin", "DB_PASSWORD");
+    const hash2 = generateHash("uom.sim", "jellyfin", "DB_PASSWORD");
+    const hash3 = generateHash("homelab", "nextcloud", "DB_PASSWORD");
+    const hash4 = generateHash("homelab", "jellyfin", "API_KEY");
 
+    expect(new Set([hash1, hash2, hash3, hash4]).size).toBe(4);
+
+    // And the namespace really is load-bearing: two namespaces of one app+var differ.
+    // This is the property that makes two instances of an app coexist in one home.
     expect(hash1).not.toBe(hash2);
-    expect(hash1).not.toBe(hash3);
-    expect(hash2).not.toBe(hash3);
   });
 });
 

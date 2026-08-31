@@ -22,8 +22,10 @@ function safeParse(input: unknown) {
 describe("minimal appbay.yaml", () => {
   it("parses an empty object with defaults", () => {
     const result = parse({});
-    expect(result.project).toBe("default");
-    expect(result.environment).toBe("default");
+    // RFC-001 §4: absence must be EXPRESSIBLE. `namespace` is `.optional()`, not
+    // `.default("default")` — a default here is what made the invocation value unreachable
+    // in compile.ts, because `config?.namespace ?? invocation` could never see undefined.
+    expect(result.namespace).toBeUndefined();
     expect(result.shared_network).toEqual(["appbay_shared"]);
   });
 
@@ -34,7 +36,7 @@ describe("minimal appbay.yaml", () => {
     expect(result.upstream?.source).toBe(
       "./jellyfin-upstream/docker-compose.yml",
     );
-    expect(result.project).toBe("default");
+    expect(result.namespace).toBeUndefined();
   });
 });
 
@@ -45,8 +47,7 @@ describe("minimal appbay.yaml", () => {
 describe("standard appbay.yaml", () => {
   it("parses upstream with ingress and gpu traits", () => {
     const result = parse({
-      project: "homelab",
-      environment: "prod",
+      namespace: "homelab",
       upstream: {
         source: "./jellyfin-upstream/docker-compose.yml",
         expose: [{ service: "jellyfin", networks: ["proxy"] }],
@@ -68,8 +69,7 @@ describe("standard appbay.yaml", () => {
       },
     });
 
-    expect(result.project).toBe("homelab");
-    expect(result.environment).toBe("prod");
+    expect(result.namespace).toBe("homelab");
     expect(result.services?.jellyfin?.traits).toHaveLength(2);
 
     const ingress = result.services!.jellyfin!.traits![0]!;
@@ -237,14 +237,16 @@ describe("validation errors", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaults", () => {
-  it("applies default project='default'", () => {
+  it("leaves namespace undefined rather than defaulting it", () => {
+    // The keystone of RFC-001 §4. If this ever goes back to a default, every
+    // `appbay up --namespace X` is silently ignored again.
     const result = parse({});
-    expect(result.project).toBe("default");
+    expect(result.namespace).toBeUndefined();
+    expect("namespace" in result).toBe(false);
   });
 
-  it("applies default environment='default'", () => {
-    const result = parse({});
-    expect(result.environment).toBe("default");
+  it("keeps an explicitly declared namespace", () => {
+    expect(parse({ namespace: "uom.sim" }).namespace).toBe("uom.sim");
   });
 
   it("applies default shared_network=['appbay_shared']", () => {
@@ -432,8 +434,7 @@ describe("app-level trait `service` routing field preservation", () => {
 describe("full config round-trip", () => {
   it("parses a complete realistic config", () => {
     const input = {
-      project: "homelab",
-      environment: "prod",
+      namespace: "homelab",
       collection: ["media"],
       operator: "node-1",
       shared_network: ["appbay_shared", "proxy"],
@@ -498,7 +499,7 @@ describe("full config round-trip", () => {
 
     const result = parse(input);
 
-    expect(result.project).toBe("homelab");
+    expect(result.namespace).toBe("homelab");
     expect(result.shared_network).toEqual(["appbay_shared", "proxy"]);
     expect(result.upstream?.services?.exclude).toEqual(["nginx"]);
     expect(result.overlays).toHaveLength(2);

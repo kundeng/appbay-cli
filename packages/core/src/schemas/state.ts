@@ -20,12 +20,18 @@ import { z } from "zod";
 
 /**
  * Composite key for a generated value.
- * Values are keyed by (project, environment, service, varName) to ensure
- * deterministic re-renders -- the same key always returns the same value.
+ * Values are keyed by (namespace, service, varName) to ensure deterministic
+ * re-renders -- the same key always returns the same value.
+ *
+ * ⚠️ This tuple is an INPUT TO THE VALUE for `?gen=hash`, not merely an index:
+ * `generateHash` returns its digest as the value and persists nothing. Changing the
+ * tuple therefore changes every hash-derived secret. Safe when RFC-001 §4 landed —
+ * measured zero `?gen=hash` uses across both catalogs, the UOM fixtures and system-apps
+ * (all 54 generated values were `gen=password`, which IS persisted) — and not safe
+ * afterwards, which is why it went in then.
  */
 export const GeneratedValueKeySchema = z.object({
-  project: z.string(),
-  environment: z.string(),
+  namespace: z.string(),
   service: z.string(),
   varName: z.string(),
 });
@@ -72,8 +78,7 @@ export type AppStatus = z.infer<typeof AppStatusSchema>;
 /** A single app entry in the active apps registry. */
 export const ActiveAppEntrySchema = z.object({
   name: z.string(),
-  project: z.string(),
-  environment: z.string(),
+  namespace: z.string(),
   status: AppStatusSchema,
   /** ISO 8601 timestamp of the last successful deploy. */
   lastDeploy: z.string().datetime().optional(),

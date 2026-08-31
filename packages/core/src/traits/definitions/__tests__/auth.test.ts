@@ -25,8 +25,7 @@ function makeInput(
     service: "web",
     compose: { services: { web: { image: "nginx" } } },
     context: {
-      project: "default",
-      environment: "default",
+      namespace: "default",
       appName: "myapp",
       appsDir: "/opt/appbay/etc/apps",
       ingressProvider: "caddy",

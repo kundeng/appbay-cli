@@ -17,8 +17,7 @@ import type {
 /** Minimal compiler context for testing. */
 function makeContext(overrides?: Partial<CompilerContext>): CompilerContext {
   return {
-    project: "default",
-    environment: "default",
+    namespace: "default",
     appName: "test-app",
     appsDir: "/opt/appbay/etc/apps",
     runtimeFacts: {

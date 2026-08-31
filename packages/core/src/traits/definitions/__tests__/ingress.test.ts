@@ -28,8 +28,7 @@ function makeInput(
     service: "web",
     compose: { services: { web: { image: "nginx" } } },
     context: {
-      project: "default",
-      environment: "default",
+      namespace: "default",
       appName: "myapp",
       appsDir: "/opt/appbay/etc/apps",
       runtimeFacts: {
@@ -143,7 +142,7 @@ describe("Ingress trait transform", () => {
       service: "jellyfin",
       properties: { type: "ingress", host: "media.example.com", port: 8096, exposure: "external" },
       context: {
-        project: "default", environment: "default", appName: "jellyfin",
+        namespace: "default", appName: "jellyfin",
         appsDir: "/opt/appbay/etc/apps",
         runtimeFacts: {
           gpu: { available: false, cdiSupported: false },
