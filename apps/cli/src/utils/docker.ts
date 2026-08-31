@@ -6,9 +6,12 @@
  * composePath or args contain. Returns a structured result with exit code and
  * output so callers can handle errors without try/catch boilerplate.
  *
- * Also exports discoverRunningApps(), which reports which apps are RUNNING — for status
- * display only. ⚠️ It is no longer used for overlay activation: RFC-001 §5 made `when:`
- * mean *installed*, a fact about the declared app set that needs no container runtime.
+ * ⚠️ This file used to export discoverRunningApps(). RFC-001 §5 made `when:` mean
+ * *installed* — a fact about the declared app set — so the compiler stopped asking the
+ * runtime which apps were up, and the CLI has no other feature that reports running state.
+ * Removed rather than kept: the CLI's copy had zero callers and ten tests, which is exactly
+ * what dead code that looks alive looks like. `apps/web` keeps its own copy, which does have
+ * callers — the running/stopped indicator.
  */
 
 import { spawnSync } from "node:child_process";
@@ -49,52 +52,6 @@ export interface DockerComposeResult {
  * @param composePath - Absolute path to the rendered compose file.
  * @returns Structured result with exit code and output.
  */
-/**
- * Discover which Appbay-managed apps are currently running via `docker ps`.
- *
- * Container names follow `appbay.<appname>` or `appbay.<appname>.<service>`.
- * Returns a Set of app names used to activate conditional overlays when
- * compiling (e.g. open-webui's `when: [ollama]` block).
- *
- * Returns an empty set if Docker is unavailable or no Appbay containers exist.
- */
-export function discoverRunningApps(): Set<string> {
-  const apps = new Set<string>();
-
-  try {
-    // Signal 1: containers named appbay.<name>[.*] (system apps + compiled user apps)
-    const nameResult = spawnSync(
-      cliContainerBin(),
-      ["ps", "--format", "{{.Names}}", "--filter", "name=appbay."],
-      { encoding: "utf-8", timeout: 10_000 },
-    );
-    if (nameResult.status === 0) {
-      for (const line of (nameResult.stdout as string).trim().split("\n").filter(Boolean)) {
-        // "appbay.ollama" → "ollama", "appbay.caddy" → "caddy"
-        const match = line.trim().match(/^appbay\.([^.]+)/);
-        if (match) apps.add(match[1]!);
-      }
-    }
-  } catch { /* Docker unavailable */ }
-
-  try {
-    // Signal 2: compose project labels (user apps managed via `docker compose up`)
-    const labelResult = spawnSync(
-      cliContainerBin(),
-      ["ps", "--format", '{{index .Labels "com.docker.compose.project"}}'],
-      { encoding: "utf-8", timeout: 10_000 },
-    );
-    if (labelResult.status === 0) {
-      for (const line of (labelResult.stdout as string).trim().split("\n").filter(Boolean)) {
-        const name = line.trim();
-        if (name) apps.add(name);
-      }
-    }
-  } catch { /* Docker unavailable */ }
-
-  return apps;
-}
-
 /**
  * Run a `docker compose` command against a specific compose file.
  *
