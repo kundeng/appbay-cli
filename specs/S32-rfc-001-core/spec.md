@@ -309,8 +309,18 @@ for anything touching the runtime, a journey on both VMs.
       capturing the operator's own `APPBAY_HOME` before the CLI synthesises one.
     - `secrets init` is left registered; removing a command is a separate, user-visible change.
     - **Depends**: 2.2 · **Pillar**: MVP
-  - [ ] 2.4 Assert `home` against the resolved path and fail loudly on disagreement
-    - **Depends**: 2.1 · **Requirements**: 1.3
+  - [x] 2.4 Assert `home` against the resolved path and fail loudly on disagreement
+    - `init` records an absolute `home:`; `appbay home --explain` reports a disagreement.
+      Verified with the built binary: silent in place, fires on `cp -r`.
+    - ⚠️ Reports rather than aborts. "Fail loudly" — loudly yes, fatally no: hard-failing every
+      command on a copied tree locks the operator out of the tool they would fix it with, and
+      the precedent the RFC cites (the runtime socket gid) made its value overridable, not fatal.
+    - ⚠️ Absence is never disagreement — no `home:`, no config, or an unparseable config all
+      return null. A check that fired on every pre-§2.4 install would be the worse defect.
+    - ⚠️ Provisional placement in `project.yaml`; §2.1 moves it to `etc/system.yaml`. Did NOT
+      create a half-populated `etc/system.yaml` now — two config files mid-migration is the
+      confusion §2 exists to end.
+    - **Depends**: — · **Requirements**: 1.3 · **Pillar**: MVP, Test
 
 - [ ] 3. Secrets remainder (§3)
   - [x] 3.1 Narrow the manifest `provider:` enum to `vault` and reject the other four
