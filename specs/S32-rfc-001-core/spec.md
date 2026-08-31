@@ -298,8 +298,17 @@ for anything touching the runtime, a journey on both VMs.
       schemas is a file-location migration and the resolver consolidation does not need it.
       2.1 remains open.
     - **Depends**: — · **Requirements**: 1.1 · **Pillar**: MVP, Test
-  - [ ] 2.3 Fold `secrets init` into `init`; keep `rotate-password`, `repair-password-file`
-    - **Depends**: 2.2
+  - [x] 2.3 Fold `secrets init` into `init`; keep `rotate-password`, `repair-password-file`
+    - `init` stage 5/7 creates `var/lib/secrets/master-password` unconditionally. Also makes
+      §2.2's error message true — it says "run 'appbay init'", and until now that did nothing.
+    - 🚨 Testing it surfaced a separate live bug: **`appbay init --dir <path>` initialised a
+      DIFFERENT directory and never created the requested one.** `index.ts` sets
+      `process.env.APPBAY_HOME = resolveAppbayHome()` when absent, and `init` branched on that
+      variable BEFORE `options.dir`, so the env branch always won and `--dir` was unreachable.
+      The consuming project's converge passes it (`provision-appbay.yml:687`). Fixed by
+      capturing the operator's own `APPBAY_HOME` before the CLI synthesises one.
+    - `secrets init` is left registered; removing a command is a separate, user-visible change.
+    - **Depends**: 2.2 · **Pillar**: MVP
   - [ ] 2.4 Assert `home` against the resolved path and fail loudly on disagreement
     - **Depends**: 2.1 · **Requirements**: 1.3
 
@@ -365,6 +374,13 @@ for anything touching the runtime, a journey on both VMs.
 ## Notes
 
 Carried from S30 on its close.
+
+**2026-08-31 — `check:subset` met its documented limitation the day after it was written.**
+The `secrets/index.ts` export for §2.2 was left uncommitted, so it existed in the private
+WORKING TREE and in neither index. `check:subset` compares indexes by design — the failure it
+guards is a commit reaching one tree and not the other — so it reported ✓ while the public
+tree could not typecheck. `pnpm typecheck` caught it (4 successful, 5 total). Two gates, two
+different blind spots; neither is redundant.
 
 **Ship pillar (2026-08-31) — CI had never run in the public repo.** `ci.yml` is
 byte-identical across both trees and triggered on `branches: [master]`; the private repo is
