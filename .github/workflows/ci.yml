@@ -1,10 +1,17 @@
 name: CI
 
+# ⚠️ BOTH BRANCH NAMES, because this file is byte-identical in two repos with different
+# defaults: the private `kundeng/appbay` is on `master`, the public `kundeng/appbay-cli` is on
+# `main`. Listing only `master` meant this workflow had NEVER RUN in the public repo — checked
+# 2026-08-31, `gh run list` there shows Release runs only, no CI — so the repo that actually
+# holds the shipped code was merging cherry-picks with no test, no typecheck and no boundary
+# check. Same reason the docs job below sniffs for a file instead of branching on repo name:
+# one file, correct in both.
 on:
   push:
-    branches: [master]
+    branches: [main, master]
   pull_request:
-    branches: [master]
+    branches: [main, master]
 
 jobs:
   # The open-core boundary, enforced where it cannot be skipped. The pre-commit hook is the
@@ -64,10 +71,23 @@ jobs:
       - name: Type check
         run: pnpm turbo typecheck
 
+      # The repo's own consistency checks. Each existed and none of them ran here — a check
+      # wired to nothing is a check that reports green by never executing.
+      - name: System apps are in sync with their embedded copy
+        run: pnpm check:system-apps
+
+      - name: Docs do not name a command or flag the binary lacks
+        run: pnpm check:docs-cli
+
+      - name: Docs do not show a manifest the schema rejects
+        run: pnpm check:docs-manifests
+
   docs:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
     steps:
