@@ -1,71 +1,105 @@
 ---
 title: "Scope Model Reference"
-description: "Project, Environment, and Collection -- complete reference"
+description: "Namespace and Collection -- complete reference"
 ---
 
 ## Overview
 
-Appbay has three organizational concepts. Each controls a different aspect of how apps are grouped, configured, and deployed.
+Appbay has two organizational concepts. Each controls a different aspect of how apps are
+grouped, configured, and deployed.
 
 | Concept | Controls | Compose mapping | Cardinality |
 |---|---|---|---|
-| **Project** | Variable namespace | Which `project.yaml` vars are loaded | Single per app |
-| **Environment** | Variable values | Which `.env` gets rendered | Single per deploy |
+| **Namespace** | Deployment identity and variable scope | Container, network and edge-fragment names | Single per app |
 | **Collection** | App selection | Which `docker compose up` calls are made | Multi per app |
 
-Collection is NOT part of variable resolution — it is a selector only. Variable resolution is prefix-based: `${{project.KEY}}` reads from `project.yaml`, `${{environment.KEY}}` reads from `environment.yaml`, and `${{service.KEY}}` reads from service vars. Each prefix targets exactly one store; there is no cascading fallthrough.
+Collection is NOT part of variable resolution — it is a selector only.
 
-## Project
+::: {.callout-important}
+## `project:` and `environment:` were replaced by `namespace:`
 
-A project is a variable scope namespace. It controls which `projects/<project>/project.yaml` vars are loaded for `${{project.KEY}}` resolution. Container naming, volume naming, and network naming are all derived from the **app name**, not the project field.
+RFC-001 §4 collapsed the two scope fields into one. As of `v0.0.1-alpha.12`:
 
 ```yaml
-# appbay.yaml
+# appbay.yaml -- before
 project: homelab
+environment: prod
+
+# appbay.yaml -- now
+namespace: homelab.prod
 ```
 
-### What it controls at Compose runtime
+A namespace is **flat and dot-delimited**. Values shared across namespaces live one level up
+in the installation config, not in a hierarchy of names.
 
-- Container names: `appbay.ollama.web` (pattern: `appbay.<app>.<service>` — project is NOT part of the container name)
-- Volume prefixes: `ollama_data` (pattern: `<app>_<volume>`)
-- Compose project name: determined by Docker Compose from the render directory name (e.g., `ollama` from `renders/ollama/`) — no `-p` flag is passed by Appbay
-- Shared network: `appbay_shared` (the default; configurable via `shared_network:` in `appbay.yaml`)
-- Variable namespace: `${{project.DOMAIN}}` resolves from `projects/homelab/project.yaml`
+**A non-default `project:` or `environment:` is now a parse ERROR**, not a silently ignored
+key — the manifest fails with a message naming `namespace:`. The literal value `default` is
+still accepted, because it carried no information and every shipped manifest used it.
 
-### When to use multiple projects
+⚠️ `environment:` *inside a service* is Docker Compose's own field and is untouched. Only the
+top-level scope field is gone.
+:::
 
-- Separate variable namespaces on the same host (e.g., `homelab` vs `work-lab` with different domains and TZ)
-- Apps that need different project-level variable values to share the same config keys
+::: {.callout-warning}
+## Only `${{project.DOMAIN}}` actually resolves today
 
-**Default:** If `project` is omitted from `appbay.yaml`, it defaults to `"default"`.
+The `${{scope.KEY}}` reference vocabulary is **unchanged** by the rename — it is still
+`project`, `environment` and `service`. That asymmetry is deliberate and temporary: the
+declaration field moved, and renaming the reference prefix is a separate migration across
+every manifest that uses one.
 
-## Environment
+What the docs below describe as three variable stores is currently one, and it holds one key.
+`loadProjectVars` reads a single `domain:` line out of `$APPBAY_HOME/project.yaml` and returns
+`{ DOMAIN }`. Nothing reads `projects/<name>/project.yaml` or `environments/<env>.yaml`, so
+`${{environment.KEY}}` and `${{service.KEY}}` resolve against empty maps and always fail.
 
-An environment is a deployment variant. It determines which variable values are used -- different domains, secrets, ports, or feature flags for the same apps.
+A reference to an unknown key survives the render as a literal and the deploy then refuses
+the app, so this fails safe — but no error names the missing store directly.
+:::
+
+## Namespace
+
+A namespace is a deployment identity. It distinguishes two instances of the same app in one
+installation, and it scopes the variables an app resolves against.
 
 ```yaml
 # appbay.yaml
-environment: prod
+namespace: uom.sim
 ```
 
-### What it controls at Compose runtime
+**Absence means "decided at deploy time".** The field is optional and has no default, which
+is what lets a value supplied at compile time take effect — a schema default would shadow it.
 
-- Which variables are rendered into `.env` files
-- Which secret URIs are resolved (prod secrets vs dev secrets)
-- Which cert resolver is used (staging vs production Let's Encrypt)
-- Variable namespace: `${{environment.DB_HOST}}` resolves from `environments/prod/environment.yaml`
+### What it controls
 
-### Typical environments
+- Container names: `appbay.<namespace>.<app>.<service>`
+- The app's private network: `<namespace>_<app>_internal`
+- The shared-network alias other apps dial: `<namespace>_<app>_<service>`
+- The generated edge fragment: `<namespace>.<app>.caddy` / `.yml`
 
-| Name | Domain | Certs | Secrets |
-|---|---|---|---|
-| `prod` | `homelab.example.com` | Production Let's Encrypt | Real secrets |
-| `dev` | `localhost` | Staging certs | Dev secrets |
-| `staging` | `staging.example.com` | Production-like | Separate data |
+⚠️ **Dots become hyphens wherever the namespace reaches a hostname.** A dot separates labels
+in DNS, so `uom.sim_litellm_web` would parse as host `uom` in domain `sim_litellm_web` and
+resolve to nothing. An app in namespace `uom.sim` publishes `uom-sim_litellm_web`.
 
-**Default:** If `environment` is omitted, defaults to `"default"`.
+### An un-namespaced app is unchanged
 
-The environment for an app is set in `appbay.yaml`. To deploy with a different environment, set `environment:` in `appbay.yaml` or maintain separate app directories per environment.
+When `namespace:` is absent — the case for every shipped manifest — the namespace is omitted
+from all four names entirely:
+
+| | no namespace | `namespace: uom.sim` |
+|---|---|---|
+| container | `appbay.litellm.web` | `appbay.uom-sim.litellm.web` |
+| network | `litellm_internal` | `uom-sim_litellm_internal` |
+| alias | `litellm_web` | `uom-sim_litellm_web` |
+| edge fragment | `litellm.caddy` | `uom-sim.litellm.caddy` |
+
+This is deliberate: including it unconditionally would rename every container on every
+existing host in order to disambiguate installations that have nothing to disambiguate.
+
+### When to use a namespace
+
+- Two instances of one app in one installation (`uom.sim` and `uom.prod`)
+- Separate variable values for the same config keys
 
 ## Collection
 
@@ -165,7 +199,9 @@ When you run `appbay up --collection ai-stack`:
    -> [ollama, webui, tts]
 
 2. For each app, resolve variables:
-   ${{project.KEY}} from project.yaml (homelab), ${{environment.KEY}} from environment.yaml (prod), ${{service.KEY}} from app .env
+   ${{project.DOMAIN}} from $APPBAY_HOME/project.yaml
+   (${{environment.KEY}} and ${{service.KEY}} resolve against empty maps -- see the
+    warning at the top of this page)
 
 3. Compile each app:
    upstream transform -> overlays -> traits -> render
@@ -180,21 +216,26 @@ Each app is an independent Compose project. They communicate via shared networks
 
 ## Filesystem layout
 
+⚠️ **This is the intended layout, not the built one.** `etc/projects/` is not read by
+anything — `ProjectConfigSchema` and `EnvironmentConfigSchema` exist and have no non-test
+consumers, and the string `"projects"` is never joined into a path. The one file that is
+read is `$APPBAY_HOME/project.yaml` at the root.
+
 ```
 $APPBAY_HOME/
+  project.yaml                          # the ONE config that is read; `domain:` -> ${{project.DOMAIN}}
   etc/
-    projects/
-      homelab/                          # Project boundary
-        project.yaml                    # Project-level vars
+    projects/                           # ⚠️ specified, not implemented -- nothing reads this
+      homelab/
+        project.yaml
         environments/
-          prod.yaml                     # Prod variable values
-          dev.yaml                      # Dev variable values
+          prod.yaml
     apps/
       ollama/                           # App definition
-        appbay.yaml                     # project: homelab, collection: [ai-stack]
+        appbay.yaml                     # namespace: uom.sim, collection: [ai-stack]
         docker-compose.yml
       jellyfin/
-        appbay.yaml                     # project: homelab, collection: [media]
+        appbay.yaml                     # collection: [media]
         docker-compose.yml
 ```
 
@@ -202,7 +243,8 @@ $APPBAY_HOME/
 
 | Type | Keys | Semantics |
 |---|---|---|
-| **Reserved** | `project`, `environment`, `collection`, `operator`, `service` | Fixed meaning -- drives Appbay behavior |
+| **Reserved** | `namespace`, `collection`, `operator`, `service` | Fixed meaning -- drives Appbay behavior |
+| **Removed** | `project`, `environment` | Replaced by `namespace`; a non-default value is a parse error |
 | **Tags** | Anything via `tags:` | No fixed meaning -- UI filtering and bulk ops only |
 
 ## Anti-patterns
@@ -211,32 +253,30 @@ $APPBAY_HOME/
 
 ```yaml
 # WRONG: no collection-level variable resolution exists
-# RIGHT: use environment or app-level overrides
-environment: prod
+# RIGHT: use a namespace, or app-level overrides
+namespace: prod
 ```
 
-### Do not use projects for operational grouping
+### Do not use a namespace for operational grouping
 
 ```yaml
-# WRONG
-project: ai-apps     # Just for grouping
-project: media-apps
+# WRONG -- a namespace is a deployment identity, not a label
+namespace: ai-apps
+namespace: media-apps
 
-# RIGHT
-project: homelab
+# RIGHT -- group with collections, which are multi-valued
 collection: [ai-stack]    # ollama
 collection: [media]       # jellyfin
 ```
 
-### Do not use environments for selecting different app sets
+### Do not use a namespace to select different app sets
 
 ```yaml
-# WRONG
-environment: ai-mode
-environment: media-mode
+# WRONG -- namespace does not choose which apps deploy
+namespace: minimal
+namespace: full
 
-# RIGHT
-environment: prod
-collection: [ai-stack]    # appbay up --collection ai-stack
-collection: [media]       # appbay up --collection media
+# RIGHT -- collections select, the namespace identifies
+collection: [core]
+collection: [core, extras]
 ```
