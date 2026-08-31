@@ -62,10 +62,23 @@ function collectFlags(path, depth = 0) {
 }
 for (const cmd of commands) flagsFor.set(cmd, collectFlags([cmd]));
 
+/**
+ * Directories that are not instructions to an operator.
+ *
+ * ⚠️ `docs/rfc/` and `docs/history/` are ANALYSIS AND RECORD, not guidance. An RFC that
+ * proposes `appbay user` is not telling anyone to run it, and a findings document quoting
+ * `appbay up --environment` is describing behaviour that was REMOVED — naming the old flag
+ * is the whole point of the sentence. Scanning them made this check exit 1 from the moment
+ * RFC-001 landed (measured at 8274ac1: 6 discrepancies, all in those two directories), which
+ * is worse than not running it: a check that is always red stops being read.
+ */
+const NOT_INSTRUCTIONS = new Set(["rfc", "history"]);
+
 /** Every markdown/qmd file that could instruct an operator. */
 function docFiles(dir, acc = []) {
   for (const entry of readdirSync(dir)) {
     if (entry === "_site" || entry === ".quarto" || entry === "node_modules" || entry === ".git") continue;
+    if (NOT_INSTRUCTIONS.has(entry) && statSync(join(dir, entry)).isDirectory()) continue;
     const p = join(dir, entry);
     if (statSync(p).isDirectory()) docFiles(p, acc);
     else if (/\.(md|qmd)$/.test(entry)) acc.push(p);
