@@ -173,9 +173,12 @@ for anything touching the runtime, a journey on both VMs.
     - **Depends**: —
 
 - [ ] 1. Namespace (§4) — first, while it is still a text edit
-  - [ ] 1.1 `namespace: z.string().optional()` replaces `project` + `environment`
-    - **Depends**: — · **Requirements**: 2.1
-  - [ ] 1.2 Collapse the pair-keyed sites and the generated-values key from 4-tuple to 3-tuple
+  - [x] 1.1 `namespace: z.string().optional()` replaces `project` + `environment`
+    - `ScopeSchema` and `AppbayYamlSchema`. Measured before: `parse({}).project === "default"`,
+      so `?? invocation` could never fire. Measured after: no-namespace manifest → invocation
+      wins; pinned manifest → manifest wins; neither → "default".
+    - **Depends**: — · **Requirements**: 2.1 · **Pillar**: MVP
+  - [x] 1.2 Collapse the pair-keyed sites and the generated-values key from 4-tuple to 3-tuple
     - Sites: `compile.ts:370,371,380,381,446,447,555,556`; `state.ts` `GeneratedValueKeySchema`
       and `ActiveAppEntrySchema`; `generated-values.ts` `generateHash` + `keyString`;
       `status.ts:49,50,67,68,86,87`; `list.ts:28,29,70,71`.
@@ -184,7 +187,11 @@ for anything touching the runtime, a journey on both VMs.
     - ⚠️ Do NOT touch `svc.environment` in `secrets.ts`, `scoped-env.ts` or
       `vault-service.ts`: that is Compose's service environment, which RFC §4 explicitly
       keeps.
-    - **Depends**: 1.1 · **Requirements**: 2.2
+    - Landed with 1.1 (one atomic change — the tree does not compile in between).
+      `CompilerContext.namespace`, `CompileOptions/CompileAppInput.namespace`,
+      `GeneratedValueKeySchema`, `ActiveAppEntrySchema`, `generateHash`, `keyString`,
+      `resolveMagicVars`. 12 test files plus 3 yaml fixtures updated.
+    - **Depends**: 1.1 · **Requirements**: 2.2 · **Pillar**: MVP · **Properties**: (new) 1
   - [ ] 1.2b 🚦 Decide the `${{project.KEY}}` → `${{namespace.KEY}}` vocabulary rename
     - 234 references across two catalog repos plus `system-apps/`. Needs an alias period in
       `scope-resolver.ts` (accept both, warn on the old) and a sweep of both catalogs, or an
@@ -250,6 +257,21 @@ for anything touching the runtime, a journey on both VMs.
 ## Notes
 
 Carried from S30 on its close. Nothing here is started.
+
+## Correctness Properties
+
+### Property 1: the invocation reaches the compiler
+- **Statement**: *For any* manifest that does not declare `namespace`, the value passed into
+  `compile()` is what the compiler uses; *for any* manifest that does, the manifest wins.
+- **Validates**: Requirement 2.1, 2.2
+- **Test approach**: `appbay-yaml.test.ts` asserts `namespace` is `undefined` and the key
+  absent on `parse({})` — a default there silently breaks every `--namespace` again.
+
+### Property 2: the namespace is load-bearing in generated values
+- **Statement**: *For any* two namespaces, the same app + variable yields different values.
+- **Validates**: the two-instances-in-one-home goal of §4
+- **Test approach**: `generated-values.test.ts` "different inputs" varies one component per
+  pair and asserts all four digests differ.
 
 ## Log
 
