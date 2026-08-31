@@ -53,7 +53,7 @@ The dashboard is your home screen. It provides an at-a-glance view of your entir
 
 Each app card on the dashboard shows:
 
-- App name and project
+- App name and namespace
 - Running/stopped status indicator
 - Service count and container health
 - Trait badges (ingress, gpu, auth, etc.)
@@ -72,9 +72,9 @@ The app detail screen shows everything about a specific app.
 
 **Traits panel** -- Shows all attached traits with their configuration. Service-level traits are grouped under their service. Conflict warnings are displayed if applicable.
 
-**Overlays panel** -- Shows all conditional overlays with their `when` clause and activation status. Active overlays are highlighted in green; inactive ones are grayed out.
+**Overlays panel** -- Shows all conditional overlays with their `when` clause and activation status. Active overlays are highlighted in green; inactive ones are grayed out. Activation is evaluated against the **installed** app set — the same question the compiler asks — so the panel and the rendered output always agree.
 
-**Config panel** -- Displays current configuration values with variable provenance (showing where each value comes from: service, environment, or project level).
+**Config panel** -- Displays current configuration values with variable provenance (showing where each value comes from).
 
 **Secrets panel** -- Lists secret URI references for the app with resolution status (resolved, missing, auto-generated).
 

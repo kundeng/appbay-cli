@@ -111,7 +111,13 @@ services:
           staging: false
 ```
 
-The `${{project.DOMAIN}}` reference resolves from `project.yaml` at compile time. To reference an environment-specific value, use `${{environment.KEY}}` instead.
+The `${{project.DOMAIN}}` reference resolves at compile time from the `domain:` line in
+`$APPBAY_HOME/project.yaml`.
+
+⚠️ It is the only scope reference that resolves. `${{environment.KEY}}` and
+`${{service.KEY}}` are accepted by the parser but nothing populates those maps, so they
+always fail — see [Scope Model](../reference/scope-model.qmd). For a per-deployment value,
+use a plain Compose `${VAR}` read from the app's `.env`.
 
 ### Ingress providers {#ingress-providers}
 
@@ -454,12 +460,13 @@ traits:
   - type: scoped-env
     vars:
       DOMAIN: ${{project.DOMAIN}}
-      TZ: ${{environment.TZ}}
-      DB_HOST: ${{environment.DB_HOST}}
       INSTANCE_ID: ${hash}
 ```
 
-The scope prefix determines which variable store is consulted: `${{project.KEY}}` looks up `project.yaml`, `${{environment.KEY}}` looks up `environment.yaml`, and `${{service.KEY}}` looks up service-level vars. See [Core Concepts](concepts.qmd) for details.
+The scope prefix selects which variable store is consulted. ⚠️ Only `project` has one:
+`${{project.DOMAIN}}` reads the `domain:` line from `$APPBAY_HOME/project.yaml`. The
+`environment` and `service` prefixes parse but resolve against empty maps, so a reference to
+either always fails — see [Scope Model](../reference/scope-model.qmd).
 
 ### Magic generators in scoped-env
 
