@@ -18,6 +18,18 @@ that says "measured" has a probe record in
 > **(e)** `project` + `environment` collapse into one `namespace`, which subsumes the
 > instancing work and is now §4 [F53].
 
+> **Scope notice (2026-08-31) — this RFC was measured against a subset.** Every finding here
+> was produced by reading `appbay-cli`, which is a strict *subset* of the private `appbay`
+> tree at identical paths: `public/apps/` holds only `cli`, while the private tree adds
+> `apps/web` — the tRPC server and UI — at ~50k lines. So each "zero callers" claim
+> established *no callers in this repo*, a weaker statement than the one the work items act on.
+>
+> Re-measured against the superset: **1.4** (`renderEdgeSecurityBlock`, `edgeSecretEnvMapping`)
+> and **§2** (`ProjectConfigSchema`, `EnvironmentConfigSchema`, the unjoined `"projects"`)
+> hold unchanged — zero hits in `apps/web` either. **1.1** and **5.1** do not; both carry a ⚠️
+> below. Deleting `hashControlPlanePassword` remains safe: `apps/web` hashes with its own
+> `server/auth.ts`, not that function.
+
 ---
 
 ## 1. Identity: four passwords, and the one that should not exist
@@ -76,7 +88,22 @@ into it.**
 - **1.1** Delete `apps/cli/src/commands/admin.ts`, `packages/core/src/schemas/control-plane-users.ts`,
   `hashControlPlanePassword`, the `passwordHash` column (`packages/db/src/schema.ts:112`,
   `packages/db/src/index.ts:142`), and the control-plane branch of `retired.ts`.
-- **1.2** Register the web UI as a normal catalog entry with the `auth` trait.
+
+  🚨 **The column is not dead — it has nine consumers, none of them in this repo.** Measured
+  against the private superset, `passwordHash` is read by `apps/web`'s sign-in itself
+  (`app/api/auth/[...all]/route.ts:152`, `verifyPassword(body.password,
+  authoritativeUser.passwordHash)`), by `server/auth.ts:169,174,184`, by
+  `server/control-plane-users.ts:62,103,110`, and by two test files. Dropping the column here
+  breaks web-UI login on the next `git merge upstream/main`, and the break surfaces in the
+  private tree with no diff in this one to point at.
+
+  Order this as a migration, not a deletion: land 1.4 so the edge can actually carry the
+  identity, cut `apps/web` over to it, *then* drop the column. The rest of 1.1 — `admin.ts`,
+  the schema module, `hashControlPlanePassword`, the `retired.ts` branch — has no `apps/web`
+  consumer and can go first.
+- **1.2** Register the web UI as a normal catalog entry with the `auth` trait. ⚠️ Not
+  executable in this repo: the web UI is `apps/web` in the private tree, so the manifest and
+  the cutover are authored there. What belongs here is the `auth` trait support it consumes.
 - **1.3** Rename `edge user` → `user` in `apps/cli/src/commands/edge.ts`; keep `edge` for proxy
   operations. Alias the old paths for one release.
 - **1.4** 🆕 **Wire `renderEdgeSecurityBlock`.** It is complete and unreachable. Give the edge a
@@ -367,6 +394,15 @@ manifest.
   Delete `discoverRunningApps()` and its four sites (`up.ts:62`, `apply.ts:32`, `compile.ts:66`,
   `eject.ts:129`). ⚠️ Sequence against 4.3, which makes the same function namespace-aware — if
   5.1 lands first, 4.3 disappears.
+
+  ⚠️ **Six sites, not four, and there are two implementations.** `apps/web` carries its own
+  `discoverRunningApps` at `server/docker-utils.ts:25` — its docblock says it "centralises" the
+  helper — feeding `activeApps` into the same compiler at `server/queue/workers/eject.ts:51`
+  and importing it at `server/routers/deployments.ts:20`. Changing `compile()`'s parameter
+  here without changing those leaves the private tree passing a running-set where an
+  installed-set is expected: a type error at the merge if the field is renamed, and a silently
+  wrong argument if it is not. Land both sides in one private commit, then cherry-pick the
+  public half.
 - **5.2** Make the set the *full* declared set, not the invocation's target set. This is what
   fixes (e), and it is the difference between `appbay up openwebui` and `appbay up` producing the
   same artifact. Needs a test.

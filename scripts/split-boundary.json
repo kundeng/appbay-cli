@@ -7,6 +7,13 @@
     "EP1: this is configuration, not a constant buried in a script. Adding a top-level",
     "directory means editing THIS file, not three call sites.",
     "",
+    "Why `specs/` is PUBLIC while `.kiro/` is PRIVATE, which looks inconsistent and is not:",
+    "they are two different sprint queues for two different scopes. `.kiro/specs/appbay-v1/`",
+    "is the private product's queue (the web UI, the desktop app, the journeys) and stays",
+    "private. `specs/` is the CLI's own queue \u2014 sprints whose work is entirely public-set, so",
+    "the sprint record must travel upstream with the code it governs. A CLI sprint recorded",
+    "only in the private tree would be invisible to the repo that actually holds the code.",
+    "",
     "Why it matters that a commit never touches both sets: the private repo is a fork of",
     "the public one, and public-set commits are sent upstream by cherry-pick. A commit",
     "spanning both cannot be cherry-picked without dragging private files with it.",
@@ -31,7 +38,8 @@
     "scripts/split-boundary.json",
     "scripts/check-straddle.mjs",
     "tools/",
-    "tests/"
+    "tests/",
+    "specs/"
   ],
   "private": [
     ".agents/",

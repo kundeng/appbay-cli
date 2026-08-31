@@ -19,7 +19,31 @@ overturned a plausible first answer, and the finding says which and why.
 |---|---|---|
 | `appbay-cli` | `origin` → `github.com/kundeng/appbay-cli` | the code. `v0.0.1-alpha.11` / `bd32116` is what the RFC's line numbers refer to |
 | `appbay-catalog` | `github.com/kundeng/appbay-catalog` | 150 app manifests. §3.7 and §6 touch it |
-| `appbay` | `github.com/kundeng/appbay` | ⚠️ a **stale** private fork — `v0.0.1-alpha.4`, last commit 2026-08-09, seven releases behind. Reconcile or retire it; do not treat it as current |
+| `appbay` | `github.com/kundeng/appbay` | the private **superset**, branch `master`. It holds `apps/web` — the tRPC server and UI — plus the specs and internal docs: 224 files and ~50k lines absent from public. HEAD `b9c0de8` (2026-08-24) already contains `bd32116` via merge `5ca5bd8` and is 3 commits ahead |
+
+> **Correction (2026-08-31).** This row previously read *"a **stale** private fork —
+> `v0.0.1-alpha.4`, last commit 2026-08-09, seven releases behind. Reconcile or retire it."*
+> Every part of that was wrong, and acting on it would have deleted the web UI. Measured:
+> HEAD is `b9c0de8` dated 2026-08-24, not 2026-08-09; its tags run to `v0.0.1-alpha.9` and
+> both trees' `apps/cli` are `0.1.0`; it already contains `v0.0.1-alpha.11`'s commit; and it
+> is ahead, not behind — `ac93cf9 fix(#69)` and the S29 records are only there.
+
+### What this repo cannot see
+
+`appbay-cli` is a strict **subset** of `appbay` at identical paths — that is what makes
+`git merge upstream/main` conflict-free, and it is why `scripts/split-boundary.json` exists.
+`public/apps/` contains exactly one directory, `cli`. So a `grep` run here that finds no
+callers has established *no callers in the subset*, which is not the same claim.
+
+Three of the RFC's zero-caller findings were re-measured against the superset and **hold**:
+`renderEdgeSecurityBlock`, `edgeSecretEnvMapping`, `ProjectConfigSchema` and
+`EnvironmentConfigSchema` have zero hits in `apps/web`, and `"projects"` is joined into a
+path in neither tree. Two do **not** — see the ⚠️ notes on work items **1.1** and **5.1**.
+
+Practical consequence: **author code fixes in the private superset and cherry-pick them
+here.** A change checked against `apps/web` before it ships cannot break the merge; one
+checked only here can. The boundary rule that makes this work is that a commit may not touch
+both sets (`CLAUDE.md:37` in the private tree).
 
 **Test fixtures** — the UOM stack that exercises this — live on the branch
 `pre-appbay-removal` of `github.com/kundeng/llm-stack`: `provision-appbay.yml` (the full
