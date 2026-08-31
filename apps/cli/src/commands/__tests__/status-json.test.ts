@@ -9,8 +9,8 @@
  *
  * appDetailToJson:
  *   - name, dir, composeFile (basename), hasAppbayYaml
- *   - project / environment default to "default" when appbayConfig is null
- *   - project / environment read from appbayConfig when present
+ *   - namespace defaults to "default" when appbayConfig is null
+ *   - namespace read from appbayConfig when present
  *   - services: empty when no services in composeContent
  *   - services: sorted list of service names from composeContent
  *   - traits: [] when appbayConfig is null
@@ -24,7 +24,7 @@
  *   - output keys exactly match expected shape
  *
  * appSummaryToJson:
- *   - name, project, environment, hasAppbayYaml (same logic as detail)
+ *   - name, namespace, hasAppbayYaml (same logic as detail)
  *   - services: count (number), not names
  *   - traits: count (number), not type strings
  *   - errors: count (number), not error objects
@@ -83,12 +83,8 @@ describe("appDetailToJson", () => {
 
   // ── appbayConfig null ─────────────────────────────────────────────────────
 
-  it("project defaults to 'default' when appbayConfig is null", () => {
-    expect(appDetailToJson(makeApp()).project).toBe("default");
-  });
-
-  it("environment defaults to 'default' when appbayConfig is null", () => {
-    expect(appDetailToJson(makeApp()).environment).toBe("default");
+  it("namespace defaults to 'default' when appbayConfig is null", () => {
+    expect(appDetailToJson(makeApp()).namespace).toBe("default");
   });
 
   it("hasAppbayYaml is false when appbayConfig is null", () => {
@@ -109,18 +105,11 @@ describe("appDetailToJson", () => {
 
   // ── appbayConfig present ──────────────────────────────────────────────────
 
-  it("reads project from appbayConfig", () => {
+  it("reads namespace from appbayConfig", () => {
     const result = appDetailToJson(
-      makeApp({ appbayConfig: { project: "acme", environment: "prod" } as never }),
+      makeApp({ appbayConfig: { namespace: "acme" } as never }),
     );
-    expect(result.project).toBe("acme");
-  });
-
-  it("reads environment from appbayConfig", () => {
-    const result = appDetailToJson(
-      makeApp({ appbayConfig: { project: "acme", environment: "prod" } as never }),
-    );
-    expect(result.environment).toBe("prod");
+    expect(result.namespace).toBe("acme");
   });
 
   it("hasAppbayYaml is true when appbayConfig is non-null", () => {
@@ -130,11 +119,11 @@ describe("appDetailToJson", () => {
     expect(result.hasAppbayYaml).toBe(true);
   });
 
-  it("project defaults to 'default' when appbayConfig.project is absent", () => {
+  it("namespace defaults to 'default' when appbayConfig.namespace is absent", () => {
     const result = appDetailToJson(
-      makeApp({ appbayConfig: { environment: "staging" } as never }),
+      makeApp({ appbayConfig: { collection: ["x"] } as never }),
     );
-    expect(result.project).toBe("default");
+    expect(result.namespace).toBe("default");
   });
 
   // ── Services ──────────────────────────────────────────────────────────────
@@ -267,8 +256,8 @@ describe("appDetailToJson", () => {
   it("output keys match the expected detail shape", () => {
     const keys = Object.keys(appDetailToJson(makeApp())).sort();
     expect(keys).toEqual([
-      "composeFile", "dir", "environment", "errors", "hasAppbayYaml",
-      "name", "overlays", "project", "services", "traits", "upstream",
+      "composeFile", "dir", "errors", "hasAppbayYaml",
+      "name", "namespace", "overlays", "services", "traits", "upstream",
     ]);
   });
 });
@@ -284,12 +273,8 @@ describe("appSummaryToJson", () => {
     expect(appSummaryToJson(makeApp({ name: "wiki" })).name).toBe("wiki");
   });
 
-  it("project defaults to 'default' when appbayConfig is null", () => {
-    expect(appSummaryToJson(makeApp()).project).toBe("default");
-  });
-
-  it("environment defaults to 'default' when appbayConfig is null", () => {
-    expect(appSummaryToJson(makeApp()).environment).toBe("default");
+  it("namespace defaults to 'default' when appbayConfig is null", () => {
+    expect(appSummaryToJson(makeApp()).namespace).toBe("default");
   });
 
   it("hasAppbayYaml is false when appbayConfig is null", () => {
@@ -356,7 +341,7 @@ describe("appSummaryToJson", () => {
   it("output keys match the expected summary shape", () => {
     const keys = Object.keys(appSummaryToJson(makeApp())).sort();
     expect(keys).toEqual([
-      "environment", "errors", "hasAppbayYaml", "name", "project", "services", "traits",
+      "errors", "hasAppbayYaml", "name", "namespace", "services", "traits",
     ]);
   });
 

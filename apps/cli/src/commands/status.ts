@@ -46,8 +46,7 @@ export function appDetailToJson(app: DiscoveredApp): Record<string, unknown> {
   return {
     name: app.name,
     dir: app.dir,
-    project: app.appbayConfig?.project ?? "default",
-    environment: app.appbayConfig?.environment ?? "default",
+    namespace: app.appbayConfig?.namespace ?? "default",
     hasAppbayYaml: app.appbayConfig !== null,
     composeFile: basename(app.composePath),
     services,
@@ -64,8 +63,7 @@ export function appDetailToJson(app: DiscoveredApp): Record<string, unknown> {
 export function appSummaryToJson(app: DiscoveredApp): Record<string, unknown> {
   return {
     name: app.name,
-    project: app.appbayConfig?.project ?? "default",
-    environment: app.appbayConfig?.environment ?? "default",
+    namespace: app.appbayConfig?.namespace ?? "default",
     hasAppbayYaml: app.appbayConfig !== null,
     services: extractServiceNames(app.composeContent).length,
     traits: app.appbayConfig?.traits?.length ?? 0,
@@ -83,8 +81,7 @@ function printAppDetail(app: DiscoveredApp): void {
 
   console.log(`App: ${app.name}`);
   console.log(`  Directory:   ${app.dir}`);
-  console.log(`  Project:     ${app.appbayConfig?.project ?? "default"}`);
-  console.log(`  Environment: ${app.appbayConfig?.environment ?? "default"}`);
+  console.log(`  Namespace:   ${app.appbayConfig?.namespace ?? "default"}`);
   console.log(`  Compose:     ${basename(app.composePath)}`);
   console.log(`  appbay.yaml: ${app.appbayConfig !== null ? "yes" : "no"}`);
 

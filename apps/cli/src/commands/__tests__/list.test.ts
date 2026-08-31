@@ -9,14 +9,11 @@
  *   - dir is copied verbatim
  *   - composeFile is the basename of composePath (not the full path)
  *   - errors is the count (number), not the error array itself
- *   - project falls back to "default" when appbayConfig is null
- *   - environment falls back to "default" when appbayConfig is null
+ *   - namespace falls back to "default" when appbayConfig is null
  *   - hasAppbayYaml is false when appbayConfig is null
- *   - project is read from appbayConfig.project when present
- *   - environment is read from appbayConfig.environment when present
+ *   - namespace is read from appbayConfig.namespace when present
  *   - hasAppbayYaml is true when appbayConfig is non-null
- *   - project falls back to "default" when appbayConfig.project is undefined
- *   - environment falls back to "default" when appbayConfig.environment is undefined
+ *   - namespace falls back to "default" when appbayConfig.namespace is undefined
  *   - errors count reflects the length of the errors array
  *   - output object has exactly the expected keys (no extras)
  */
@@ -78,14 +75,9 @@ describe("appToJson", () => {
 
   // ── No appbay.yaml (appbayConfig === null) ────────────────────────────────
 
-  it("project defaults to 'default' when appbayConfig is null", () => {
+  it("namespace defaults to 'default' when appbayConfig is null", () => {
     const result = appToJson(makeApp({ appbayConfig: null }));
-    expect(result.project).toBe("default");
-  });
-
-  it("environment defaults to 'default' when appbayConfig is null", () => {
-    const result = appToJson(makeApp({ appbayConfig: null }));
-    expect(result.environment).toBe("default");
+    expect(result.namespace).toBe("default");
   });
 
   it("hasAppbayYaml is false when appbayConfig is null", () => {
@@ -95,44 +87,28 @@ describe("appToJson", () => {
 
   // ── With appbay.yaml present ──────────────────────────────────────────────
 
-  it("reads project from appbayConfig when present", () => {
+  it("reads namespace from appbayConfig when present", () => {
     const result = appToJson(
       makeApp({
-        appbayConfig: { project: "acme", environment: "prod" } as never,
+        appbayConfig: { namespace: "acme" } as never,
       }),
     );
-    expect(result.project).toBe("acme");
-  });
-
-  it("reads environment from appbayConfig when present", () => {
-    const result = appToJson(
-      makeApp({
-        appbayConfig: { project: "acme", environment: "prod" } as never,
-      }),
-    );
-    expect(result.environment).toBe("prod");
+    expect(result.namespace).toBe("acme");
   });
 
   it("hasAppbayYaml is true when appbayConfig is non-null", () => {
     const result = appToJson(
-      makeApp({ appbayConfig: { project: "x" } as never }),
+      makeApp({ appbayConfig: { namespace: "x" } as never }),
     );
     expect(result.hasAppbayYaml).toBe(true);
   });
 
-  it("project defaults to 'default' when appbayConfig.project is undefined", () => {
+  it("namespace defaults to 'default' when appbayConfig.namespace is undefined", () => {
     const result = appToJson(
-      // appbayConfig exists but has no project key
-      makeApp({ appbayConfig: { environment: "staging" } as never }),
+      // appbayConfig exists but has no namespace key
+      makeApp({ appbayConfig: { collection: ["x"] } as never }),
     );
-    expect(result.project).toBe("default");
-  });
-
-  it("environment defaults to 'default' when appbayConfig.environment is undefined", () => {
-    const result = appToJson(
-      makeApp({ appbayConfig: { project: "demo" } as never }),
-    );
-    expect(result.environment).toBe("default");
+    expect(result.namespace).toBe("default");
   });
 
   // ── Errors count ──────────────────────────────────────────────────────────
@@ -165,7 +141,7 @@ describe("appToJson", () => {
     const result = appToJson(makeApp());
     const keys = Object.keys(result).sort();
     expect(keys).toEqual(
-      ["composeFile", "dir", "environment", "errors", "hasAppbayYaml", "name", "project"],
+      ["composeFile", "dir", "errors", "hasAppbayYaml", "name", "namespace"],
     );
   });
 

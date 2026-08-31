@@ -25,8 +25,7 @@ import { pad } from "../utils/formatting.js";
 export function appToJson(app: DiscoveredApp): Record<string, unknown> {
   return {
     name: app.name,
-    project: app.appbayConfig?.project ?? "default",
-    environment: app.appbayConfig?.environment ?? "default",
+    namespace: app.appbayConfig?.namespace ?? "default",
     hasAppbayYaml: app.appbayConfig !== null,
     composeFile: basename(app.composePath),
     dir: app.dir,
@@ -67,26 +66,24 @@ export const listCommand = new Command("list")
 
     // Table output mode.
     const nameWidth = Math.max(14, ...targets.map((a) => a.name.length + 1));
-    const projectWidth = Math.max(10, ...targets.map((a) => (a.appbayConfig?.project ?? "default").length + 1));
-    const envWidth = Math.max(12, ...targets.map((a) => (a.appbayConfig?.environment ?? "default").length + 1));
+    const namespaceWidth = Math.max(10, ...targets.map((a) => (a.appbayConfig?.namespace ?? "default").length + 1));
 
     // Header.
     console.log(
-      `  ${pad("NAME", nameWidth)} ${pad("PROJECT", projectWidth)} ${pad("ENVIRONMENT", envWidth)} ${"APPBAY.YAML"}  ${"COMPOSE FILE"}`,
+      `  ${pad("NAME", nameWidth)} ${pad("NAMESPACE", namespaceWidth)} ${"APPBAY.YAML"}  ${"COMPOSE FILE"}`,
     );
     console.log(
-      `  ${pad("----", nameWidth)} ${pad("-------", projectWidth)} ${pad("-----------", envWidth)} ${"----------"}   ${"------------"}`,
+      `  ${pad("----", nameWidth)} ${pad("---------", namespaceWidth)} ${"----------"}   ${"------------"}`,
     );
 
     for (const app of targets) {
-      const project = app.appbayConfig?.project ?? "default";
-      const env = app.appbayConfig?.environment ?? "default";
+      const namespace = app.appbayConfig?.namespace ?? "default";
       const hasConfig = app.appbayConfig !== null ? "yes" : "no";
       const composeFile = basename(app.composePath);
       const errorSuffix = app.errors.length > 0 ? `  (${app.errors.length} error(s))` : "";
 
       console.log(
-        `  ${pad(app.name, nameWidth)} ${pad(project, projectWidth)} ${pad(env, envWidth)} ${pad(hasConfig, 12)} ${composeFile}${errorSuffix}`,
+        `  ${pad(app.name, nameWidth)} ${pad(namespace, namespaceWidth)} ${pad(hasConfig, 12)} ${composeFile}${errorSuffix}`,
       );
     }
 
