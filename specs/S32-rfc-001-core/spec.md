@@ -1,14 +1,15 @@
 ---
 spec_id: S32-rfc-001-core
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: FORK-FORWARD
 since: 2026-08-31
+closed: 2026-08-31
 activated: 2026-08-31
 until: null
 epic: security
 features: [namespace-axis, system-home-consolidation, identity-collapse, when-semantics]
 supersedes: []
-superseded_by: null
+superseded_by: S33-systemd-unit-and-tier2
 depends_on: [S30-rfc-001-consolidation]
 anchors: [data-architecture]
 ---
@@ -305,7 +306,8 @@ for anything touching the runtime, a journey on both VMs.
     - **Depends**: 1.1 · **Pillar**: MVP, Test
 
 - [x] 2. System home (§2)
-  - [x] 2.1 Move the instance config to `etc/system.yaml` (merge with SystemConfig deferred)
+  - [x] 2.1 Move the instance config to `etc/system.yaml`
+        · [>] → S33-systemd-unit-and-tier2 (the `SystemConfig` merge, and 2.7's deletion)
     - One reader, `readInstanceConfigText()`, prefers `etc/system.yaml` and falls back to
       `project.yaml`; nine read sites route through it. `init` MOVES an existing legacy file
       rather than writing a second beside it — the reader prefers the new path, so leaving
@@ -784,3 +786,59 @@ surfaced: checking the build against the design first is what made the doc gap l
 
 **2026-08-31** — Created DRAFT as S30's deferral carrier. Numbered 32 because S31 is the
 private queue's `S31-alpha-remainder` and the two queues share one number sequence.
+
+---
+
+# 4 · Close-out — RFC-001 audited item by item
+
+Closed **FORK-FORWARD** 2026-08-31. Every task in this spec is done; the leftover is the half of
+RFC 2.1 that could not land, carried to `S33-systemd-unit-and-tier2`.
+
+⚠️ This table was built by checking the RFC against the CODE, not against the task list above —
+which is how §3.6 and §4.7 were found. Neither was ever a task here.
+
+| RFC | item | state |
+|---|---|---|
+| 1.1 | delete `admin.ts`, schema module, hasher, `passwordHash` | ✅ task 5.3 |
+| 1.2 | web UI behind the edge with `auth` | ✅ task 5.1c — as a generated edge route rather than a catalog entry; the manifest form would need the control plane to deploy itself |
+| 1.3 | `edge user` → `user`, aliased | ✅ shipped earlier — `appbay user` exists |
+| 1.4 | wire `renderEdgeSecurityBlock` | ✅ tasks 5.1a/5.1b — the renderer was *incomplete*, not merely unreachable |
+| 1.5 | import `users.yaml` | ✅ task 5.4 |
+| 2.1 | merge `InstanceConfigSchema` + `SystemConfig` | ⚠️ **half** — the instance config moved to `etc/system.yaml`; the `SystemConfig` merge is `[>] → S33` |
+| 2.2 | one `resolveMasterPassword()` | ✅ task 2.2 |
+| 2.3 | fold `secrets init` into `init` | ✅ task 2.3 |
+| 2.4 | assert `home` against the resolved path | ✅ task 2.4 |
+| 2.5 | per-vault salt + format version | ✅ task 6.1 |
+| 2.6 | doc comment | — withdrawn by the RFC itself |
+| 2.7 | delete `/etc/appbay/config` | `[>] → S33` — the RFC itself says "after the systemd unit exports `APPBAY_HOME`", and the unit is not written |
+| 3.1 | argv containment | ✅ S30 |
+| 3.2 | narrow the `provider:` enum | ✅ task 3.1 |
+| 3.3 | route `*-kdbx` through the neutral path | ✅ task 3.2 |
+| 3.4 | extract the scope/key split | ✅ task 3.3 |
+| 3.5 | confirm full CRUD survives | ✅ task 3.5 |
+| 3.6 | `.env.local` umask window | ✅ **found in this audit** — `writeFile` then `chmod` left it at 666 under umask 000 |
+| 3.7 | sweep `keepass://` from the catalog | — measured no-op: 0 uses |
+| 3.8 | `vault.ts` comment | ✅ task 3.4 |
+| 4.1 | `namespace:` replaces the pair | ✅ task 1.1 |
+| 4.2 | collapse the pair-keyed sites | ✅ task 1.2 |
+| 4.3 | namespace-aware running-app discovery | ✅ task 1.3b |
+| 4.4 | namespace into container/network identity | ✅ task 1.3 |
+| 4.5 | `dnsSafe(namespace)` | ✅ task 1.3 |
+| 4.6 | `${{namespace.KEY}}` value loader | 🚦 **decided against** — task 1.2b. `namespace:` is a label with no store; `${{project.KEY}}` reads the per-host config. Different concepts that shared a word |
+| 4.7 | `install --as <name>` | ✅ **found in this audit** |
+| 4.8 | fix the bogus suggestion text | ✅ task 1.x — the remaining greps are the comment recording the fix |
+| 5.1–5.6 | `when` means installed | ✅ section 4 |
+| 6.1–6.2, 6.4–6.7 | catalog sourcing | ✅ S30 |
+| 6.3 | extract the UOM stack to its own repo | — a different repository; out of scope here |
+
+## What a reader should not take on trust
+
+- **§1's cutover rests on a closed port, not on cryptography.** The owner chose header trust
+  over JWT verification (2026-08-31). It is sound because `server start` sets
+  `APPBAY_EDGE_AUTH=1` only when it also bound the port to loopback — one decision, one place.
+  Reopen the port with `APPBAY_BIND=0.0.0.0` and edge auth turns off with it, by construction.
+- **An installation not behind the Caddy edge can no longer reach the web UI at all.** There is
+  no password left to fall back on. That is the cost of the full cutover and it is stated in the
+  UI, in the quickstart, and in the compose deploy guide.
+- **Existing vaults are v1 and stay v1 until written.** The read path for the old format is
+  load-bearing; deleting it would surface as "Wrong vault password" on intact files.
