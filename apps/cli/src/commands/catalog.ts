@@ -7,7 +7,11 @@ import {
   catalogUpdateSource,
   catalogListSources,
 } from "@appbay/core";
-import type { DiscoveredCatalogEntry, CatalogOverride } from "@appbay/core";
+import type {
+  DiscoveredCatalogEntry,
+  CatalogOverride,
+  CatalogNearDuplicate,
+} from "@appbay/core";
 
 export const catalogCommand = new Command("catalog")
   .description("Browse and manage the app catalog");
@@ -29,6 +33,23 @@ function reportOverrides(overrides: CatalogOverride[]): void {
   }
 }
 
+/**
+ * Print names that differ only by punctuation or case.
+ *
+ * Both entries resolve, so nothing is lost and this is not an error — but `open-webui` and
+ * `openwebui` are the same software with different definitions, and an operator who types
+ * the wrong one installs the other silently. RFC-001 §6.7.
+ */
+function reportNearDuplicates(nearDuplicates: CatalogNearDuplicate[]): void {
+  for (const d of nearDuplicates) {
+    const listed = d.entries.map((e) => `"${e.name}" (${e.source})`).join(" and ");
+    console.error(
+      `  ambiguous: ${listed} differ only by punctuation or case. Both install; ` +
+        `they are not the same definition. Directories: ${d.entries.map((e) => e.dir).join(", ")}`,
+    );
+  }
+}
+
 catalogCommand
   .command("list")
   .description("List all catalog entries")
@@ -44,12 +65,13 @@ catalogCommand
       category?: string;
     }) => {
       const home = resolveAppbayHome();
-      const { entries, errors, overrides } = await discoverCatalog(home);
+      const { entries, errors, overrides, nearDuplicates } = await discoverCatalog(home);
 
       for (const err of errors) {
         console.error(`  warning: ${err.dir}: ${err.message}`);
       }
       reportOverrides(overrides);
+      reportNearDuplicates(nearDuplicates);
 
       let filtered = entries;
       if (options.source) {
@@ -106,12 +128,13 @@ catalogCommand
   .option("--json", "output as JSON")
   .action(async (query: string, options: { json?: boolean }) => {
     const home = resolveAppbayHome();
-    const { entries, errors, overrides } = await discoverCatalog(home);
+    const { entries, errors, overrides, nearDuplicates } = await discoverCatalog(home);
 
     for (const err of errors) {
       console.error(`  warning: ${err.dir}: ${err.message}`);
     }
     reportOverrides(overrides);
+    reportNearDuplicates(nearDuplicates);
 
     const q = query.toLowerCase();
     const matches = entries.filter(

@@ -41,11 +41,37 @@ export interface CatalogOverride {
   shadowedDir: string;
 }
 
+/**
+ * Two entries whose names differ only by hyphens, underscores or case — `open-webui` and
+ * `openwebui`. Not a collision (both resolve, neither is lost), so it is neither an error nor
+ * an override; it is an ambiguity the operator should know about, because typing the wrong
+ * one silently installs a different definition of the same software.
+ */
+export interface CatalogNearDuplicate {
+  /** The shared normalized key, e.g. `openwebui`. */
+  normalized: string;
+  entries: Array<{ name: string; source: string; dir: string }>;
+}
+
 export interface CatalogDiscoveryResult {
   entries: DiscoveredCatalogEntry[];
   errors: CatalogDiscoveryError[];
   /** Names where an added source overrode `bundled`. Empty on a stock install. */
   overrides: CatalogOverride[];
+  /** Names that differ only by punctuation or case. See {@link CatalogNearDuplicate}. */
+  nearDuplicates: CatalogNearDuplicate[];
+}
+
+/**
+ * Fold a catalog name to the key used for near-duplicate detection.
+ *
+ * Deliberately narrow — case plus `-`/`_` only, no stemming or edit distance. Measured over
+ * all 155 entries in the shipped catalog plus the UOM stack, this rule produces exactly ONE
+ * group (`open-webui` / `openwebui`), which is the real case RFC-001 §6.7 names. A looser
+ * rule would fire across a 150-app catalog and the warning would be ignored.
+ */
+function normalizeCatalogName(name: string): string {
+  return name.toLowerCase().replace(/[-_]/g, "");
 }
 
 export async function discoverCatalog(
@@ -142,7 +168,26 @@ export async function discoverCatalog(
   const deduped = Array.from(seen.values());
   deduped.sort((a, b) => a.name.localeCompare(b.name));
 
-  return { entries: deduped, errors, overrides };
+  // RFC-001 §6.7. Run AFTER dedup, so a name that lost a collision is not also reported as a
+  // near-duplicate of the winner — that would be one confusing event described twice.
+  const byNormalized = new Map<string, DiscoveredCatalogEntry[]>();
+  for (const entry of deduped) {
+    const key = normalizeCatalogName(entry.name);
+    const bucket = byNormalized.get(key);
+    if (bucket) bucket.push(entry);
+    else byNormalized.set(key, [entry]);
+  }
+
+  const nearDuplicates: CatalogNearDuplicate[] = [];
+  for (const [normalized, bucket] of byNormalized) {
+    if (new Set(bucket.map((e) => e.name)).size < 2) continue;
+    nearDuplicates.push({
+      normalized,
+      entries: bucket.map((e) => ({ name: e.name, source: e.source, dir: e.dir })),
+    });
+  }
+
+  return { entries: deduped, errors, overrides, nearDuplicates };
 }
 
 async function scanCatalogSource(

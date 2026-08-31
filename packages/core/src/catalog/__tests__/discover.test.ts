@@ -148,6 +148,51 @@ describe("discoverCatalog", () => {
     });
   });
 
+  describe("near-duplicate names (§6.7)", () => {
+    it("flags names that differ only by punctuation or case, without dropping either", async () => {
+      const home = await freshHome();
+      await addEntry(home, "bundled", "open-webui", "open-webui", "upstream's");
+      await addEntry(home, join("sources", "uom-ai-stack"), "openwebui", "openwebui", "the UOM one");
+
+      const { entries, errors, overrides, nearDuplicates } = await discoverCatalog(home);
+
+      // Both still install — this is an ambiguity, not a collision.
+      expect(entries.map((e) => e.name).sort()).toEqual(["open-webui", "openwebui"]);
+      expect(errors).toEqual([]);
+      expect(overrides).toEqual([]);
+
+      expect(nearDuplicates).toHaveLength(1);
+      expect(nearDuplicates[0]!.normalized).toBe("openwebui");
+      expect(nearDuplicates[0]!.entries.map((e) => e.name).sort()).toEqual([
+        "open-webui",
+        "openwebui",
+      ]);
+      expect(nearDuplicates[0]!.entries.map((e) => e.source).sort()).toEqual([
+        "bundled",
+        "uom-ai-stack",
+      ]);
+    });
+
+    it("does not flag an exact-name override — that is one event, not two", async () => {
+      const home = await freshHome();
+      await addEntry(home, "bundled", "litellm", "litellm");
+      await addEntry(home, join("sources", "uom-ai-stack"), "litellm", "litellm");
+
+      const { overrides, nearDuplicates } = await discoverCatalog(home);
+      expect(overrides).toHaveLength(1);
+      expect(nearDuplicates).toEqual([]);
+    });
+
+    it("stays quiet on ordinary distinct names", async () => {
+      const home = await freshHome();
+      await addEntry(home, "bundled", "grafana", "grafana");
+      await addEntry(home, "bundled", "prometheus", "prometheus");
+
+      const { nearDuplicates } = await discoverCatalog(home);
+      expect(nearDuplicates).toEqual([]);
+    });
+  });
+
   it("reports an unparseable catalog.yaml without dropping the rest", async () => {
     const home = await freshHome();
     await addEntry(home, "bundled", "good", "good");

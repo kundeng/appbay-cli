@@ -5,4 +5,5 @@ export {
   type CatalogDiscoveryError,
   type CatalogDiscoveryResult,
   type CatalogOverride,
+  type CatalogNearDuplicate,
 } from "./discover.js";
