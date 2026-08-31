@@ -12,6 +12,8 @@
 
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+// Config files are small and read on paths already synchronous elsewhere in core.
+import { readFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, copyFile, unlink } from "node:fs/promises";
 import {
   compile,
@@ -322,9 +324,9 @@ export interface DeployOptions {
  * Load project.yaml from APPBAY_HOME and return project-level variables.
  */
 export async function loadProjectVars(appbayHome: string): Promise<Record<string, string>> {
-  const configPath = join(appbayHome, "project.yaml");
   try {
-    const text = await readFile(configPath, "utf-8");
+    const text =
+      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
     const vars: Record<string, string> = {};
     const domainMatch = text.match(/^domain:\s*(.+)$/m);
     if (domainMatch?.[1]?.trim()) {
@@ -513,6 +515,7 @@ function describeCaddyFailure(
 // ---------------------------------------------------------------------------
 
 import type { ShepherdAction, ShepherdPhase } from "../traits/types.js";
+import { readInstanceConfigText } from "../schemas/instance.js";
 
 interface ShepherdRunResult {
   ran: number;

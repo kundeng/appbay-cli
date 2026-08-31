@@ -240,3 +240,43 @@ export function checkHomeAssertion(
   const norm = (p: string) => p.replace(/\/+$/, "");
   return norm(recorded) === norm(resolvedHome) ? null : { recorded, resolved: resolvedHome };
 }
+
+// ---------------------------------------------------------------------------
+// Config file location — RFC-001 §2.1
+// ---------------------------------------------------------------------------
+
+/** Where the instance config lives from RFC-001 §2 onward, relative to APPBAY_HOME. */
+export const SYSTEM_CONFIG_REL = "etc/system.yaml";
+
+/** Pre-§2 location, read for one release so an existing install survives the upgrade. */
+export const LEGACY_INSTANCE_CONFIG_REL = "project.yaml";
+
+/**
+ * Read the instance config, preferring `etc/system.yaml` and falling back to `project.yaml`.
+ *
+ * 🚨 THE FILENAME COLLISION IS THE POINT. `$APPBAY_HOME/project.yaml` and
+ * `etc/projects/<name>/project.yaml` are two different files with two different schemas and
+ * the same name — `instance.ts` carries a warning block about it — and the root one holds
+ * `domain`, `container_runtime`, `ingress_provider` and friends, none of which is
+ * project-scoped. Moving it to `etc/system.yaml` ends the collision and says what the file
+ * actually is.
+ *
+ * ⚠️ The fallback is a MIGRATION SHIM, due out one release later, exactly like the legacy
+ * password paths in `secrets/master-password.ts`. An install that has not been re-inited
+ * keeps working; `appbay init` writes the new location and removes the old one.
+ *
+ * @returns the file's text, or null when neither exists.
+ */
+export function readInstanceConfigText(
+  appbayHome: string,
+  readFile: (path: string) => string,
+): string | null {
+  for (const rel of [SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL]) {
+    try {
+      return readFile(`${appbayHome}/${rel}`);
+    } catch {
+      // Try the next location.
+    }
+  }
+  return null;
+}

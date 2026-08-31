@@ -19,7 +19,7 @@ import { join, dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import { mkdir, stat, writeFile, readFile, rename } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { statSync, readFileSync } from "node:fs";
+import { existsSync, statSync, readFileSync } from "node:fs";
 import {
   SYSTEM_APPS,
   ContainerRuntimeSchema,
@@ -36,6 +36,9 @@ import {
   type ContainerRuntime,
   inspectEdgePorts,
   catalogAddSource,
+  readInstanceConfigText,
+  SYSTEM_CONFIG_REL,
+  LEGACY_INSTANCE_CONFIG_REL,
   persistMasterPassword,
   hasMasterPassword,
   MASTER_PASSWORD_REL,
@@ -125,7 +128,7 @@ function resolveRuntimeSocketGid(): number | null {
  */
 function resolveControlPlaneSelinux(appbayHome: string): "confined" | "unconfined" {
   try {
-    const raw = readFileSync(join(appbayHome, "project.yaml"), "utf-8");
+    const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
     const cfg = parseInstanceConfig(raw);
     return cfg.control_plane_selinux === "unconfined" ? "unconfined" : "confined";
   } catch {
@@ -464,8 +467,21 @@ async function writeProjectConfig(
   ingressProvider?: IngressProvider,
   acmeDnsProvider?: AcmeDnsProvider,
 ): Promise<boolean> {
-  const configPath = join(appbayHome, "project.yaml");
+  // RFC-001 §2.1: written to etc/system.yaml. `project.yaml` shared a filename with
+  // `etc/projects/<name>/project.yaml` — a different file with a different schema — while
+  // holding domain, container_runtime and ingress_provider, none of which is project-scoped.
+  const configPath = join(appbayHome, SYSTEM_CONFIG_REL);
+  const legacyPath = join(appbayHome, LEGACY_INSTANCE_CONFIG_REL);
   if (await fileExists(configPath)) {
+    return false;
+  }
+  // An install that predates §2.1 already has the legacy file. Move it rather than writing a
+  // second config beside it: two files with overlapping fields is exactly the confusion this
+  // change removes, and the reader prefers the new path, so leaving both would make the old
+  // one silently dead.
+  if (await fileExists(legacyPath)) {
+    await mkdir(join(appbayHome, "etc"), { recursive: true });
+    await rename(legacyPath, configPath);
     return false;
   }
   // ⚠️ `home` is ABSOLUTE and asserted — RFC-001 §2.4. It records where this tree believes it
@@ -579,7 +595,13 @@ async function upsertInstanceKey(
   value: string,
   defaultValue: string,
 ): Promise<"created" | "updated" | "unchanged"> {
-  const configPath = join(appbayHome, "project.yaml");
+  // ⚠️ Edit the config WHERE IT IS. Hardcoding the §2.1 path would create a second file
+  // beside a legacy `project.yaml` on an install that has not been re-inited — and since the
+  // reader prefers the new location, the legacy file would go silently dead while still
+  // holding the operator's settings.
+  const newPath = join(appbayHome, SYSTEM_CONFIG_REL);
+  const legacyPath = join(appbayHome, LEGACY_INSTANCE_CONFIG_REL);
+  const configPath = existsSync(newPath) ? newPath : legacyPath;
   const text = await readFile(configPath, "utf-8");
 
   const current = parseInstanceConfig(text)[key];

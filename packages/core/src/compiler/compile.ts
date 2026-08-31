@@ -43,6 +43,7 @@ import { containerBin, resolveIngressProvider } from "../runtime/container-runti
 import { readFileSync } from "node:fs";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
+import { readInstanceConfigText } from "../schemas/instance.js";
 
 /**
  * What an operator can actually do about an unresolved `${{scope.KEY}}` reference.
@@ -1032,7 +1033,7 @@ async function resolveMagicVars(
 function instanceConfigFor(appbayHome: string): Record<string, unknown> {
   try {
     return parseInstanceConfig(
-      readFileSync(join(appbayHome, "project.yaml"), "utf-8"),
+      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "",
     ) as Record<string, unknown>;
   } catch {
     return {};

@@ -23,6 +23,7 @@ import {
   type AcmeDnsProvider,
 } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
+import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -306,7 +307,14 @@ function showSetupStatus(): void {
       detail: "config/security/users.json",
     }] : []),
     { name: "Server compose", ok: existsSync(join(appbayHome, "docker-compose.server.yml")), detail: "docker-compose.server.yml" },
-    { name: "Project config", ok: existsSync(join(appbayHome, "project.yaml")), detail: "project.yaml" },
+    {
+      name: "Instance config",
+      // Either location counts — an install that predates RFC-001 §2.1 is still configured.
+      ok:
+        existsSync(join(appbayHome, SYSTEM_CONFIG_REL)) ||
+        existsSync(join(appbayHome, LEGACY_INSTANCE_CONFIG_REL)),
+      detail: SYSTEM_CONFIG_REL,
+    },
   ];
 
   for (const c of checks) {

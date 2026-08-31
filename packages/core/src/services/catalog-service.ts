@@ -1,9 +1,12 @@
 import { readdir, readFile, stat, mkdir, cp, rm, writeFile, chmod } from "node:fs/promises";
+// Config files are small and read on paths that are already synchronous elsewhere in core.
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { discoverCatalog, type DiscoveredCatalogEntry } from "../catalog/discover.js";
 import type { CatalogEntry, RequiredInput } from "../schemas/catalog.js";
+import { readInstanceConfigText } from "../schemas/instance.js";
 
 export interface InstallOptions {
   appbayHome: string;
@@ -494,7 +497,8 @@ export async function catalogListSources(
 async function loadProjectVars(home: string): Promise<Record<string, string>> {
   const vars: Record<string, string> = {};
   try {
-    const raw = await readFile(join(home, "project.yaml"), "utf-8");
+    const raw =
+      readInstanceConfigText(home, (p) => readFileSync(p, "utf-8")) ?? "";
     const parsed = parseYaml(raw);
     if (parsed && typeof parsed === "object") {
       for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {

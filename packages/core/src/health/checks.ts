@@ -27,6 +27,7 @@ import {
   resolveIngressProvider,
 } from "../runtime/container-runtime.js";
 import { parseInstanceConfig } from "../schemas/instance.js";
+import { readInstanceConfigText } from "../schemas/instance.js";
 
 /**
  * Try to execute a binary. Returns trimmed stdout on success, null on failure.
@@ -248,7 +249,7 @@ export function checkStoreBinding(appbayHome: string): HealthCheckResult {
   let recorded: string | undefined;
   try {
     recorded = parseInstanceConfig(
-      readFileSync(join(appbayHome, "project.yaml"), "utf-8"),
+      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "",
     ).container_store;
   } catch {
     // No project.yaml at all — an uninitialised install. `appbay-home` reports that.

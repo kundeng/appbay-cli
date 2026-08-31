@@ -38,6 +38,7 @@ import {
   type IngressProvider,
   type InstanceConfig,
 } from "../schemas/instance.js";
+import { readInstanceConfigText } from "../schemas/instance.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
 // Both barrels (schemas/index.ts and this file) are pulled into the package root
@@ -68,7 +69,9 @@ function instanceConfig(appbayHome?: string): InstanceConfig {
 
   let config: InstanceConfig = {};
   try {
-    config = parseInstanceConfig(readFileSync(join(home, "project.yaml"), "utf-8"));
+    config = parseInstanceConfig(
+      readInstanceConfigText(home, (p) => readFileSync(p, "utf-8")) ?? "",
+    );
   } catch {
     // No project.yaml — an uninitialised install, or a command that runs before init.
     // Default rather than fail: `appbay doctor` must still be able to say what is missing.

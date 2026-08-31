@@ -40,7 +40,7 @@ import {
   CONFIG_FILE,
   type HomeTier,
 } from "../utils/appbay-home.js";
-import { checkHomeAssertion, type HomeMismatch } from "@appbay/core";
+import { checkHomeAssertion, readInstanceConfigText, type HomeMismatch } from "@appbay/core";
 
 /** Label shown per tier in `--explain`, in resolution order. */
 const TIER_LABEL: Record<string, string> = {
@@ -64,7 +64,10 @@ function looksScaffolded(path: string): boolean {
 /** The recorded-vs-resolved home disagreement for a tree, or null. RFC-001 §2.4. */
 function homeMismatchFor(path: string): HomeMismatch | null {
   try {
-    return checkHomeAssertion(path, readFileSync(resolve(path, "project.yaml"), "utf-8"));
+    return checkHomeAssertion(
+      path,
+      readInstanceConfigText(path, (p) => readFileSync(p, "utf-8")),
+    );
   } catch {
     return null; // no config to compare against — not a disagreement
   }
