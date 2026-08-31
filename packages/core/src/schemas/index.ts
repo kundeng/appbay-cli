@@ -143,15 +143,6 @@ export {
   LEGACY_INSTANCE_CONFIG_REL,
 } from "./instance.js";
 
-export {
-  ControlPlaneUserStatusSchema,
-  type ControlPlaneUserStatus,
-  ControlPlanePasswordHashSchema,
-  ControlPlaneUserSchema,
-  type ControlPlaneUser,
-  ControlPlaneUsersDocumentSchema,
-  type ControlPlaneUsersDocument,
-} from "./control-plane-users.js";
 
 export {
   EdgeRoleSchema,

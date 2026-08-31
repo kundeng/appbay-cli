@@ -322,11 +322,12 @@ broken role matching and is not.
 :::
 
 ::: {.callout-note}
-## Edge users are not AppBay accounts
+## Edge users sign in to AppBay too
 The people who sign in to your deployed apps are **edge users**, managed with
-`appbay edge users`. They are a separate credential domain from the account you use to sign
-in to AppBay itself (`appbay admin`) and from the vault password. See
-[The Three Credentials](credentials.qmd).
+`appbay edge users` — and since RFC-001 §1 they are also the accounts that sign in to AppBay
+itself, which is a stack behind the same edge. Reaching the control plane additionally requires
+the `authp/admin` role. The vault's master password stays a separate credential. See
+[Credentials](credentials.qmd).
 :::
 
 ### Verifying it actually restricts

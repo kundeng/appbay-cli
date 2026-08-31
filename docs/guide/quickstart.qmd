@@ -417,22 +417,28 @@ The web UI provides a dashboard, deploy planner, log viewer, config editor, and 
 appbay server start
 ```
 
-Open your browser to [http://localhost:3000](http://localhost:3000).
+`server start` writes the edge's route to the control plane and binds port 3000 to loopback in
+the same step, so the way in is `https://appbay.<your-domain>` — the same Caddy Security portal
+that guards your apps.
 
-The first time you open it, the control plane asks you to **create an administrator** —
-username, password, confirm. This is a first-run setup screen, not a login.
+Sign in with the **edge** administrator `appbay setup` printed. There is no second account and
+no first-run setup screen.
 
 ::: {.callout-important}
-## The web administrator is not the one `appbay setup` printed
+## It is the account `appbay setup` printed
 
-`appbay setup` creates the **edge** administrator — Caddy Security's bootstrap user, which
-guards the apps behind the reverse proxy. The account you create here is the **control-plane**
-administrator, stored separately in `$APPBAY_HOME/etc/control-plane/users.yaml` (mode 0600).
+This used to be a different credential: a **control-plane** administrator in
+`$APPBAY_HOME/etc/control-plane/users.yaml`, created on a first-run screen, deliberately never
+synchronised with the edge. RFC-001 §1 removed it — the UI is a stack behind the edge like any
+other, so the edge account is the account.
 
-These are two of Appbay's three credential domains — control plane, edge, and the secret vault
-— and they are deliberately never synchronised. Resetting one does not touch the others.
-Signing in here with the password `setup` printed will fail, and that is the design working,
-not a bug.
+⚠️ It must hold the `authp/admin` role. The control plane's route carries an admin-only policy,
+narrower than an app's default, because it is the one stack that can reach the container runtime
+socket.
+
+⚠️ Without an edge route the server does **not** fall back to a password. It has no way to
+authenticate anyone and says so instead of serving. If you see that, set `domain:` in
+`etc/system.yaml` and re-run `appbay server start`.
 :::
 
 ![Appbay Dashboard](../images/appbay-dashboard.png){fig-alt="Appbay Dashboard showing KPI cards, app inventory, and overlay graph"}

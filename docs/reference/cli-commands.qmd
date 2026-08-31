@@ -503,21 +503,25 @@ Reset a Caddy Security local edge user's password.
 appbay edge users reset-password username
 ```
 
-### `appbay admin reset-password`
+### `appbay admin` — retired
 
-Reset the password for an account that signs in to **AppBay itself** — a control-plane
-account in `etc/control-plane/users.yaml`.
+RFC-001 §1 removed AppBay's own accounts. The control plane is a stack behind the Caddy
+Security edge like any other app, so the account that signs in to AppBay is an edge user:
 
 ```bash
-appbay admin reset-password alice
+appbay edge users reset-password alice --generate --reveal
 ```
 
-::: {.callout-important}
-## Two credential domains, and this is the other one
+Running `appbay admin` prints this and exits non-zero, so a script that still calls it fails
+rather than appearing to succeed.
 
-`appbay admin` manages who can sign in to **AppBay's own control plane**. `appbay edge users`
-manages who can sign in to your **deployed apps**, through the Caddy Security edge. They are
-separate stores and are never synchronised — resetting one has no effect on the other.
+::: {.callout-important}
+## One store now, and a role instead of a second password
+
+There is no longer a separate credential domain for the control plane. What distinguishes it is
+the **role**: its edge route carries an admin-only policy (`authp/admin`), narrower than an
+app's default, because it is the one stack that can reach the container runtime socket. So
+"can open Grafana" still does not imply "can reconfigure the installation".
 :::
 
 ### `appbay rebuild-cache`
@@ -900,8 +904,9 @@ appbay mcp inspector http://localhost:3001
 what replaced them and change nothing.
 
 Authelia was AppBay's authentication edge until S25 replaced it with the integrated Caddy
-Security edge. Authentication now lives in `appbay edge` (users who sign in to your deployed
-apps) and `appbay admin` (accounts that sign in to AppBay itself).
+Security edge. `appbay admin` joined them when RFC-001 §1 removed AppBay's own accounts.
+Authentication now lives entirely in `appbay edge` — one store for the people who sign in to
+your deployed apps and to AppBay itself.
 
 ## Shell integration
 

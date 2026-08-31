@@ -30,7 +30,6 @@ import { urlCommand } from "./commands/url.js";
 import { updateCommand } from "./commands/update.js";
 import { envCommand } from "./commands/env.js";
 import { applyCommand } from "./commands/apply.js";
-import { adminCommand } from "./commands/admin.js";
 import { edgeCommand } from "./commands/edge.js";
 import { retiredCommands } from "./commands/retired.js";
 import { completionCommand } from "./commands/completion.js";
@@ -122,7 +121,6 @@ program.addCommand(configCommand);
 program.addCommand(envCommand);
 program.addCommand(presetsCommand);
 program.addCommand(secretsCommand);
-program.addCommand(adminCommand);
 program.addCommand(edgeCommand);
 // Retired commands: they only explain what replaced them, and still exit non-zero.
 for (const c of retiredCommands) program.addCommand(c);

@@ -103,13 +103,26 @@ export const secretsMeta = sqliteTable("secrets_meta", {
 });
 
 // ---------------------------------------------------------------------------
-// Users — local auth (SQLite-backed, for Appbay web UI access control)
+// Users — a cache of who has signed in
 // ---------------------------------------------------------------------------
 
+/**
+ * 🚨 NO PASSWORD COLUMN — RFC-001 §1 deleted AppBay's own accounts.
+ *
+ * `password_hash` lived here because AppBay authenticated people itself. It no longer does:
+ * the Caddy Security edge authenticates them and injects the identity, so there is no
+ * credential for this process to hold. Storing one would recreate the second credential
+ * domain §1 exists to remove — and a hash nothing verifies is worse than none, because it
+ * looks like a working authentication path to whoever reads the schema next.
+ *
+ * ⚠️ An EXISTING database keeps the column. The table is created with `IF NOT EXISTS`, so
+ * this only shapes new ones; nothing writes the column any more, and nothing reads it. The
+ * stored hashes are inert rather than removed — dropping them is a migration, and the
+ * migration only matters once something would otherwise trust them.
+ */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
   createdAt: text("created_at").notNull(),
 });
 

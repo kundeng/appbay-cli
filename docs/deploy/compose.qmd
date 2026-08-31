@@ -72,21 +72,29 @@ Two networks are created:
 
 ## First-run setup
 
-On first launch the server enters setup mode. Navigate to `http://<host>:3000` and create an admin account (username and password). This account is stored in the SQLite database using Appbay's built-in scrypt-based auth.
+There is no setup mode and no admin account to create. RFC-001 §1 removed AppBay's own
+accounts: the control plane authenticates through the Caddy Security edge, so whoever the edge
+identifies is who is signed in.
 
-After creating the admin account, authenticate the CLI:
-
-```bash
-appbay admin reset-password admin --generate --reveal
-# Prompts for server URL, username, and password
-# Stores a session token locally
-```
-
-Alternatively, set a token via environment variable:
+That makes the edge a prerequisite rather than an option. `appbay server start` writes the edge
+route and binds port 3000 to loopback in the same step, so the edge becomes the only way in:
 
 ```bash
-export APPBAY_TOKEN=<your-token>
+appbay init --ingress-provider caddy
+# set `domain:` in $APPBAY_HOME/etc/system.yaml
+appbay server start          # -> https://appbay.<domain>, port 3000 on 127.0.0.1
 ```
+
+Create the account that reaches it — admin-only, because the control plane can reach the
+container runtime socket:
+
+```bash
+appbay edge users create alice --generate --reveal
+```
+
+⚠️ Without an edge route the server does **not** fall back to a password. It has no way to
+authenticate anyone and refuses to serve, which the UI states explicitly. `APPBAY_BIND=0.0.0.0`
+reopens the port but does not restore authentication.
 
 ## Updating
 

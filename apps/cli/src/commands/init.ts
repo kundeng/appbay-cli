@@ -37,6 +37,8 @@ import {
   inspectEdgePorts,
   catalogAddSource,
   readInstanceConfigText,
+  importControlPlaneAccounts,
+  LEGACY_CONTROL_PLANE_REL,
   applyEdgeIdentity,
   EdgeIdentityConfigSchema,
   type EdgeIdentityConfig,
@@ -346,6 +348,55 @@ function resolveEdgeIdentity(appbayHome: string): EdgeIdentityConfig {
   const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
   const declared = parseInstanceConfig(raw).edge_identity;
   return declared ?? EdgeIdentityConfigSchema.parse({});
+}
+
+/**
+ * Import retired control-plane accounts and say exactly what happened — RFC-001 §1.5.
+ *
+ * Prints nothing at all when there is no legacy file, which is every installation created
+ * after §1 and every one that has already been migrated.
+ *
+ * ⚠️ FAILURE IS REPORTED, NOT THROWN. The import shells out to the Caddy image to hash each
+ * password, so it fails on a host where the runtime or the image is unavailable — and that
+ * must not abort an `init` whose other six stages succeeded. The legacy file is left in place
+ * when anything goes wrong, so re-running picks up where it stopped.
+ */
+async function runControlPlaneImport(appbayHome: string): Promise<void> {
+  let report;
+  try {
+    report = await importControlPlaneAccounts(appbayHome);
+  } catch (err) {
+    console.log("");
+    console.log("  ⚠ Could not import legacy control-plane accounts:");
+    console.log(`      ${err instanceof Error ? err.message : String(err)}`);
+    console.log(`  ${LEGACY_CONTROL_PLANE_REL} was left in place — re-run \`appbay init\` once`);
+    console.log("  the container runtime and the Caddy image are available.");
+    return;
+  }
+
+  if (!report.found) return;
+
+  console.log("");
+  console.log("  Legacy control-plane accounts (RFC-001 §1 removed that credential domain):");
+
+  for (const account of report.imported) {
+    console.log(`    ✔ ${account.username} → edge user, role authp/admin`);
+    console.log(`         password: ${account.password}`);
+  }
+  for (const skip of report.skipped) {
+    console.log(`    – ${skip.username} skipped — ${skip.reason}`);
+  }
+
+  if (report.imported.length > 0) {
+    console.log("");
+    console.log("  🚨 THOSE PASSWORDS ARE SHOWN ONCE AND ARE NOT STORED ANYWHERE. The old ones");
+    console.log("     could not be carried over: they were scrypt hashes and the edge stores");
+    console.log("     bcrypt, so there was nothing to convert. Copy them now, or reset with");
+    console.log("     `appbay edge users reset-password <username> --generate --reveal`.");
+  }
+  if (report.archivedTo) {
+    console.log(`  Archived the old file to ${report.archivedTo}`);
+  }
 }
 
 /**
@@ -1111,6 +1162,16 @@ export const initCommand = new Command("init")
           );
         }
       }
+
+      // ── Carry legacy control-plane accounts to the edge (RFC-001 §1.5) ──────
+      //
+      // 🚨 WITHOUT THIS, UPGRADING LOCKS THE OPERATOR OUT. §1 deleted AppBay's own accounts,
+      // so etc/control-plane/users.yaml is no longer read — and the edge store the UI now
+      // authenticates against has never heard of those people.
+      //
+      // ⚠️ The passwords cannot travel: the old file held scrypt hashes and Caddy Security
+      // holds bcrypt. Each account gets a NEW generated password, printed once, right here.
+      await runControlPlaneImport(appbayHome);
 
       // ── Record the container STORE this install is bound to (#58 R3) ────────
       //

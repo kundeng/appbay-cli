@@ -285,7 +285,6 @@ describe("unique constraints", () => {
       .values({
         id: randomUUID(),
         username: "admin",
-        passwordHash: "hashed-password-1",
         createdAt: now(),
       })
       .run();
@@ -295,7 +294,6 @@ describe("unique constraints", () => {
         .values({
           id: randomUUID(),
           username: "admin",
-          passwordHash: "hashed-password-2",
           createdAt: now(),
         })
         .run();
@@ -328,7 +326,6 @@ describe("unique constraints", () => {
       .values({
         id: userId,
         username: "admin",
-        passwordHash: "hashed",
         createdAt: now(),
       })
       .run();

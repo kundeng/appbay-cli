@@ -136,10 +136,11 @@ const SCHEMA_SQL = `
       last_checked_at TEXT
     );
 
+    -- 🚨 No password_hash: RFC-001 §1 deleted AppBay's own accounts, so there is no
+    -- credential for this process to hold. See packages/db/src/schema.ts.
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
 
