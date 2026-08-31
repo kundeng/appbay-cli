@@ -280,8 +280,24 @@ for anything touching the runtime, a journey on both VMs.
     - **Depends**: 1.1 · **Pillar**: MVP, Test
 
 - [ ] 2. System home (§2)
-  - [ ] 2.1 Merge `InstanceConfigSchema` + `SystemConfig` into `etc/system.yaml`
-    - **Depends**: — · **Requirements**: 1.2
+  - [x] 2.1 Move the instance config to `etc/system.yaml` (merge with SystemConfig deferred)
+    - One reader, `readInstanceConfigText()`, prefers `etc/system.yaml` and falls back to
+      `project.yaml`; nine read sites route through it. `init` MOVES an existing legacy file
+      rather than writing a second beside it — the reader prefers the new path, so leaving
+      both would make the old one silently dead while still holding the operator's settings.
+    - ⚠️ The suite caught the version of that bug I wrote: `upsertInstanceKey` was pointed at
+      the new path unconditionally, so on a legacy install it would have created
+      `etc/system.yaml` holding one key while `project.yaml` kept the rest. It now edits the
+      config where the config is.
+    - Verified with the binary three ways: fresh install writes only `etc/system.yaml`; a
+      legacy-only install reads correctly with no false home mismatch; `init` on a legacy tree
+      moves the file with contents intact.
+    - ⚠️ **`/etc/appbay/config` is NOT deleted.** The RFC says tier 2's real job is outranking
+      a per-operator `~/.config` choice on a service install, and that `Environment=APPBAY_HOME=`
+      in the systemd unit covers it at tier 1 — "the deletion needs the unit, not just the
+      deletion". The unit is not written, so deleting the tier would remove a working
+      mechanism and leave nothing in its place. The SystemConfig half of the merge stays open.
+    - **Depends**: — · **Requirements**: 1.2 · **Pillar**: MVP, Docs
   - [x] 2.2 One `resolveMasterPassword()`; delete the keepass ladder and both duplicate resolvers
     - FOUR resolvers, not the RFC's three — two duplicated pairs, differing only in whether
       `appbayHome` was an argument or re-derived. Two of them computed the home differently
