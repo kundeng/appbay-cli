@@ -45,13 +45,25 @@ top-level scope field is gone.
 ## Only `${{project.DOMAIN}}` actually resolves today
 
 The `${{scope.KEY}}` reference vocabulary is **unchanged** by the rename — it is still
-`project`, `environment` and `service`. That asymmetry is deliberate and temporary: the
-declaration field moved, and renaming the reference prefix is a separate migration across
-every manifest that uses one.
+`project`, `environment` and `service`. That asymmetry is deliberate and **permanent**, not a
+migration still owed: `namespace:` and `${{project.KEY}}` are different things that shared a
+word.
+
+- **`namespace:`** is a per-app *label*. It disambiguates container names, network aliases
+  and state keys. It has no variable store and never had one.
+- **`${{project.KEY}}`** reads the *installation* config — one file per host, shared by every
+  app on it, whatever their namespaces.
+
+Renaming the prefix to `${{namespace.KEY}}` would point every reference at a scope that holds
+nothing. The two are independent, so the §4 field rename does not oblige a reference rename.
 
 What the docs below describe as three variable stores is currently one, and it holds one key.
 `loadProjectVars` reads a single `domain:` line out of `$APPBAY_HOME/etc/system.yaml` and returns
-`{ DOMAIN }`. Nothing reads `projects/<name>/project.yaml` or `environments/<env>.yaml`, so
+`{ DOMAIN }`. The exposed keys are an **allow-list**, not everything in the file: `home:`,
+`project:` and `container_runtime:` live there too and are deliberately *not* variables —
+`home:` in particular is an absolute path, which is machine state and not something a manifest
+should be able to interpolate. Nothing reads `projects/<name>/project.yaml` or
+`environments/<env>.yaml`, so
 `${{environment.KEY}}` and `${{service.KEY}}` resolve against empty maps and always fail.
 
 A reference to an unknown key survives the render as a literal and the deploy then refuses
@@ -152,7 +164,7 @@ Collection is NOT part of variable resolution. It is a selector, not a scope lev
 
 | Syntax | Resolves from | Only from |
 |---|---|---|
-| `${{project.KEY}}` | `etc/projects/<name>/project.yaml` | project store only |
+| `${{project.KEY}}` | `etc/system.yaml` (`domain:` only) | project store only |
 | `${{environment.KEY}}` | `etc/projects/<name>/environments/<env>.yaml` | environment store only |
 | `${{service.KEY}}` | Service-level vars in `appbay.yaml` or `.env` | service store only |
 

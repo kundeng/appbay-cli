@@ -13,7 +13,6 @@
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 // Config files are small and read on paths already synchronous elsewhere in core.
-import { readFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, copyFile, unlink } from "node:fs/promises";
 import {
   compile,
@@ -30,6 +29,7 @@ import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
 import { containerBin } from "../runtime/container-runtime.js";
+import { loadProjectVars } from "./instance-vars.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -321,22 +321,11 @@ export interface DeployOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Load project.yaml from APPBAY_HOME and return project-level variables.
+ * Re-exported so the public API name does not move. The implementation lives in
+ * `instance-vars.ts` because `catalog-service.ts` had its own divergent copy — see that
+ * module's header for what the two disagreed about.
  */
-export async function loadProjectVars(appbayHome: string): Promise<Record<string, string>> {
-  try {
-    const text =
-      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
-    const vars: Record<string, string> = {};
-    const domainMatch = text.match(/^domain:\s*(.+)$/m);
-    if (domainMatch?.[1]?.trim()) {
-      vars.DOMAIN = domainMatch[1].trim();
-    }
-    return vars;
-  } catch {
-    return {};
-  }
-}
+export { loadProjectVars };
 
 /**
  * Filter apps by collection membership.
@@ -515,7 +504,6 @@ function describeCaddyFailure(
 // ---------------------------------------------------------------------------
 
 import type { ShepherdAction, ShepherdPhase } from "../traits/types.js";
-import { readInstanceConfigText } from "../schemas/instance.js";
 
 interface ShepherdRunResult {
   ran: number;

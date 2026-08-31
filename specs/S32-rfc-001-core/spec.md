@@ -220,12 +220,37 @@ for anything touching the runtime, a journey on both VMs.
       `GeneratedValueKeySchema`, `ActiveAppEntrySchema`, `generateHash`, `keyString`,
       `resolveMagicVars`. 12 test files plus 3 yaml fixtures updated.
     - **Depends**: 1.1 · **Requirements**: 2.2 · **Pillar**: MVP · **Properties**: (new) 1
-  - [ ] 1.2b 🚦 Decide the `${{project.KEY}}` → `${{namespace.KEY}}` vocabulary rename
-    - 234 references across two catalog repos plus `system-apps/`. Needs an alias period in
-      `scope-resolver.ts` (accept both, warn on the old) and a sweep of both catalogs, or an
-      explicit decision to keep `project` as the reference scope name while the declaration
-      field is `namespace`. Not free, and not this task.
-    - **Depends**: 1.1
+  - [x] 1.2b 🚦 DECIDED: do NOT rename — and the divergence found while deciding is fixed
+    - **The decision is no rename, permanently.** `namespace:` is a per-app LABEL that
+      disambiguates container names, network aliases and state keys; it has no variable store
+      and never had one. `${{project.KEY}}` reads the per-HOST installation config. They
+      shared a word, not a concept, so the §4 field rename does not oblige a reference rename
+      — and `${{namespace.KEY}}` would point all 234 references at a scope holding nothing.
+      No alias period is needed because nothing is being deprecated.
+    - 🚨 **What the decision surfaced: two `loadProjectVars` backed the same syntax and they
+      disagreed.** `deploy-service.ts:326` regex-matched `^domain:` → `{ DOMAIN }` (the
+      compile path, and what the docs describe). `catalog-service.ts:497` YAML-parsed and
+      uppercased EVERY top-level string key (the catalog-install path, undocumented and
+      untested). So `${{project.CONTAINER_RUNTIME}}` resolved when an app was installed from
+      the catalog and failed to compile a moment later.
+    - 🚨 **2.1 had quietly widened that leak.** Adding `home:` to the file the wide reader
+      consumes meant `${{project.HOME}}` interpolated the installation's ABSOLUTE PATH into a
+      catalog app's `.env.local`. Found by asking what the store actually holds, not by a
+      test — nothing covered the catalog reader at all.
+    - Fix: one `services/instance-vars.ts` owns the reader and the `.env.local` substituter;
+      both call sites import it; `loadProjectVars` stays exported from `deploy-service` so the
+      public API name does not move. Exposed keys are an **allow-list** (`domain` only), not a
+      deny-list — a deny-list is what let `home:` through the moment §2.1 wrote it.
+    - Narrowing the wide path is measured-safe: across both catalogs, the UOM fixtures and
+      `system-apps/`, `${{project.DOMAIN}}` is the only reference that resolves anywhere. The
+      one `${{project.ADMIN_GROUP}}` hit is a comment in the Portainer fixture explaining why
+      it is deliberately NOT used. All 8 `${{environment.` and 6 `${{env.` hits are in docs
+      and RFC probe records, not live manifests.
+    - 11 new tests, incl. one that pins `HOME` OUT of the store — it fails against the old
+      wide reader, so it discriminates rather than describes. Verified through the package's
+      public entry too (`dist/index.js`), which is where the export chain can break invisibly
+      to `check:subset`.
+    - **Depends**: 1.1 · **Pillar**: MVP, Docs, Test
   - [x] 1.3 Namespace into container/network/ingress identity, with `dnsSafe()`
     - New `compiler/identity.ts` owns all six generated names. The alias was built in three
       places independently and is a CONTRACT — it is the host the edge dials — so the

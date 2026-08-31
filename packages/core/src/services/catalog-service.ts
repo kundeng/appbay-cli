@@ -1,12 +1,11 @@
 import { readdir, readFile, stat, mkdir, cp, rm, writeFile, chmod } from "node:fs/promises";
 // Config files are small and read on paths that are already synchronous elsewhere in core.
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { discoverCatalog, type DiscoveredCatalogEntry } from "../catalog/discover.js";
 import type { CatalogEntry, RequiredInput } from "../schemas/catalog.js";
-import { readInstanceConfigText } from "../schemas/instance.js";
+import { loadProjectVars, resolveScopedVars } from "./instance-vars.js";
 
 export interface InstallOptions {
   appbayHome: string;
@@ -494,25 +493,3 @@ export async function catalogListSources(
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function loadProjectVars(home: string): Promise<Record<string, string>> {
-  const vars: Record<string, string> = {};
-  try {
-    const raw =
-      readInstanceConfigText(home, (p) => readFileSync(p, "utf-8")) ?? "";
-    const parsed = parseYaml(raw);
-    if (parsed && typeof parsed === "object") {
-      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-        if (typeof v === "string") vars[k.toUpperCase()] = v;
-      }
-    }
-  } catch {
-    // No project config
-  }
-  return vars;
-}
-
-function resolveScopedVars(value: string, projectVars: Record<string, string>): string {
-  return value.replace(/\$\{\{project\.(\w+)\}\}/g, (_match, key: string) => {
-    return projectVars[key.toUpperCase()] ?? `\${${key}}`;
-  });
-}

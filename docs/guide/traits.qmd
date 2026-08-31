@@ -114,10 +114,11 @@ services:
 The `${{project.DOMAIN}}` reference resolves at compile time from the `domain:` line in
 `$APPBAY_HOME/etc/system.yaml`.
 
-⚠️ It is the only scope reference that resolves. `${{environment.KEY}}` and
-`${{service.KEY}}` are accepted by the parser but nothing populates those maps, so they
-always fail — see [Scope Model](../reference/scope-model.qmd). For a per-deployment value,
-use a plain Compose `${VAR}` read from the app's `.env`.
+⚠️ It is the only scope reference that resolves, and `DOMAIN` is the only key. The other
+settings in `etc/system.yaml` (`home:`, `project:`, `container_runtime:`) are not variables.
+`${{environment.KEY}}` and `${{service.KEY}}` are accepted by the parser but nothing populates
+those maps, so they always fail — see [Scope Model](../reference/scope-model.qmd). For a
+per-deployment value, use a plain Compose `${VAR}` read from the app's `.env`.
 
 ### Ingress providers {#ingress-providers}
 
