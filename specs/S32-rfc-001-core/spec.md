@@ -282,8 +282,22 @@ for anything touching the runtime, a journey on both VMs.
 - [ ] 2. System home (§2)
   - [ ] 2.1 Merge `InstanceConfigSchema` + `SystemConfig` into `etc/system.yaml`
     - **Depends**: — · **Requirements**: 1.2
-  - [ ] 2.2 One `resolveMasterPassword()`; delete the keepass ladder and both duplicate resolvers
-    - **Depends**: 2.1 · **Requirements**: 1.1
+  - [x] 2.2 One `resolveMasterPassword()`; delete the keepass ladder and both duplicate resolvers
+    - FOUR resolvers, not the RFC's three — two duplicated pairs, differing only in whether
+      `appbayHome` was an argument or re-derived. Two of them computed the home differently
+      from the CLI's own `resolveAppbayHome()`.
+    - Order: `APPBAY_MASTER_PASSWORD` → `var/lib/secrets/master-password` → legacy env →
+      legacy files → generate. Steps 3–4 are a marked migration shim. Writes moved to the new
+      location too; preferring it on read while `initVault` still wrote the old one would
+      consolidate nothing.
+    - 🚨 **Refuses to collapse two DIFFERENT legacy passwords**, which the RFC does not cover.
+      `initVault` and `initKdbx` each generated their own `randomBytes(24)`, so a both-backend
+      install holds two unrelated credentials; picking either leaves the other store readable
+      by nothing. Throws naming both files and how to choose.
+    - ⚠️ Did NOT land 2.1 first, contrary to the task's stated dependency: merging the config
+      schemas is a file-location migration and the resolver consolidation does not need it.
+      2.1 remains open.
+    - **Depends**: — · **Requirements**: 1.1 · **Pillar**: MVP, Test
   - [ ] 2.3 Fold `secrets init` into `init`; keep `rotate-password`, `repair-password-file`
     - **Depends**: 2.2
   - [ ] 2.4 Assert `home` against the resolved path and fail loudly on disagreement
