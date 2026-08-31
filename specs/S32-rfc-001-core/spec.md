@@ -232,6 +232,13 @@ for anything touching the runtime, a journey on both VMs.
       the RFC lists four. `discoverRunningApps` is NOT deleted: it also drives the web UI's
       running/stopped indicator, a real runtime question §5 does not touch. What died is
       `deploy()`'s now-dead `discoverRunning` option.
+    - ⚠️ **Audit correction (2026-08-31).** "The function survives" was half right and I
+      wrote it as if it were whole. There are TWO copies. `apps/web`'s has real callers
+      (`apps.ts:52`, `:88` — the running indicator) and stays. `apps/cli`'s had exactly the
+      four overlay callers §5 removed, and the CLI reports running state nowhere — so it was
+      dead, and RFC 5.1's "delete it" was right for that copy. Deleted, with its ten tests.
+      Those tests are why it looked alive: they exercise the function directly rather than
+      any path reaching it, so coverage stayed green while the last caller disappeared.
     - ⭐ The `apps.ts` overlay GRAPH was the one that mattered: it evaluated
       `isWhenSatisfied` against the RUNNING set while the compiler used installed, so the UI
       would have drawn an overlay inactive that the render applied. Two answers to one
@@ -315,6 +322,12 @@ the running/stopped indicator in the web UI. §5 replaces the overlay caller onl
 - **Validates**: the two-instances-in-one-home goal of §4
 - **Test approach**: `generated-values.test.ts` "different inputs" varies one component per
   pair and asserts all four digests differ.
+
+**2026-08-31 — sequencing correction.** After §5 the next unit is **1.3** (RFC 4.4–4.6:
+namespace into container/network/ingress identity, with `dnsSafe()`), NOT §2. The design
+table above says so — "§5 `when`, then 4.3–4.6" — and I stated §2 as next in a status
+report, which contradicts this spec's own ordering. RFC 4.3 itself is now moot: it asked for
+`discoverRunningApps` to be made namespace-aware, and §5 removed the caller that needed it.
 
 **2026-08-31 — §5's test suite could express states the system cannot reach.** The overlay
 tests handed `compile()` an `activeApps` set, so "ollama is installed but not active" was a
