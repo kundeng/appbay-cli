@@ -28,8 +28,7 @@ export const SYSTEM_APPS: SystemAppDef[] = [
   {
     name: "caddy",
     files: {
-      "appbay.yaml": `project: system
-environment: default
+      "appbay.yaml": `namespace: system
 collection: [system, infrastructure]
 tags:
   tier: system
@@ -348,9 +347,7 @@ networks:
   {
     name: "homeassistant",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [self-hosted, home-automation]
+      "appbay.yaml": `collection: [self-hosted, home-automation]
 tags:
   tier: personal
   role: home-automation
@@ -452,8 +449,7 @@ networks:
   {
     name: "homepage",
     files: {
-      "appbay.yaml": `project: system
-environment: default
+      "appbay.yaml": `namespace: system
 collection: [system, dashboard]
 tags:
   tier: system
@@ -503,9 +499,7 @@ networks:
   {
     name: "jellyfin",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [self-hosted, media]
+      "appbay.yaml": `collection: [self-hosted, media]
 tags:
   tier: personal
   role: media-server
@@ -562,9 +556,7 @@ networks:
   {
     name: "keeweb",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-tags:
+      "appbay.yaml": `tags:
   tier: system
   role: secrets-ui
 
@@ -599,9 +591,7 @@ volumes:
   {
     name: "nextcloud",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [self-hosted, productivity]
+      "appbay.yaml": `collection: [self-hosted, productivity]
 tags:
   tier: personal
   role: file-sync
@@ -700,9 +690,7 @@ networks:
   {
     name: "ollama",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [ai-stack, gpu-apps]
+      "appbay.yaml": `collection: [ai-stack, gpu-apps]
 tags:
   tier: compute
   role: llm-inference
@@ -752,9 +740,7 @@ networks:
   {
     name: "open-webui",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [ai-stack]
+      "appbay.yaml": `collection: [ai-stack]
 tags:
   tier: frontend
   role: chat-ui
@@ -829,9 +815,7 @@ networks:
   {
     name: "sysinfo",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [starter, diagnostics]
+      "appbay.yaml": `collection: [starter, diagnostics]
 tags:
   tier: ops
   role: diagnostics
@@ -951,8 +935,7 @@ services:
   {
     name: "traefik",
     files: {
-      "appbay.yaml": `project: system
-environment: default
+      "appbay.yaml": `namespace: system
 collection: [system, infrastructure]
 tags:
   tier: system
@@ -1054,9 +1037,7 @@ networks:
   {
     name: "vaultwarden",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [self-hosted, security]
+      "appbay.yaml": `collection: [self-hosted, security]
 tags:
   tier: personal
   role: password-manager
@@ -1116,9 +1097,7 @@ networks:
   {
     name: "whoami",
     files: {
-      "appbay.yaml": `project: default
-environment: default
-collection: [starter]
+      "appbay.yaml": `collection: [starter]
 tags:
   tier: demo
   role: health-check

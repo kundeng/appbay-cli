@@ -1,5 +1,3 @@
-project: default
-environment: default
 tags:
   tier: system
   role: secrets-ui

@@ -18,8 +18,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { compile } from "../compile.js";
 
-const APPBAY_WITH_INGRESS = `project: homelab
-environment: prod
+const APPBAY_WITH_INGRESS = `namespace: homelab
 services:
   web:
     traits:
@@ -99,8 +98,16 @@ describe("P4: provider-agnostic trait proof", () => {
     // Find the ingress edge config file each provider emitted. There may be
     // other auxiliary files (e.g. from other traits), so locate the edge file
     // by its provider-specific path rather than asserting total length.
-    const traefikEdge = traefikAux.find((a) => a.path === "etc/apps/traefik/config/dynamic/myapp.yml");
-    const caddyEdge = caddyAux.find((a) => a.path === "etc/apps/caddy/config/dynamic/myapp.caddy");
+    //
+    // ⚠️ The stem is `homelab.myapp`, not `myapp`: this fixture declares
+    // `namespace: homelab`, and RFC-001 §4.4 puts the namespace into the generated edge
+    // fragment name so two namespaces of one app do not overwrite each other's site block.
+    const traefikEdge = traefikAux.find(
+      (a) => a.path === "etc/apps/traefik/config/dynamic/homelab.myapp.yml",
+    );
+    const caddyEdge = caddyAux.find(
+      (a) => a.path === "etc/apps/caddy/config/dynamic/homelab.myapp.caddy",
+    );
 
     // Each provider emits exactly one edge config file for the ingress trait.
     expect(traefikEdge).toBeDefined();

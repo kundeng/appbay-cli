@@ -1,5 +1,3 @@
-project: default
-environment: default
 collection: [self-hosted, home-automation]
 tags:
   tier: personal

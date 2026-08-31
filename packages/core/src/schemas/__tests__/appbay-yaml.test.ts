@@ -245,6 +245,27 @@ describe("defaults", () => {
     expect("namespace" in result).toBe(false);
   });
 
+  it("rejects a NON-DEFAULT removed scope field instead of dropping it", () => {
+    // Zod strips unknown keys, so without an explicit rule `project: homelab` would parse
+    // clean and the value would vanish with no error — the trap this guards.
+    for (const [field, value] of [["project", "homelab"], ["environment", "prod"]] as const) {
+      const result = AppbayYamlSchema.safeParse({ [field]: value });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]!.message).toContain("removed in RFC-001");
+        expect(result.error.issues[0]!.message).toContain("namespace");
+      }
+    }
+  });
+
+  it("accepts the removed fields when they say 'default' — that value carried nothing", () => {
+    // All 162 declarations across both catalogs and system-apps said `default`. Rejecting
+    // them would fail every existing manifest to report a value that never did anything.
+    const result = AppbayYamlSchema.safeParse({ project: "default", environment: "default" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.namespace).toBeUndefined();
+  });
+
   it("keeps an explicitly declared namespace", () => {
     expect(parse({ namespace: "uom.sim" }).namespace).toBe("uom.sim");
   });

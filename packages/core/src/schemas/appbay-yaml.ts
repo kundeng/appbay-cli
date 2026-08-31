@@ -15,6 +15,29 @@ import { z } from "zod";
 // Scope Section
 // ---------------------------------------------------------------------------
 
+/**
+ * A field RFC-001 §4 removed, kept in the schema so that USING it fails rather than vanishing.
+ *
+ * 🚨 Zod strips unknown keys, so without this a manifest saying `project: homelab` parses
+ * cleanly and the value simply disappears — no error, and the setting the operator wrote is
+ * silently not in effect. A removed field that is silently dropped is a trap.
+ *
+ * ⚠️ `default` is ACCEPTED, and that exception is what makes this shippable. All 162
+ * declarations across both catalogs and system-apps say `default`, which carried no
+ * information — dropping it is lossless, and rejecting it would fail every existing manifest
+ * to tell operators about a value that never did anything. Only a non-default value is
+ * refused, because only a non-default value is being lost.
+ */
+function removedScopeField(name: string, guidance: string) {
+  return z
+    .literal("default", {
+      errorMap: () => ({
+        message: `\`${name}:\` was removed in RFC-001 §4. ${guidance}`,
+      }),
+    })
+    .optional();
+}
+
 export const ScopeSchema = z.object({
   /**
    * Deployment namespace, flat and dot-delimited: `uom.sim`. RFC-001 §4.
@@ -26,6 +49,14 @@ export const ScopeSchema = z.object({
    * to be expressible for "decided at deploy time" to mean anything.
    */
   namespace: z.string().optional(),
+  project: removedScopeField(
+    "project",
+    'Use `namespace:` instead — one axis replaces project + environment. A namespace is flat and dot-delimited, e.g. `namespace: uom.sim`.',
+  ),
+  environment: removedScopeField(
+    "environment",
+    'Use `namespace:` instead. Note this is the SCOPE field only; `environment:` inside a service is Compose\'s own and is unaffected.',
+  ),
   collection: z.array(z.string()).optional(),
   operator: z.string().optional(),
   shared_network: z.array(z.string()).default(["appbay_shared"]),
@@ -368,6 +399,14 @@ export const AppbayYamlSchema = z.object({
   // -- Scope --
   /** See ScopeSchema.namespace — optional so the invocation can win. RFC-001 §4. */
   namespace: z.string().optional(),
+  project: removedScopeField(
+    "project",
+    'Use `namespace:` instead — one axis replaces project + environment. A namespace is flat and dot-delimited, e.g. `namespace: uom.sim`.',
+  ),
+  environment: removedScopeField(
+    "environment",
+    'Use `namespace:` instead. Note this is the SCOPE field only; `environment:` inside a service is Compose\'s own and is unaffected.',
+  ),
   collection: z.array(z.string()).optional(),
   operator: z.string().optional(),
   shared_network: z.array(z.string()).default(["appbay_shared"]),

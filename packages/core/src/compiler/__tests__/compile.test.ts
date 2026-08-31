@@ -50,8 +50,7 @@ const COMPOSE_WITH_SCOPED_VAR = `services:
       - APP_DOMAIN=\${{project.DOMAIN}}
 `;
 
-const APPBAY_WITH_UPSTREAM = `project: homelab
-environment: prod
+const APPBAY_WITH_UPSTREAM = `namespace: homelab
 shared_network:
   - appbay_shared
 upstream:
@@ -62,8 +61,7 @@ upstream:
         - appbay_shared
 `;
 
-const APPBAY_WITH_INGRESS = `project: homelab
-environment: prod
+const APPBAY_WITH_INGRESS = `namespace: homelab
 services:
   web:
     traits:

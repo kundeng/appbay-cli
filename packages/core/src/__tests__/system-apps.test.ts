@@ -188,21 +188,34 @@ describe("SYSTEM_APPS appbay.yaml schema validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("SYSTEM_APPS appbay.yaml scope fields", () => {
+  // ⚠️ This used to require every app to declare a non-empty `project` AND `environment`.
+  // RFC-001 §4 replaced both with one optional `namespace`, and eleven of the twelve apps
+  // were declaring `default` — a value that carried no information and is now expressed by
+  // absence. Requiring a scope field is exactly backwards under the new model.
   for (const app of SYSTEM_APPS) {
-    it(`${app.name}: declares a non-empty project`, () => {
-      const rawParsed = yamlParse(app.files["appbay.yaml"]!) as Record<string, unknown>;
-      const project = rawParsed["project"];
-      expect(typeof project).toBe("string");
-      expect((project as string).length).toBeGreaterThan(0);
+    it(`${app.name}: carries no removed scope field`, () => {
+      const raw = yamlParse(app.files["appbay.yaml"]!) as Record<string, unknown>;
+      expect(raw["project"]).toBeUndefined();
+      expect(raw["environment"]).toBeUndefined();
     });
 
-    it(`${app.name}: declares a non-empty environment`, () => {
-      const rawParsed = yamlParse(app.files["appbay.yaml"]!) as Record<string, unknown>;
-      const env = rawParsed["environment"];
-      expect(typeof env).toBe("string");
-      expect((env as string).length).toBeGreaterThan(0);
+    it(`${app.name}: any namespace it declares is a non-empty string`, () => {
+      const raw = yamlParse(app.files["appbay.yaml"]!) as Record<string, unknown>;
+      const ns = raw["namespace"];
+      if (ns === undefined) return; // absent means "decided at deploy time"
+      expect(typeof ns).toBe("string");
+      expect((ns as string).length).toBeGreaterThan(0);
     });
   }
+
+  it("the three edge/system-tier apps keep their system namespace", () => {
+    // `project: system` was load-bearing — apps/web's command palette keys its icon off it.
+    // It migrated to `namespace: system` rather than being dropped with the `default`s.
+    const systemNs = SYSTEM_APPS.filter(
+      (a) => (yamlParse(a.files["appbay.yaml"]!) as Record<string, unknown>)["namespace"] === "system",
+    ).map((a) => a.name).sort();
+    expect(systemNs).toEqual(["caddy", "homepage", "traefik"]);
+  });
 });
 
 // ---------------------------------------------------------------------------

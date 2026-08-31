@@ -1,5 +1,4 @@
-project: system
-environment: default
+namespace: system
 collection: [system, infrastructure]
 tags:
   tier: system

@@ -1,5 +1,3 @@
-project: default
-environment: default
 collection: [ai-stack, gpu-apps]
 tags:
   tier: compute

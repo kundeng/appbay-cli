@@ -85,8 +85,7 @@ const COMPOSE_WITH_OVERLAY_PEER = `services:
     image: nginx:latest
 `;
 
-const APPBAY_WITH_OVERLAY = `project: homelab
-environment: prod
+const APPBAY_WITH_OVERLAY = `namespace: homelab
 overlays:
   - when:
       - nonexistent-app
@@ -96,8 +95,7 @@ overlays:
           - OVERLAY_INJECTED=true
 `;
 
-const APPBAY_WITH_SCOPED_VARS = `project: homelab
-environment: prod
+const APPBAY_WITH_SCOPED_VARS = `namespace: homelab
 `;
 
 const COMPOSE_WITH_SCOPED_VARS = `services:
@@ -254,8 +252,7 @@ describe("Compiler pipeline properties", () => {
 `;
 
     // Both apps have upstream config with expose, which triggers alias generation.
-    const appbayConfig = (appName: string) => `project: homelab
-environment: prod
+    const appbayConfig = (appName: string) => `namespace: homelab
 shared_network:
   - appbay_shared
 upstream:
@@ -333,8 +330,7 @@ upstream:
     image: nginx:latest
 `;
 
-    const appbayWithDuplicateTrait = `project: homelab
-environment: prod
+    const appbayWithDuplicateTrait = `namespace: homelab
 services:
   web:
     traits:
@@ -400,8 +396,7 @@ services:
       - "80:80"
 `;
 
-    const appbayConfig = `project: homelab
-environment: prod
+    const appbayConfig = `namespace: homelab
 services:
   web:
     traits:

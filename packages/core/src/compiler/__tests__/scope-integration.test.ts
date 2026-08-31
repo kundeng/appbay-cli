@@ -114,8 +114,7 @@ describe("Scope resolution integration", () => {
     );
     await writeFile(
       join(appDir, "appbay.yaml"),
-      `project: default
-environment: default
+      `namespace: default
 traits:
   - type: ingress
     service: whoami

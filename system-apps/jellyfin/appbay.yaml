@@ -1,5 +1,3 @@
-project: default
-environment: default
 collection: [self-hosted, media]
 tags:
   tier: personal
