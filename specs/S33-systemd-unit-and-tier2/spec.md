@@ -1,14 +1,15 @@
 ---
 spec_id: S33-systemd-unit-and-tier2
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: FORK-FORWARD
+closed: 2026-08-31
 since: 2026-08-31
 activated: 2026-08-31
 until: null
 epic: platform
 features: [systemd-unit, tier2-config-narrowing, system-config-merge]
 supersedes: []
-superseded_by: null
+superseded_by: S34-service-account-runtime-access
 depends_on: [S32-rfc-001-core]
 anchors: [data-architecture]
 ---
@@ -220,8 +221,10 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
       because writing that pointer is the whole command.
     - **Depends**: 3.2 · **Pillar**: MVP, Test
 
-- [ ] 4. 🚦 The D-6 service account cannot run podman — a design decision, not a bug fix
-  - [!] 4.1 BLOCKED on an owner decision. Proven, with commands and errors, in probe-87:
+- [x] 4. 🚦 The D-6 service account cannot run podman
+        · [>] → S34-service-account-runtime-access
+  - [>] 4.1 → S34. An owner decision between three defensible answers, not more investigation.
+        Proven, with commands and errors, in probe-87:
     - `sudo -u appbay podman info` → `cannot resolve /home/appbay: lstat ... no such file`
       (`--no-create-home`), and with `HOME` set → `no subuid ranges found for user "appbay"`
       (`grep -c appbay /etc/subuid` = 0). Both are direct consequences of how `init-system`
@@ -234,3 +237,36 @@ second. Do not reverse it to "clean up" the config tier before its replacement e
       rootful podman socket, or running the unit as root — each changes what the D-6 model
       means, so it is the owner's call rather than mine.
     - **Depends**: 3.2 · **Evidence**: `docs/rfc/evidence/probe-87-*.yaml`
+
+---
+
+# 4 · Close-out
+
+Closed **FORK-FORWARD** 2026-08-31. Every task is done except the one that was never a build
+task — the D-6/podman access decision, carried to `S34-service-account-runtime-access`.
+
+## What this sprint was actually for, in the end
+
+It was chartered to write a systemd unit so RFC-001 2.7's deletion could proceed. **It disproved
+that.** The unit shipped anyway, on its own merits; the deletion did not, and the RFC now says so
+with the measurement attached. A sprint whose first act invalidates its own premise is the
+cheapest outcome available — the alternative was implementing 2.7 and finding out from an
+operator whose installation moved.
+
+## The three defects found by checking rather than by building
+
+| | found by | would have surfaced as |
+|---|---|---|
+| `owner:` validated on read | reading the code the RFC pointed at | a typo in a dead field silently moving an operator's whole tree |
+| `appbay init` crashes for the D-6 account | running the documented next step on a real host | a raw bun stack trace on the first command after `init-system` |
+| a doc sweep deleted the `## edge` section | auditing "done" tasks against artifacts, not checkboxes | a router documented nowhere |
+
+## The process lesson, which cost the most
+
+`check-docs-cli`'s router half is guarded by `existsSync("apps/web/…")` — private-only — so
+running it from the public tree skips it and prints ✓. I validated a doc change there and
+shipped a deleted section. This is the same shape as S32 task 3.1's stale `packages/core/dist`.
+
+⇒ **A gate that is inert in one tree proves nothing when run there.** Both trees, or neither.
+The gate itself now also checks documented tRPC procedures against the routers, because a manual
+sweep missed the same class of thing twice in one sprint.
