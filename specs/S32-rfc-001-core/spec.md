@@ -313,15 +313,23 @@ for anything touching the runtime, a journey on both VMs.
     - **Depends**: 2.1 · **Requirements**: 1.3
 
 - [ ] 3. Secrets remainder (§3)
-  - [ ] 3.1 Narrow the manifest `provider:` enum to `vault` and reject the other four
-    - **Depends**: 2.2
+  - [x] 3.1 Narrow the manifest `provider:` enum to `vault` and reject the other four
+    - Both halves: the `provider:` field AND the `refs` values. Measured zero non-vault uses
+      across both catalogs, the UOM fixtures and system-apps, so nothing real breaks; all 162
+      still parse. The providers stay registered — `keepass://` remains usable at the CLI,
+      which is what the RFC asks. What changed is what a MANIFEST may say.
+    - 🚨 `check:docs-manifests` immediately failed six documented manifests this invalidated.
+      The guard written three units ago paid for itself on the first schema change after it.
+    - ⚠️ False pass on the way: the checker run from the PUBLIC tree said ✓ while the private
+      one showed six failures — stale `packages/core/dist`. Build before checking.
+    - **Depends**: 2.2 · **Pillar**: MVP, Docs
   - [ ] 3.2 Route `set-kdbx`/`get-kdbx`/`delete-kdbx` through `secrets set|get|delete`
     - `set-kdbx` still takes the value as argv (`secrets.ts:591`) with no stdin path — the
       exposure `secrets set` was already fixed for. **This is an I1 violation still live.**
     - **Depends**: 2.2 · **Requirements**: (I1)
-  - [ ] 3.3 Extract the duplicated scope/key split into one exported helper
+  - [x] 3.3 Extract the duplicated scope/key split into one exported helper
     - **Depends**: —
-  - [ ] 3.4 Fix the `vault.ts:96-101` comment — the depth is unbounded
+  - [x] 3.4 Fix the `vault.ts:96-101` comment — the depth is unbounded
     - **Depends**: —
 
 - [x] 4. `when` (§5)
