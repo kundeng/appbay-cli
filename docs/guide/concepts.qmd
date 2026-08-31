@@ -78,7 +78,7 @@ flowchart LR
     CO[Collection] -->|app selection| S[which apps deploy]
 ```
 
-### Installation settings — `$APPBAY_HOME/project.yaml`
+### Installation settings — `$APPBAY_HOME/etc/system.yaml`
 
 Settings that describe **this installation** rather than any one app. Written by `appbay init` and read on every command.
 
@@ -91,7 +91,7 @@ Settings that describe **this installation** rather than any one app. Written by
 | `ingress_provider` | `traefik` \| `caddy` | `traefik` | which reverse proxy the ingress trait emits for |
 
 ```yaml
-# $APPBAY_HOME/project.yaml
+# $APPBAY_HOME/etc/system.yaml
 project: homelab
 domain: homelab.example.com
 container_runtime: podman
@@ -106,17 +106,20 @@ appbay init --container-runtime podman --ingress-provider caddy
 
 Both accept a per-invocation override — `$APPBAY_CONTAINER_RUNTIME` and `$APPBAY_INGRESS_PROVIDER` — which wins over the file and is not persisted.
 
-::: {.callout-warning}
-## Two different files are called `project.yaml`
+::: {.callout-note}
+## Two files used to be called `project.yaml`
 
-They are not interchangeable and they share nothing but a filename.
+RFC-001 §2.1 renamed the installation config to `etc/system.yaml`, because the two shared
+nothing but a name and the root one held no project-scoped keys at all.
 
 | path | purpose | keys |
 |---|---|---|
-| `$APPBAY_HOME/project.yaml` | **this installation** — the table above | `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider` |
+| `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider` |
 | `$APPBAY_HOME/etc/projects/<name>/project.yaml` | **one project's variable scope**, described just below | `name`, `vars`, `defaults` |
 
-Everything from here to the end of this section is about the *second* one.
+⚠️ `$APPBAY_HOME/project.yaml` is still READ for one release so an install that has not been
+re-inited keeps working; `appbay init` moves it. Everything from here to the end of this
+section is about the *second* file.
 :::
 
 ### Project

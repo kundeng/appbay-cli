@@ -168,7 +168,7 @@ and exits non-zero.
 either is now a parse error naming the migration. Collections are selectors, not scope levels.
 
 ⚠️ Of the `${{scope.KEY}}` vocabulary, only `${{project.DOMAIN}}` resolves today — it reads
-the `domain:` line from `$APPBAY_HOME/project.yaml`. `${{environment.KEY}}` and
+the `domain:` line from `$APPBAY_HOME/etc/system.yaml`. `${{environment.KEY}}` and
 `${{service.KEY}}` parse but resolve against empty maps. See
 [the scope model reference](docs/reference/scope-model.qmd).
 

@@ -112,7 +112,7 @@ services:
 ```
 
 The `${{project.DOMAIN}}` reference resolves at compile time from the `domain:` line in
-`$APPBAY_HOME/project.yaml`.
+`$APPBAY_HOME/etc/system.yaml`.
 
 ⚠️ It is the only scope reference that resolves. `${{environment.KEY}}` and
 `${{service.KEY}}` are accepted by the parser but nothing populates those maps, so they
@@ -464,7 +464,7 @@ traits:
 ```
 
 The scope prefix selects which variable store is consulted. ⚠️ Only `project` has one:
-`${{project.DOMAIN}}` reads the `domain:` line from `$APPBAY_HOME/project.yaml`. The
+`${{project.DOMAIN}}` reads the `domain:` line from `$APPBAY_HOME/etc/system.yaml`. The
 `environment` and `service` prefixes parse but resolve against empty maps, so a reference to
 either always fails — see [Scope Model](../reference/scope-model.qmd).
 
