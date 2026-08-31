@@ -198,8 +198,23 @@ for anything touching the runtime, a journey on both VMs.
       explicit decision to keep `project` as the reference scope name while the declaration
       field is `namespace`. Not free, and not this task.
     - **Depends**: 1.1
-  - [ ] 1.3 Namespace into container/network/ingress identity, with `dnsSafe()`
-    - **Depends**: 1.2 · **Requirements**: 2.3
+  - [x] 1.3 Namespace into container/network/ingress identity, with `dnsSafe()`
+    - New `compiler/identity.ts` owns all six generated names. The alias was built in three
+      places independently and is a CONTRACT — it is the host the edge dials — so the
+      duplication was a fork waiting to happen.
+    - 🚨 **The namespace is OMITTED when absent or "default"**, which is what keeps this from
+      being a migration. All 155 manifests declare none, so unconditional inclusion would
+      rename every container on every existing host to disambiguate nothing. Tested:
+      `undefined`, `"default"` and `""` all reproduce the pre-§4 names byte for byte.
+    - `dnsSafe()` folds dots→hyphens wherever the namespace reaches a hostname [F54].
+    - **Depends**: 1.2 · **Requirements**: 2.3 · **Properties**: 4 · **Pillar**: MVP
+  - [x] 1.3b RFC 4.3 — make running-app discovery namespace-aware
+    - Not "moot" after all, which the §5 audit had concluded. §4.4 puts the namespace in the
+      container name, and `apps/web`'s surviving copy parsed the FIRST segment — so
+      `appbay.uom-sim.litellm.litellm` reports the app as `uom-sim`. Segment counting cannot
+      fix it (`appbay.<app>.<svc>` and `appbay.<ns>.<app>` are the same shape), so the
+      compiler stamps `com.appbay.app` and the reader uses it, with the name as fallback.
+    - **Depends**: 1.3
   - [ ] 1.4 Fix the `compile.ts:435`/`:517` suggestion — it names two files nothing reads and
         two flags that do not exist
     - **Depends**: 1.1
@@ -310,6 +325,13 @@ the running/stopped indicator in the web UI. §5 replaces the overlay caller onl
 - **Test approach**: `appbay-yaml.test.ts` asserts `namespace` is `undefined` and the key
   absent on `parse({})` — a default there silently breaks every `--namespace` again.
 
+### Property 4: an un-namespaced host is not renamed
+- **Statement**: *For any* app, when the namespace is absent or `default`, every generated
+  name equals what appbay produced before RFC-001 §4.
+- **Validates**: Requirement 2.3, and the absence of a migration
+- **Test approach**: `identity.test.ts` asserts the legacy strings for `undefined`,
+  `"default"` and `""`. If these change, every existing host renames on next converge.
+
 ### Property 3: targeting does not change the artifact
 - **Statement**: *For any* app, `compile({apps: [X]})` and `compile({})` render X identically.
 - **Validates**: Requirement 3.1
@@ -322,6 +344,13 @@ the running/stopped indicator in the web UI. §5 replaces the overlay caller onl
 - **Validates**: the two-instances-in-one-home goal of §4
 - **Test approach**: `generated-values.test.ts` "different inputs" varies one component per
   pair and asserts all four digests differ.
+
+**2026-08-31 — RFC 4.3 was not moot, and my §5 audit said it was.** The audit concluded
+4.3 (make `discoverRunningApps` namespace-aware) died with §5's caller removal. That held
+only until §4.4 put the namespace into the container name — at which point the *surviving*
+web copy mis-parses it. Two corrections one after the other on the same item: first "the
+function survives" (half true), then "4.3 is moot" (true only until the next task). The
+lesson is the same both times — a claim about a function with two copies needs to name which.
 
 **2026-08-31 — sequencing correction.** After §5 the next unit is **1.3** (RFC 4.4–4.6:
 namespace into container/network/ingress identity, with `dnsSafe()`), NOT §2. The design
