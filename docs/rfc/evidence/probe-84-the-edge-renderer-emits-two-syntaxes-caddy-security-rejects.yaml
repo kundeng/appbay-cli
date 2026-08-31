@@ -1,0 +1,80 @@
+record: probe-84-the-edge-renderer-emits-two-syntaxes-caddy-security-rejects
+type: probe
+title: the-edge-renderer-emits-two-syntaxes-caddy-security-rejects
+timestamp: "2026-08-31T06:38:00-04:00"
+claim: renderEdgeSecurityBlock is complete and needs only wiring (S32 task 5.1)
+verdict: 'refutes'
+key_evidence: 'run against the PINNED image, two of the three provider renderers emit Caddyfile
+  text that Caddy Security rejects, and neither is visible to tsc or to any unit test. (1) LDAP
+  `servers <url>` per line ADAPTS WITHOUT ERROR and then fails provisioning with "no
+  authentication servers found" — `servers` is a BLOCK, so the addresses land nowhere; this is
+  the worst shape because the config is syntactically valid. (2) OIDC `oauth identity provider
+  generic <name>` is rejected at adapt time with `unsupported "generic" shortcut: [appbay_idp]`
+  — the token after `provider` is the NAME and the driver is a DIRECTIVE INSIDE the block;
+  three candidate forms were tried and only `provider <name>` + `driver generic` adapts. Both
+  were fixed and all three configurations then return "Valid configuration". Separately, the
+  DEFAULT single-local-provider config now renders the shipped Caddyfile byte for byte, which
+  is what makes wiring it a no-op on every existing installation — verified twice: against
+  system-apps/caddy/config/Caddyfile, and against the file the compiled binary actually seeds.'
+exit_code: 0
+duration_s: 121
+command: >-
+  docker run --rm --network caddyprobe -v <generated>/Caddyfile:/etc/caddy/Caddyfile:ro
+  localhost/appbay-caddy-security:2.11.4-v1.1.64
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+output_kind: text
+output:
+  text: |
+    tree: fd774fc (public) / 2706b8f (private)
+    image: localhost/appbay-caddy-security:2.11.4-v1.1.64  (the pinned edge image)
+
+    == BEFORE — the renderer as S32 found it ==
+      default   Valid configuration
+      ldap      Error: loading security app module: provision security: server initialization
+                failed: failed configuring identity store: no authentication servers found
+      oidc      Error: adapting config using caddyfile: parsing caddyfile tokens for 'security':
+                unsupported "generic" shortcut: [appbay_idp], at /etc/caddy/Caddyfile:27
+
+    == defect 1 — `servers` is a BLOCK, not a repeated directive ==
+      emitted:  servers ldaps://dc1.corp.example.org
+                servers ldaps://dc2.corp.example.org
+      correct:  servers {
+                    ldaps://dc1.corp.example.org
+                    ldaps://dc2.corp.example.org
+                }
+      🚨 The flat form ADAPTS CLEANLY. Nothing in the Caddyfile grammar rejects it; the
+         failure is at provisioning, and it says the servers are missing rather than that
+         the syntax is wrong. Every unit test passed on the broken form.
+
+    == defect 2 — the oidc driver is a directive, not a positional token ==
+      three forms tried against the image:
+        oauth identity provider generic <name>    → adapt error: unsupported "generic" shortcut
+        oauth identity provider generic           → adapt error (same class)
+        oauth identity provider <name>            → ADAPTS; provisioning proceeds to fetch
+          + driver generic                          the issuer metadata
+      Reaching the metadata fetch is what proves the syntax: the remaining errors were
+      `dial tcp: lookup idp.example.org: no such host`, then `failed to fetch jwt keys ...
+      invalid character '<'` once a local metadata endpoint was served. With a real
+      .well-known/openid-configuration and a generated RS256 JWKS on the probe network:
+        oidc      Valid configuration
+
+    == AFTER — all three, same image ==
+      default   Valid configuration
+      ldap      Valid configuration
+      oidc      Valid configuration
+
+    == the default is a no-op, which is what makes wiring safe ==
+      diff <(applyEdgeIdentity(SYSTEM_APPS.caddy.files, DEFAULT)) system-apps/caddy/config/Caddyfile
+        → identical
+
+      and through the compiled binary, not just the library:
+        appbay init  (no edge_identity:)   → seeded Caddyfile identical to shipped ✓
+        appbay init  (ldap configured)     → ldap identity store appbay_corp { servers { … } }
+                                             appbay.yaml:  EDGE_LDAP_BIND_PASSWORD_CORP: "vault://caddy/LDAP_BIND_PASSWORD"
+                                             compose:      - EDGE_LDAP_BIND_PASSWORD_CORP=${EDGE_LDAP_BIND_PASSWORD_CORP:?required}
+        both seeded files                  → caddy validate: Valid configuration ✓
+
+    == operational note for whoever configures oidc ==
+      Caddy Security fetches the issuer metadata AND the JWKS at PROVISION time. An
+      unreachable IdP is therefore a start-up failure for the whole edge, not a degraded
+      login. That is a real availability coupling and belongs in the docs for the key.

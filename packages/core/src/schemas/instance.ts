@@ -26,6 +26,7 @@
 
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
+import { EdgeIdentityConfigSchema } from "./edge-identity-providers.js";
 
 /**
  * Container runtime that drives compose and container commands.
@@ -182,6 +183,21 @@ export const InstanceConfigSchema = z.object({
    * provider module. Neither happens without it.
    */
   acme_dns_provider: AcmeDnsProviderSchema.optional(),
+
+  /**
+   * Which identity providers the edge authenticates against — RFC-001 §1 (task 5.1b).
+   *
+   * 🚨 ABSENT IS NOT "no identity". It means the single local store, which is what every
+   * installation has had since before this key existed. The edge renders the same block for
+   * absent and for an explicit single-local config — byte for byte, asserted in
+   * `edge-portal-config.test.ts` — so adding this key changes nothing until an operator puts
+   * a provider in it.
+   *
+   * Setting an `ldap` or `oidc` provider is what makes the human-password count reach zero:
+   * what remains is one `bindPasswordRef` / `clientSecretRef`, a `vault://` secret routed
+   * through the ordinary path with no second mechanism.
+   */
+  edge_identity: EdgeIdentityConfigSchema.optional(),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;

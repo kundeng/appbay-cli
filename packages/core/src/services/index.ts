@@ -24,6 +24,7 @@ export * from "./edge-identity-service.js";
 
 // Caddy Security portal/identity block rendering
 export * from "./edge-portal-config.js";
+export * from "./edge-caddy-files.js";
 
 // Recoverable edge stack migration (one host, one edge)
 export * from "./edge-migration-service.js";

@@ -437,13 +437,37 @@ for anything touching the runtime, a journey on both VMs.
       discriminate: reintroducing defect 1 fails 2 tests, defect 3 fails 3. A `toContain`
       suite would have passed against the broken draft.
     - **Depends**: 2.1 · **Pillar**: MVP, Test
-  - [ ] 5.1b Wire it: a config source, the render step, and `edgeSecretEnvMapping` injection
-    - Now safe to do, because 5.1a proved the output is identical for every existing install.
-      Still missing: nothing LOADS an `EdgeIdentityConfig` — the schema exists and no reader
-      does. Needs a source (an `edge_identity:` key in `etc/system.yaml` is the natural one
-      after §2.1), the deploy-time render into the Caddyfile, and the env injection so
-      `{env.EDGE_LDAP_BIND_PASSWORD_*}` resolves through the normal secret path.
-    - **Depends**: 5.1a
+  - [x] 5.1b Wired: `edge_identity:` in `etc/system.yaml` → Caddyfile + secret ref + compose env
+    - Source is `edge_identity:` on `InstanceConfigSchema`, which §2.1 had just made the right
+      home. Absent = the single local store, which renders the shipped block byte for byte, so
+      an installation that never sets it sees no drift and no refresh.
+    - `services/edge-caddy-files.ts` applies the config to caddy's three seeded files: the
+      `security {}` block, the `secrets` trait ref, and the compose env line. A TRANSFORM and
+      not a template, because `system-apps.ts` is GENERATED from `system-apps/` and cannot
+      itself depend on runtime config. Every missing anchor THROWS — a transform that quietly
+      declined to find its anchor would seed an edge with no LDAP provider and report success.
+    - The bind password is deliberately NOT added to `optional:`. The ACME credentials are
+      optional because an install may legitimately have none; a configured provider's bind
+      password is not, and a portal that starts without it says "wrong username or password"
+      to every user.
+    - 🚨 **Two renderer defects that only `caddy validate` could find** — probe-84:
+      1. LDAP `servers <url>` per line **adapts without error** and then fails provisioning
+         with "no authentication servers found". `servers` is a BLOCK. Every unit test passed
+         on the broken form; this is the worst shape because the config is syntactically valid.
+      2. OIDC `oauth identity provider generic <name>` is rejected at adapt time —
+         `unsupported "generic" shortcut`. The token after `provider` is the NAME and the
+         driver is a directive INSIDE the block. Three candidate forms were tried; one adapts.
+    - Verified against the **pinned image** `localhost/appbay-caddy-security:2.11.4-v1.1.64`:
+      default, ldap and oidc all return `Valid configuration` (oidc needed a local
+      `.well-known/openid-configuration` plus a generated RS256 JWKS, because Caddy Security
+      fetches both at PROVISION time — an unreachable IdP fails the whole edge, which is now
+      documented).
+    - Verified through the compiled binary, not just the library: `init` with no
+      `edge_identity:` seeds a Caddyfile byte-identical to the shipped one; `init` with an ldap
+      provider seeds the store, the `vault://` ref and the `:?required` compose env, and the
+      seeded file itself passes `caddy validate`.
+    - **Depends**: 5.1a · **Requirements**: 4.1 · **Pillar**: MVP, Test, Docs
+    - **Evidence**: `docs/rfc/evidence/probe-84-*.yaml`
   - [ ] 5.2 Cut `apps/web` over to the edge identity store
     - **Depends**: 5.1b · **Requirements**: 4.1
   - [ ] 5.3 Only now: delete `admin.ts`, the schema module, `hashControlPlanePassword`, the

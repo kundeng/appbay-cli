@@ -128,6 +128,38 @@ describe("additional providers ADD to the default, they do not replace it", () =
     expect(out.indexOf("appbay_local {")).toBeLessThan(out.indexOf("appbay_corp {"));
   });
 
+  // 🚨 Both of the next two were LIVE BUGS that every other test in this file passed on.
+  // They were caught only by running `caddy validate` against the pinned image, so these
+  // assertions exist to make the syntax checkable without a container.
+  it("emits `servers` as a BLOCK — the flat form silently yields zero servers", () => {
+    // `servers <url>` per line ADAPTS without error and then fails provisioning with
+    // "no authentication servers found". Nothing in the Caddyfile syntax rejects it.
+    const out = renderEdgeSecurityBlock(withLdap);
+    expect(out).toMatch(/\n\t\t\tservers \{\n\t\t\t\tldaps:\/\/dc1\.corp\.example\.org\n\t\t\t\}/);
+    expect(out).not.toMatch(/servers ldaps:/);
+  });
+
+  it("puts the oidc driver INSIDE the block, not after `provider`", () => {
+    // `oauth identity provider generic <name>` is rejected at adapt time with
+    // `unsupported "generic" shortcut: [<name>]`. The token after `provider` is the NAME.
+    const withOidc = EdgeIdentityConfigSchema.parse({
+      providers: [
+        { type: "local", realm: "local" },
+        {
+          type: "oidc",
+          realm: "idp",
+          issuerUrl: "https://idp.example.org/",
+          clientId: "appbay",
+          clientSecretRef: "vault://caddy/OIDC_CLIENT_SECRET",
+        },
+      ],
+    });
+    const out = renderEdgeSecurityBlock(withOidc);
+    expect(out).toContain("oauth identity provider appbay_idp {");
+    expect(out).toContain("\t\t\tdriver generic");
+    expect(out).not.toContain("provider generic appbay_idp");
+  });
+
   it("renders the bind password as an env placeholder, never as a value", () => {
     // Rendering the value would put a bind password in var/lib/renders/**, on disk and in
     // the plan diff.

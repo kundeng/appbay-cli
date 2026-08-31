@@ -37,6 +37,9 @@ import {
   inspectEdgePorts,
   catalogAddSource,
   readInstanceConfigText,
+  applyEdgeIdentity,
+  EdgeIdentityConfigSchema,
+  type EdgeIdentityConfig,
   SYSTEM_CONFIG_REL,
   LEGACY_INSTANCE_CONFIG_REL,
   persistMasterPassword,
@@ -303,6 +306,23 @@ function ensureDockerNetwork(): boolean {
 }
 
 /**
+ * Read this installation's edge identity configuration — RFC-001 §1 (5.1b).
+ *
+ * 🚨 ABSENT IS THE DEFAULT, NOT AN ERROR. Every installation predates this key, so a missing
+ * `edge_identity:` must resolve to the single local store — which renders the shipped block
+ * byte for byte, so nothing about an existing edge changes.
+ *
+ * An UNPARSEABLE value is different and must not be swallowed: silently falling back to the
+ * default would seed an edge with no LDAP provider while reporting success, and the operator
+ * would meet "wrong username or password" for every user with nothing naming the cause.
+ */
+function resolveEdgeIdentity(appbayHome: string): EdgeIdentityConfig {
+  const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
+  const declared = parseInstanceConfig(raw).edge_identity;
+  return declared ?? EdgeIdentityConfigSchema.parse({});
+}
+
+/**
  * Seed built-in system app definitions into the apps directory.
  *
  * Uses the embedded SYSTEM_APPS definitions from @appbay/core so that
@@ -311,7 +331,7 @@ function ensureDockerNetwork(): boolean {
  */
 async function seedSystemApps(
   appsDir: string,
-  opts: { refresh?: boolean; edge: IngressProvider },
+  opts: { refresh?: boolean; edge: IngressProvider; edgeIdentity: EdgeIdentityConfig },
 ): Promise<{ seeded: string[]; stale: string[]; refreshed: string[] }> {
   const seeded: string[] = [];
   const stale: string[] = [];
@@ -322,6 +342,13 @@ async function seedSystemApps(
       continue;
     }
     const appDir = join(appsDir, app.name);
+
+    // RFC-001 §1 (5.1b) — caddy's files are a function of the installation's identity
+    // configuration. For the default single-local-provider config this is byte-for-byte the
+    // shipped definition (asserted in edge-caddy-files.test.ts), so an installation that has
+    // never set `edge_identity:` sees no drift and no refresh.
+    const files =
+      app.name === "caddy" ? applyEdgeIdentity(app.files, opts.edgeIdentity) : app.files;
 
     // 🚨 "INSTALLED" IS A COMPOSE FILE, NOT A DIRECTORY, and the difference is not
     // pedantry — it was a real bug found deploying on a VM.
@@ -351,7 +378,7 @@ async function seedSystemApps(
       // worse failure. `--refresh-system-apps` is the explicit act; a converge that does not
       // ask still gets told.
       const drifted: string[] = [];
-      for (const [filename, content] of Object.entries(app.files)) {
+      for (const [filename, content] of Object.entries(files)) {
         const filePath = join(appDir, filename);
         const current = await readFile(filePath, "utf-8").catch(() => null);
         if (current !== content) drifted.push(filename);
@@ -369,7 +396,7 @@ async function seedSystemApps(
           await rename(filePath, `${filePath}.bak`).catch(() => undefined);
         }
         await mkdir(dirname(filePath), { recursive: true });
-        await writeFile(filePath, app.files[filename], "utf-8");
+        await writeFile(filePath, files[filename] as string, "utf-8");
       }
       refreshed.push(`${app.name} (${drifted.join(", ")})`);
       continue;
@@ -377,7 +404,7 @@ async function seedSystemApps(
 
     await mkdir(appDir, { recursive: true });
 
-    for (const [filename, content] of Object.entries(app.files)) {
+    for (const [filename, content] of Object.entries(files)) {
       const filePath = join(appDir, filename);
       // ⚠️ Still never clobber a file that exists. A half-populated directory gets
       // completed, not reset — an operator's edited Caddyfile must survive.
@@ -874,6 +901,7 @@ export const initCommand = new Command("init")
       const sys = await seedSystemApps(appsDir, {
         refresh: options.refreshSystemApps === true,
         edge: ingressProvider ?? resolveIngressProvider(appbayHome),
+        edgeIdentity: resolveEdgeIdentity(appbayHome),
       });
       if (sys.seeded.length > 0) {
         console.log("  Seeded system apps:");

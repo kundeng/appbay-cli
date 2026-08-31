@@ -76,7 +76,14 @@ function renderLdap(p: Extract<EdgeIdentityProvider, { type: "ldap" }>): string[
   const out = [
     `\t\tldap identity store ${storeName(p.realm)} {`,
     `\t\t\trealm ${p.realm}`,
-    ...p.servers.map((s) => `\t\t\tservers ${s}${p.tlsInsecureSkipVerify ? " ignore_cert_errors" : ""}`),
+    // 🚨 `servers` IS A BLOCK, NOT A REPEATED DIRECTIVE. Written as `servers <url>` per line
+    // the Caddyfile still ADAPTS — no parse error — and then provisioning fails with
+    // "no authentication servers found", because the addresses land nowhere. Caught only by
+    // running `caddy validate` against the pinned image; every unit test passed on the
+    // broken form. Do not flatten this back to one line per server.
+    `\t\t\tservers {`,
+    ...p.servers.map((s) => `\t\t\t\t${s}${p.tlsInsecureSkipVerify ? " ignore_cert_errors" : ""}`),
+    `\t\t\t}`,
     `\t\t\tattributes {`,
     `\t\t\t\tname givenName`,
     `\t\t\t\tsurname sn`,
@@ -99,8 +106,13 @@ function renderLdap(p: Extract<EdgeIdentityProvider, { type: "ldap" }>): string[
 
 function renderOidc(p: Extract<EdgeIdentityProvider, { type: "oidc" }>): string[] {
   return [
-    `\t\toauth identity provider generic ${storeName(p.realm)} {`,
+    // 🚨 THE DRIVER IS A DIRECTIVE, NOT A POSITIONAL TOKEN. `oauth identity provider generic
+    // <name>` is rejected at adapt time with `unsupported "generic" shortcut: [<name>]` — the
+    // token after `provider` is the NAME, and the driver goes inside the block. Verified
+    // against the pinned image; all three wrong forms were tried and only this one adapts.
+    `\t\toauth identity provider ${storeName(p.realm)} {`,
     `\t\t\trealm ${p.realm}`,
+    `\t\t\tdriver generic`,
     `\t\t\tbase_auth_url ${p.issuerUrl}`,
     `\t\t\tmetadata_url ${p.issuerUrl.replace(/\/+$/, "")}/.well-known/openid-configuration`,
     `\t\t\tclient_id ${p.clientId}`,

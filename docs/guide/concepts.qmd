@@ -89,6 +89,7 @@ Settings that describe **this installation** rather than any one app. Written by
 | `catalog_source` | path or git URL | bundled catalog | where `appbay install` looks |
 | `container_runtime` | `docker` \| `podman` | `docker` | which container binary every command invokes |
 | `ingress_provider` | `traefik` \| `caddy` | `traefik` | which reverse proxy the ingress trait emits for |
+| `edge_identity` | provider list | one local store | who the Caddy edge authenticates against |
 
 ```yaml
 # $APPBAY_HOME/etc/system.yaml
@@ -98,13 +99,51 @@ container_runtime: podman
 ingress_provider: caddy
 ```
 
-The last two are set through `appbay init`, which applies them on re-init too and reports `created` / `updated` / `unchanged`:
+`container_runtime` and `ingress_provider` are set through `appbay init`, which applies them on re-init too and reports `created` / `updated` / `unchanged`:
 
 ```bash
 appbay init --container-runtime podman --ingress-provider caddy
 ```
 
 Both accept a per-invocation override — `$APPBAY_CONTAINER_RUNTIME` and `$APPBAY_INGRESS_PROVIDER` — which wins over the file and is not persisted.
+
+### Who the edge lets in {#edge-identity}
+
+By default the Caddy edge has a single **local** identity store — the accounts `appbay edge
+users` manages, hashed into `etc/apps/caddy/config/security/users.json`. `edge_identity:`
+replaces that with a directory or an OIDC provider, at which point appbay stores no human
+password at all: what remains is one bind password or client secret, a `vault://` reference
+like any other.
+
+```yaml
+# $APPBAY_HOME/etc/system.yaml
+edge_identity:
+  providers:
+    - type: local            # keep a break-glass local account
+      realm: local
+    - type: ldap
+      realm: corp
+      servers: ["ldaps://dc1.corp.example.com"]
+      bindDn: "CN=svc-appbay,OU=Service,DC=corp,DC=example,DC=com"
+      bindPasswordRef: "vault://caddy/LDAP_BIND_PASSWORD"
+      searchBaseDn: "DC=corp,DC=example,DC=com"
+      searchUserFilter: "(&(sAMAccountName=%s)(objectclass=user))"
+      groupRoleMap:
+        "CN=AppBay-Admins,OU=Groups,DC=corp,DC=example,DC=com": ["authp/admin"]
+```
+
+`appbay init` renders this into the edge's Caddyfile and adds `bindPasswordRef` to caddy's
+secrets trait, so the credential travels the ordinary secret path and never reaches a file on
+disk. Omitting the key is the single local store — byte for byte the configuration every
+installation has always had, so adding nothing changes nothing.
+
+⚠️ **Provider order is load-bearing.** Caddy Security tries them in the order listed and the
+first is the portal's default store, so a broad provider listed first shadows a narrower one
+after it.
+
+⚠️ **An `oidc` provider couples edge start-up to the IdP.** Caddy Security fetches the issuer
+metadata *and* the signing keys while provisioning, so an unreachable IdP fails the whole edge
+rather than degrading logins. Keeping a `local` provider in the list is the break-glass path.
 
 ::: {.callout-note}
 ## Two files used to be called `project.yaml`
@@ -114,17 +153,20 @@ nothing but a name and the root one held no project-scoped keys at all.
 
 | path | purpose | keys |
 |---|---|---|
-| `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider` |
+| `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider`, `edge_identity` |
 | `$APPBAY_HOME/etc/projects/<name>/project.yaml` | **one project's variable scope**, described just below | `name`, `vars`, `defaults` |
 
-⚠️ `$APPBAY_HOME/etc/system.yaml` is still READ for one release so an install that has not been
-re-inited keeps working; `appbay init` moves it. Everything from here to the end of this
-section is about the *second* file.
+⚠️ The old path `$APPBAY_HOME/project.yaml` is still READ for one release so an install that
+has not been re-inited keeps working; `appbay init` moves it. Everything from here to the end
+of this section is about the *second* file.
 :::
 
 ### Project
 
-A **project** is a variable scope namespace. It determines which `projects/<project>/project.yaml` variable file is loaded when resolving `${{project.KEY}}` references.
+A **namespace** disambiguates one copy of an app from another on the same host. It is a
+*label*, not a variable scope: it does not select a variable file, and `${{project.KEY}}` does
+not read it. That reference resolves against the **installation** config above, which is one
+file per host shared by every namespace on it — see [Scope Model](../reference/scope-model.qmd).
 
 ```yaml
 # appbay.yaml
@@ -140,7 +182,12 @@ and the shared alias `homelab_<app>_<service>`, so two namespaces of one app do 
 Dots in a namespace become hyphens wherever the name reaches a hostname, because a dot
 separates labels in DNS: `namespace: uom.sim` publishes `uom-sim_<app>_<service>`.
 
-Use multiple projects when you need separate variable namespaces -- for example, `homelab` and `work-lab` can each have their own `DOMAIN`, `TZ`, and other project-level vars on the same host.
+Use a namespace when you need two copies of an app side by side — `homelab` and `work-lab`
+get distinct containers, networks and shared aliases and never collide.
+
+⚠️ They do **not** get distinct variables. There is one `domain:` per installation, so
+`${{project.DOMAIN}}` is the same value in every namespace. Per-namespace variables are not
+implemented; use a plain Compose `${VAR}` from the app's `.env` for a value that must differ.
 
 ### Environment
 
@@ -156,7 +203,10 @@ to `default` — so RFC-001 §4 collapsed them into one dot-delimited `namespace
 values: `prod` (real domain, production certs), `dev` (localhost, staging certs), or a
 compound like `uom.sim`.
 
-The environment for an app is set in `appbay.yaml` via the `environment:` field. To deploy with a different environment, update `appbay.yaml` or maintain separate app directories per environment.
+⚠️ There is no `environment:` field any more. It was removed with `project:` in RFC-001 §4 and
+the schema now accepts only the literal `default` for either, so an old manifest still parses
+and a manifest trying to *use* one fails loudly instead of being silently ignored. Put the
+variant in `namespace:` — `namespace: uom.sim` — and deploy a second copy alongside the first.
 
 ### Collection
 
