@@ -5,7 +5,10 @@ description: "Every tRPC procedure with input and output types"
 
 ## Overview
 
-All API endpoints are tRPC procedures served at `/api/trpc/`. Except where noted, all procedures require authentication via session cookie or bearer token.
+All API endpoints are tRPC procedures served at `/api/trpc/`. Except where noted, all procedures
+require an authenticated caller — which since RFC-001 §1 means the Caddy Security edge has
+authenticated the person and injected `Remote-User`. There is no session cookie and no bearer
+token; AppBay neither issues nor reads one.
 
 ## Notation
 

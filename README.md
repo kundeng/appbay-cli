@@ -137,25 +137,26 @@ appbay completion        Generate shell completions
 `appbay --help` is authoritative, and
 [the CLI reference](docs/reference/cli-commands.qmd) documents every flag.
 
-### The three credentials
+### The two credentials
 
-AppBay has three independent passwords. Each is recovered by a different command, and
-they are never synchronized — see [the credentials guide](docs/guide/credentials.qmd).
+AppBay has two independent passwords — see [the credentials guide](docs/guide/credentials.qmd).
 
 ```
-appbay secrets vault rotate-password     The vault password (unlocks vault.enc)
-appbay edge users reset-password <user>  An edge user (signs in to your deployed apps)
-appbay admin reset-password <user>       The AppBay control-plane account (the web UI)
+appbay edge users reset-password <user>  Signs in to your deployed apps — AND to AppBay itself
+appbay secrets vault rotate-password     The master password (unlocks vault.enc)
 ```
 
-⚠️ `appbay admin reset-password` needs the control-plane database, which only the server
-creates. On a CLI-only install it crashes with a raw `SQLiteError` and leaves a zero-byte
-`var/lib/appbay.db` behind — verified 2026-08-31 against `v0.0.1-alpha.11`. If you have not
-deployed the web UI, the account it resets does not exist and this command has nothing to do.
-The credential you almost certainly want is `appbay edge users reset-password`.
+There used to be three. RFC-001 §1 removed the separate **control-plane account**: the web UI
+sits behind the Caddy Security edge like any other app, so the edge account is the account.
+Reaching the control plane additionally requires the `authp/admin` role — its edge route carries
+an admin-only policy, because it is the one stack that can reach the container runtime socket.
 
-`appbay authelia` and `appbay auth` are retired; running either explains what replaced it
-and exits non-zero.
+⚠️ Signing in is not the same as decrypting. The master password stays separate so that
+reaching the UI does not hand someone every secret in the vault, and so the CLI can open the
+vault on a host where no edge is running.
+
+`appbay authelia`, `appbay auth` and `appbay admin` are retired; running any of them explains
+what replaced it and exits non-zero.
 
 ## Scope Model
 

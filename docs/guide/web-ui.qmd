@@ -295,24 +295,43 @@ The settings screen includes visual customization options:
 
 ## Authentication
 
-All web UI access requires authentication. The following rules apply:
+The web UI does not authenticate anyone. The Caddy Security edge does, before a request reaches
+it at all, and injects the identity as a `Remote-User` header.
 
 | Access path | Requirement |
 |-------------|-------------|
-| All web pages | Valid session cookie |
-| tRPC API calls | Valid session cookie or bearer token |
-| SSE connections | Auth token validated on connect |
-| `health.get` endpoint | No auth (for load balancer health checks) |
+| All web pages | the edge's identity header |
+| tRPC API calls | the same header, read in `createContext` |
+| SSE connections | the same header, checked on connect |
+| `health.get` endpoint | none — so bootstrap can check a server nobody has signed into |
 
-### Login screen
+⚠️ There is no session cookie and no bearer token. AppBay neither issues nor reads one; the
+edge's cookie is its own. RFC-001 §1 removed the account system that had them.
 
-**Route:** `/login`
+### Signing in
 
-Enter your username and password. Sessions are managed via HTTP-only secure cookies with configurable expiry.
+**Route:** `https://appbay.<your-domain>` — anything else is redirected to the edge portal at
+`/auth`. There is no `/login` page.
 
-### Logout
+Sign in with an edge user (`appbay edge users`), the same account that signs in to your deployed
+apps. Reaching the control plane additionally requires the `authp/admin` role, because it is the
+one stack that can reach the container runtime socket.
 
-Click your username in the top-right corner and select "Logout" to end your session.
+⚠️ If the UI says it is **not reachable through the edge**, that is a deployment problem rather
+than a login one — the server has no way to authenticate anyone and is refusing to serve. Run
+`appbay init --ingress-provider caddy`, set `domain:` in `etc/system.yaml`, then
+`appbay server start`.
+
+### Signing out
+
+Through the edge portal, which owns the session. AppBay has none to end.
+
+### Managing accounts
+
+**Route:** `/identity` — the same `EdgeIdentityStore` the CLI drives, so the two never disagree.
+
+⚠️ Not `/auth`: the edge reserves `/auth*` for its login portal, so a page there is unreachable
+once the control plane is behind the edge.
 
 ## Keyboard shortcuts reference
 
