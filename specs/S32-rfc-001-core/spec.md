@@ -370,8 +370,20 @@ mechanically guarded — `pnpm check:docs-manifests` fails on a documented manif
 rejects. `overlays.qmd` had documented §5.2's defect as the intended design; `scope-model.qmd`
 described two variable stores that never existed.
 
-⚠️ Still unchecked: `traits.qmd`, `secrets.qmd`, `web-ui.qmd`. Their yaml blocks pass the
-manifest guard, but their prose has not been read against the code.
+**Docs pillar (2026-08-31, third pass) — the remaining three were checked and were wrong.**
+`traits.qmd`, `secrets.qmd` and `web-ui.qmd` passed the manifest guard because their yaml is
+valid; their PROSE taught two variable stores that do not exist. `secrets.qmd` had an entire
+"Scoped secrets" section instructing operators to define an `ENV` var in
+`etc/projects/<name>/environments/<env>.yaml` and interpolate it into a vault URI — every
+step of which resolves to nothing. It also documented `vault://<environment>/<folder>/<secret-name>`
+as *the* URI format; measured, `parseVaultUri` takes the last segment as the key and any
+depth before it, and all 66 real references are two-segment `vault://<app>/<KEY>`.
+
+⚠️ **A guard that checks syntax does not check claims.** The manifest checker was green on all
+three files throughout. Structural validity and truth are different properties, and only one
+of them is mechanisable here.
+
+All six guide/reference docs now match the code.
 
 **2026-08-31 — the verification gate was wrong, and it was mine, not the repo's.** The
 namespace commit landed in both trees reporting `pnpm -r test` green (core 857, cli 379, web
