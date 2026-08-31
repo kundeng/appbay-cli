@@ -17,7 +17,7 @@ import {
   loadProjectVars,
   isSystemApp,
 } from "@appbay/core";
-import { dockerCompose, discoverRunningApps } from "../utils/docker.js";
+import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 import { cliContainerBin } from "../utils/docker.js";
@@ -59,7 +59,6 @@ export const upCommand = new Command("up")
       dockerCompose: (subArgs, composePath, env) => {
         return dockerCompose(subArgs, composePath, env);
       },
-      discoverRunning: () => discoverRunningApps(),
     });
 
     // Report compile errors

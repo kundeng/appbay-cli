@@ -23,8 +23,12 @@ export interface OverlayInput {
     when: WhenClause;
     services: Record<string, Record<string, unknown>>;
   }>;
-  /** Names of currently active (enabled) apps. */
-  activeApps: Set<string>;
+  /**
+   * Names of INSTALLED apps — the full declared set, not what happens to be running.
+   * RFC-001 §5: `when: [a, b]` asserts a and b are installed, which is a fact about
+   * desired state, knowable at compile time and needing no container runtime.
+   */
+  installedApps: Set<string>;
 }
 
 /** An overlay whose `when` clause was satisfied. */
@@ -64,11 +68,11 @@ function isAndClause(clause: WhenClause): clause is string[] {
  */
 function evaluateClause(
   clause: WhenClause,
-  activeApps: Set<string>,
+  installedApps: Set<string>,
 ): string | null {
   if (isAndClause(clause)) {
     // AND -- every listed app must be active.
-    const missing = clause.filter((app) => !activeApps.has(app));
+    const missing = clause.filter((app) => !installedApps.has(app));
     if (missing.length > 0) {
       return `AND clause not met: missing app(s) ${missing.join(", ")}`;
     }
@@ -77,7 +81,7 @@ function evaluateClause(
 
   // OR -- at least one of the listed apps must be active.
   const { any: apps } = clause;
-  const found = apps.some((app) => activeApps.has(app));
+  const found = apps.some((app) => installedApps.has(app));
   if (!found) {
     return `OR clause not met: none of ${apps.join(", ")} are active`;
   }
@@ -97,7 +101,7 @@ export function selectActiveOverlays(input: OverlayInput): OverlayResult {
   const inactiveOverlays: InactiveOverlay[] = [];
 
   for (const overlay of input.overlays) {
-    const reason = evaluateClause(overlay.when, input.activeApps);
+    const reason = evaluateClause(overlay.when, input.installedApps);
     if (reason === null) {
       activeOverlays.push({
         when: overlay.when,

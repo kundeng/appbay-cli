@@ -6,7 +6,7 @@
  *   2. For each app:
  *      a. Upstream transform -- if appbayConfig has upstream, transform it
  *      b. Resolve variables -- resolve ${{scope.KEY}} refs in compose
- *      c. Select overlays -- evaluate when clauses against activeApps
+ *      c. Select overlays -- evaluate when clauses against the INSTALLED app set
  *      d. Apply traits -- run trait engine with registry
  *      e. Render -- assemble final compose YAML
  *      f. Plan -- diff against current rendered file on disk
@@ -48,7 +48,15 @@ import { resolveBuilds, buildShepherdAction } from "./builds.js";
 // Public types
 // ---------------------------------------------------------------------------
 
-/** Options for the compile() orchestrator. */
+/**
+ * Options for the compile() orchestrator.
+ *
+ * ⚠️ There is deliberately no `activeApps` here. Overlays used to be evaluated against a
+ * `podman ps` snapshot passed in by the caller; RFC-001 §5 makes `when:` mean *installed*,
+ * which is a fact about the declared app set. It is derived inside `compile()` rather than
+ * accepted as input, because it must be the FULL declared set — accepting it from the caller
+ * is exactly how `appbay up openwebui` and `appbay up` came to produce different artifacts.
+ */
 export interface CompileOptions {
   /** Path to apps directory (e.g., $APPBAY_HOME/etc/apps). */
   appsDir: string;
@@ -58,8 +66,6 @@ export interface CompileOptions {
   stateDir: string;
   /** Specific apps to compile (default: all discovered). */
   apps?: string[];
-  /** Currently active apps (for overlay evaluation). */
-  activeApps?: Set<string>;
   /** Runtime facts for trait context. */
   runtimeFacts?: RuntimeFacts;
   /** Deployment namespace (default: "default"). RFC-001 §4. */
@@ -166,7 +172,6 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     rendersDir,
     stateDir,
     apps: requestedApps,
-    activeApps = new Set<string>(),
     runtimeFacts = DEFAULT_RUNTIME_FACTS,
     namespace,
     projectVars = {},
@@ -206,6 +211,12 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     }
   }
 
+  // RFC-001 §5.2: the installed set is the FULL declared set, captured BEFORE the target
+  // filter below. That ordering is the whole fix — evaluating `when:` against the filtered
+  // set meant `appbay up openwebui` saw one app installed and `appbay up` saw all of them,
+  // so the same manifest compiled to different artifacts depending on the command line.
+  const installedApps = new Set(discovered.map((app) => app.name));
+
   // Filter to requested apps if specified.
   if (requestedApps && requestedApps.length > 0) {
     const requested = new Set(requestedApps);
@@ -240,7 +251,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
         app,
         appsDir,
         rendersDir,
-        activeApps,
+        installedApps,
         runtimeFacts,
         registry,
         generatedValueStore,
@@ -335,7 +346,7 @@ interface CompileAppInput {
   app: DiscoveredApp;
   appsDir: string;
   rendersDir: string;
-  activeApps: Set<string>;
+  installedApps: Set<string>;
   runtimeFacts: RuntimeFacts;
   registry: TraitRegistry;
   generatedValueStore: GeneratedValueStore;
@@ -359,7 +370,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     app,
     appsDir,
     rendersDir,
-    activeApps,
+    installedApps,
     runtimeFacts,
     registry,
     generatedValueStore,
@@ -454,7 +465,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   if (config?.overlays && config.overlays.length > 0) {
     const overlayResult = selectActiveOverlays({
       overlays: config.overlays,
-      activeApps,
+      installedApps,
     });
     activeOverlaysForLog = overlayResult.activeOverlays;
 

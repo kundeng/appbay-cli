@@ -252,6 +252,11 @@ function didConverge(
 }
 
 /** Callback for discovering currently running apps. */
+/**
+ * ⚠️ RETIRED by RFC-001 §5 and kept only as a name for `apps/web`'s status-display helper,
+ * which is a different job. `deploy()` no longer takes one: overlays evaluate against the
+ * INSTALLED app set, which `compile()` derives itself.
+ */
 export type RunningAppsDiscoverer = () => Set<string>;
 
 /** Per-app deploy result in the shepherd pipeline. */
@@ -307,7 +312,6 @@ export interface DeployOptions {
   /** Docker compose runner (injected by caller). */
   dockerCompose: DockerComposeRunner;
   /** Running apps discoverer (injected by caller). */
-  discoverRunning: RunningAppsDiscoverer;
   /** Project-level variables (e.g., { DOMAIN: "example.com" }). */
   projectVars?: Record<string, string>;
 }
@@ -571,7 +575,7 @@ async function runShepherdActions(
  *   4. Post-deploy hooks
  */
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
-  const { appbayHome, dockerCompose: runDockerCompose, discoverRunning } = options;
+  const { appbayHome, dockerCompose: runDockerCompose } = options;
   const appsDir = join(appbayHome, "etc", "apps");
   const rendersDir = join(appbayHome, "var", "lib", "renders");
   const stateDir = join(appbayHome, "var", "lib", "state");
@@ -604,7 +608,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   } catch { /* Non-fatal */ }
 
   // Phase 1: Compile
-  const activeApps = discoverRunning();
   const projectVars = options.projectVars ?? await loadProjectVars(appbayHome);
 
   let compileResult: CompileResult;
@@ -614,7 +617,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       rendersDir,
       stateDir,
       apps: targetApps,
-      activeApps,
       projectVars,
       // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
       // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller

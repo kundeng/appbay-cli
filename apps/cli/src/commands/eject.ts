@@ -22,7 +22,6 @@ import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { compile, loadProjectVars , detectRuntimeFacts } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { discoverRunningApps } from "../utils/docker.js";
 
 /**
  * Extract environment variable assignments from a rendered compose YAML.
@@ -126,7 +125,6 @@ export const ejectCommand = new Command("eject")
 
     // Compile the single app through the full pipeline.
     // Discover running apps so overlays (e.g. when: [ollama]) activate.
-    const activeApps = discoverRunningApps();
     let result;
     try {
       // 🚨 projectVars IS NOT OPTIONAL IN PRACTICE. Without it every `${{project.X}}`
@@ -140,7 +138,6 @@ export const ejectCommand = new Command("eject")
         rendersDir,
         stateDir,
         apps: [app],
-        activeApps,
         projectVars: await loadProjectVars(appbayHome),
         // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
         // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller

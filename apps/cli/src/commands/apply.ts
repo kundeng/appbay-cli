@@ -10,7 +10,7 @@ import {
   resolveAppsDir,
   resolveRendersDir,
   resolveStateDir, resolveAppbayHome } from "../utils/appbay-home.js";
-import { dockerCompose, discoverRunningApps } from "../utils/docker.js";
+import { dockerCompose } from "../utils/docker.js";
 import { join, dirname } from "node:path";
 import { writeFile, mkdir } from "node:fs/promises";
 
@@ -29,7 +29,6 @@ export const applyCommand = new Command("apply")
 
     console.log("Compiling plan...\n");
 
-    const activeApps = discoverRunningApps();
 
     let result: CompileResult;
     try {
@@ -40,7 +39,7 @@ export const applyCommand = new Command("apply")
       // on apps that `appbay compile` handled fine, because compile.ts passed it and this
       // did not. Found by the BDD suite (S26 2.2), not by any unit test.
       // runtimeFacts: see the note in compile.ts — without it the gpu trait sees no GPU.
-      result = await compile({ appsDir, rendersDir, stateDir, apps: targetApps, activeApps, projectVars: await loadProjectVars(resolveAppbayHome()), runtimeFacts: detectRuntimeFacts({ stateDir }) });
+      result = await compile({ appsDir, rendersDir, stateDir, apps: targetApps, projectVars: await loadProjectVars(resolveAppbayHome()), runtimeFacts: detectRuntimeFacts({ stateDir }) });
     } catch (err) {
       console.error(`Compile failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);

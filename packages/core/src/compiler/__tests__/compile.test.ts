@@ -358,28 +358,27 @@ describe("compile()", () => {
   // 10. Overlay activation — AND clause (array form)
   // -------------------------------------------------------------------------
 
-  it("activates AND overlay when all required apps are active", async () => {
-    await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_OVERLAY_AND);
+  // ⚠️ These declare the peer app on disk rather than handing compile() a set. RFC-001 §5
+  // made `when:` mean INSTALLED, and `compile()` derives that itself — so the only way to
+  // say "traefik is installed" is for traefik to be installed. That is the point: the old
+  // tests could assert an activation state the real system could not produce.
 
-    // "traefik" is active → overlay should fire
-    const result = await compile(
-      makeOptions({ activeApps: new Set(["traefik"]) }),
-    );
+  it("activates AND overlay when all required apps are installed", async () => {
+    await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_OVERLAY_AND);
+    await writeApp(tempDir, "traefik", SIMPLE_COMPOSE);
+
+    const result = await compile(makeOptions());
 
     expect(result.errors).toHaveLength(0);
-    expect(result.apps).toHaveLength(1);
-    const app = result.apps[0]!;
-    // Overlay adds traefik.enable label — should appear in rendered compose.
+    const app = result.apps.find((a) => a.appName === "myapp")!;
     expect(app.rendered).toContain("traefik.enable");
   });
 
-  it("produces inactive-overlay warning when required app is not active", async () => {
+  it("produces inactive-overlay warning when the required app is not installed", async () => {
     await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_OVERLAY_AND);
 
-    // No active apps → overlay stays inactive
-    const result = await compile(makeOptions({ activeApps: new Set() }));
+    const result = await compile(makeOptions());
 
-    // Should have a warning about the skipped overlay.
     const overlayWarnings = result.warnings.filter((w) =>
       w.includes("Overlay skipped"),
     );
@@ -387,20 +386,39 @@ describe("compile()", () => {
     expect(result.apps[0]!.rendered).not.toContain("traefik.enable");
   });
 
+  it("evaluates `when:` against the FULL declared set, not the invocation's targets", async () => {
+    // RFC-001 §5.2 — the property the old signature could not hold. `appbay up myapp` and
+    // `appbay up` must produce the SAME artifact for myapp; previously the caller passed a
+    // set derived from the target list, so narrowing the command line silently deactivated
+    // overlays and re-rendered the app differently.
+    await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_OVERLAY_AND);
+    await writeApp(tempDir, "traefik", SIMPLE_COMPOSE);
+
+    const all = await compile(makeOptions());
+    const targeted = await compile(makeOptions({ apps: ["myapp"] }));
+
+    expect(targeted.apps).toHaveLength(1);
+    expect(targeted.apps[0]!.rendered).toContain("traefik.enable");
+    expect(targeted.apps[0]!.rendered).toBe(
+      all.apps.find((a) => a.appName === "myapp")!.rendered,
+    );
+  });
+
   // -------------------------------------------------------------------------
   // 11. Overlay activation — OR clause ({any} form)
   // -------------------------------------------------------------------------
 
-  it("activates OR overlay when any required app is active", async () => {
+  it("activates OR overlay when any required app is installed", async () => {
     await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_OVERLAY_ANY);
+    await writeApp(tempDir, "caddy", SIMPLE_COMPOSE);
 
-    // Only "caddy" active — satisfies the `any` clause
-    const result = await compile(
-      makeOptions({ activeApps: new Set(["caddy"]) }),
-    );
+    const result = await compile(makeOptions());
 
     expect(result.errors).toHaveLength(0);
-    expect(result.apps[0]!.rendered).toContain("unless-stopped");
+    // ⚠️ Not apps[0]. compile() returns every discovered app sorted by name, and installing
+    // the peer means the peer is compiled too — "caddy" sorts before "myapp".
+    const app = result.apps.find((a) => a.appName === "myapp")!;
+    expect(app.rendered).toContain("unless-stopped");
   });
 
   // -------------------------------------------------------------------------

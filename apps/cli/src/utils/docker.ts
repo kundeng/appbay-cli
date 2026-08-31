@@ -6,7 +6,9 @@
  * composePath or args contain. Returns a structured result with exit code and
  * output so callers can handle errors without try/catch boilerplate.
  *
- * Also exports discoverRunningApps() for overlay activation.
+ * Also exports discoverRunningApps(), which reports which apps are RUNNING — for status
+ * display only. ⚠️ It is no longer used for overlay activation: RFC-001 §5 made `when:`
+ * mean *installed*, a fact about the declared app set that needs no container runtime.
  */
 
 import { spawnSync } from "node:child_process";

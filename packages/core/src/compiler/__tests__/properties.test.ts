@@ -295,10 +295,10 @@ upstream:
   });
 
   // -------------------------------------------------------------------------
-  // 6. Overlay inactivity -- overlays excluded when peer apps not active
+  // 6. Overlay inactivity -- overlays excluded when peer apps are not installed
   // -------------------------------------------------------------------------
 
-  it("overlay inactivity: overlays do not apply when peer apps are absent", async () => {
+  it("overlay inactivity: overlays do not apply when peer apps are not installed", async () => {
     await writeApp(
       tempDir,
       "myapp",
@@ -306,10 +306,9 @@ upstream:
       APPBAY_WITH_OVERLAY,
     );
 
-    // Compile with empty activeApps (nonexistent-app is not active).
-    const result = await compile(
-      makeOptions({ activeApps: new Set<string>() }),
-    );
+    // Only myapp is on disk, so the overlay's peer is NOT installed. RFC-001 §5: the
+    // installed set is derived from the tree, so "peer absent" is expressed by absence.
+    const result = await compile(makeOptions());
     expect(result.apps).toHaveLength(1);
 
     // The overlay fragment should NOT be in the rendered output.

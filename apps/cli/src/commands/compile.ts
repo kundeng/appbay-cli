@@ -18,7 +18,6 @@ import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { compile, loadProjectVars, type CompileResult, type AppCompileResult , detectRuntimeFacts } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { discoverRunningApps } from "../utils/docker.js";
 import { pad } from "../utils/formatting.js";
 
 /**
@@ -63,10 +62,7 @@ export const compileCommand = new Command("compile")
     console.log(`Compiling apps from ${appsDir}...\n`);
 
     // Discover currently running apps so conditional overlays fire correctly.
-    const activeApps = discoverRunningApps();
-    if (activeApps.size > 0) {
-      console.log(`  Active apps: ${[...activeApps].join(", ")}\n`);
-    }
+
 
     // Load project variables so ${{project.DOMAIN}} etc. resolve correctly.
     const projectVars = await loadProjectVars(appbayHome);
@@ -79,7 +75,6 @@ export const compileCommand = new Command("compile")
         rendersDir,
         stateDir,
         apps: apps.length > 0 ? apps : undefined,
-        activeApps,
         projectVars,
         // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
         // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller
