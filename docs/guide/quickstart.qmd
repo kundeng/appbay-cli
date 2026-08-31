@@ -62,7 +62,7 @@ Appbay drives whichever container binary you configure. Point it at Podman once,
 appbay init --container-runtime podman
 ```
 
-That writes `container_runtime: podman` to `$APPBAY_HOME/project.yaml`, and every command
+That writes `container_runtime: podman` to `$APPBAY_HOME/etc/system.yaml`, and every command
 Appbay issues from then on invokes `podman`. It also works on re-init, so a configuration
 management run can converge it repeatedly — the command reports `created`, `updated` or
 `unchanged` so you can drive changed-state from a read-back rather than an exit code.
@@ -134,7 +134,7 @@ fails. Relabelling the socket does **not** fix it: the denial is SELinux's
 `unix_stream_socket connectto` check against the API service's own process label, which no
 file label can satisfy.
 
-The switch is one line in `$APPBAY_HOME/project.yaml`:
+The switch is one line in `$APPBAY_HOME/etc/system.yaml`:
 
 ```yaml
 control_plane_selinux: unconfined

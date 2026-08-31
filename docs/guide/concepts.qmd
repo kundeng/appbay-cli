@@ -117,7 +117,7 @@ nothing but a name and the root one held no project-scoped keys at all.
 | `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider` |
 | `$APPBAY_HOME/etc/projects/<name>/project.yaml` | **one project's variable scope**, described just below | `name`, `vars`, `defaults` |
 
-⚠️ `$APPBAY_HOME/project.yaml` is still READ for one release so an install that has not been
+⚠️ `$APPBAY_HOME/etc/system.yaml` is still READ for one release so an install that has not been
 re-inited keeps working; `appbay init` moves it. Everything from here to the end of this
 section is about the *second* file.
 :::
@@ -188,7 +188,7 @@ error naming the scope and key; Appbay never silently substitutes an empty strin
 ## Only the `project` store is implemented
 
 The table above is the intended model. Today `loadProjectVars` reads a single `domain:` line
-from `$APPBAY_HOME/project.yaml`, and nothing reads `projects/<name>/project.yaml` or
+from `$APPBAY_HOME/etc/system.yaml`, and nothing reads `projects/<name>/project.yaml` or
 `environments/<env>.yaml` at all. So `${{project.DOMAIN}}` is the one reference that
 resolves; `${{environment.KEY}}` and `${{service.KEY}}` always fail.
 
@@ -338,7 +338,7 @@ The pipeline runs in two phases. For each discovered app, stages run in this ord
 
 1. **Discover** -- Scan `etc/apps/` for directories with `docker-compose.yml`. Parse and validate `appbay.yaml` with Zod schemas. Errors are recorded but do not block other apps.
 2. **Upstream transform** -- For apps with an `upstream.source`, apply namespace isolation first (internal network creation, volume prefixing, shared network aliases). This runs *before* variable resolution so that scope references inside the upstream compose are visible to the resolver.
-3. **Resolve variables** -- Evaluate `${{scope.KEY}}` references against the variable store named by the scope prefix. Only `project` has a populated store (`$APPBAY_HOME/project.yaml`'s `domain:`); see the warning under [Variable resolution](#variable-resolution). Magic generators (`${password:N}`, `${uuid}`, etc.) are evaluated and persisted.
+3. **Resolve variables** -- Evaluate `${{scope.KEY}}` references against the variable store named by the scope prefix. Only `project` has a populated store (`$APPBAY_HOME/etc/system.yaml`'s `domain:`); see the warning under [Variable resolution](#variable-resolution). Magic generators (`${password:N}`, `${uuid}`, etc.) are evaluated and persisted.
 4. **Select overlays** -- Evaluate `when` clauses against the active app set; merge matching fragments into the compose model.
 5. **Apply traits** -- Transform the compose model (add Traefik config, GPU devices, auth middleware, etc.) in declaration order.
 6. **Render** -- Write final compose YAML to `var/lib/renders/<app>/`

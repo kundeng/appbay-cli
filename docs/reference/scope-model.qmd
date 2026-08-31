@@ -50,7 +50,7 @@ declaration field moved, and renaming the reference prefix is a separate migrati
 every manifest that uses one.
 
 What the docs below describe as three variable stores is currently one, and it holds one key.
-`loadProjectVars` reads a single `domain:` line out of `$APPBAY_HOME/project.yaml` and returns
+`loadProjectVars` reads a single `domain:` line out of `$APPBAY_HOME/etc/system.yaml` and returns
 `{ DOMAIN }`. Nothing reads `projects/<name>/project.yaml` or `environments/<env>.yaml`, so
 `${{environment.KEY}}` and `${{service.KEY}}` resolve against empty maps and always fail.
 
@@ -200,7 +200,7 @@ When you run `appbay up --collection ai-stack`:
    -> [ollama, webui, tts]
 
 2. For each app, resolve variables:
-   ${{project.DOMAIN}} from $APPBAY_HOME/project.yaml
+   ${{project.DOMAIN}} from $APPBAY_HOME/etc/system.yaml
    (${{environment.KEY}} and ${{service.KEY}} resolve against empty maps -- see the
     warning at the top of this page)
 
@@ -220,7 +220,7 @@ Each app is an independent Compose project. They communicate via shared networks
 ⚠️ **This is the intended layout, not the built one.** `etc/projects/` is not read by
 anything — `ProjectConfigSchema` and `EnvironmentConfigSchema` exist and have no non-test
 consumers, and the string `"projects"` is never joined into a path. The one file that is
-read is `$APPBAY_HOME/project.yaml` at the root.
+read is `$APPBAY_HOME/etc/system.yaml` at the root.
 
 ```
 $APPBAY_HOME/
