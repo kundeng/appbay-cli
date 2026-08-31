@@ -490,14 +490,17 @@ Generated values are evaluated once and persisted in the state store. Subsequent
 
 The secrets trait declares URI-based secret references that are resolved at deploy time. See [Secrets Management](secrets.qmd) for the full documentation.
 
+⚠️ Since RFC-001 §3.2 a manifest may carry only `vault://` references — the storage backend
+is an installation choice, and a manifest naming one breaks on any host that chose differently.
+
 ```yaml
 traits:
   - type: secrets
     refs:
-      DB_PASSWORD: infisical://homelab/prod/nextcloud/db-password
-      SMTP_KEY: file:///run/secrets/smtp-key
-      API_TOKEN: env://EXTERNAL_API_TOKEN
-      ENCRYPTION_KEY: sops://secrets.enc.yaml#encryption_key
+      DB_PASSWORD: vault://nextcloud/DB_PASSWORD
+      SMTP_KEY: vault://nextcloud/SMTP_KEY
+      API_TOKEN: vault://nextcloud/API_TOKEN
+      ENCRYPTION_KEY: vault://nextcloud/ENCRYPTION_KEY
 ```
 
 ### Injection modes

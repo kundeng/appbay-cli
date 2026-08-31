@@ -58,7 +58,7 @@ Appbay takes your Docker Compose apps and adds:
 - **Traits** — declarative capabilities (ingress, GPU, auth, hooks, backup) attached to apps
 - **Conditional overlays** — automatic cross-app wiring (e.g., "when ollama is *installed*, inject its URL into webui")
 - **Scoped variables** — ${{scope.KEY}} references resolved at compile time (see the caveat under Scope Model)
-- **Secret URI references** — `vault://`, `keepass://`, `file://`, `env://`, `sops://` resolved at deploy time
+- **Secret URI references** — `vault://` in manifests, resolved at deploy time (the backend is an installation choice, not a manifest one)
 - **Config overrides** — `.env.local` for catalog-installed apps, upstream `.env` stays frozen
 - **Plan/diff** — see exactly what will change before deploying, with secrets redacted
 

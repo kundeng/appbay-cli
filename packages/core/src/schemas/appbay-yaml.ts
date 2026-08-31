@@ -248,9 +248,38 @@ export const SecretsTraitSchema = z.object({
    * traits/definitions/secrets.ts.
    */
   service: z.string().optional(),
-  provider: z.enum(["vault", "keepass", "file", "env", "sops"]).default("vault"),
-  /** Map of env_var_name to secret URI. */
-  refs: z.record(z.string()),
+  /**
+   * ⚠️ `vault` only, since RFC-001 §3.2. The enum accepted five values, which made the
+   * STORAGE BACKEND visible to manifests — so a manifest written against one backend broke
+   * on the other, for a field that never selected anything: resolution has always keyed off
+   * the URI's own scheme (`SecretStore.resolve`), and this was metadata.
+   *
+   * Measured before narrowing: zero manifests across both catalogs, the UOM fixtures and
+   * system-apps used a non-vault value.
+   */
+  provider: z
+    .literal("vault", {
+      errorMap: () => ({
+        message:
+          "Only `provider: vault` is permitted in appbay.yaml (RFC-001 §3.2). The backend is " +
+          "an installation choice, not a manifest one — keepass:// remains usable at the CLI " +
+          "for direct inspection.",
+      }),
+    })
+    .default("vault"),
+  /**
+   * Map of env_var_name to secret URI.
+   *
+   * ⚠️ `vault://` only — see `provider`. A `keepass://`, `sops://`, `file://` or `env://` ref
+   * pins the manifest to one installation's storage choice.
+   */
+  refs: z.record(
+    z.string().refine((uri) => !/^(keepass|sops|file|env):\/\//.test(uri), {
+      message:
+        "Only vault:// secret references are permitted in appbay.yaml (RFC-001 §3.2). " +
+        "The backend is selected per installation, not per manifest.",
+    }),
+  ),
   /** Ref keys allowed to be absent. They are omitted from the deploy environment. */
   optional: z.array(z.string()).optional(),
   injection: z.enum(["none", "runtime-env", "wrapper-file", "entrypoint-wrapper", "wrapper-live"]).default("runtime-env"),

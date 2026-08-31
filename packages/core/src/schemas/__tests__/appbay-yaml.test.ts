@@ -311,6 +311,26 @@ describe("defaults", () => {
     }
   });
 
+  it("rejects a non-vault provider and a non-vault ref — RFC-001 §3.2", () => {
+    // The backend is an installation choice, not a manifest one. Before this, the enum
+    // accepted five values and any scheme was allowed in `refs`, so a manifest written
+    // against one backend broke on the other — for a field that never selected anything:
+    // resolution has always keyed off the URI scheme, and `provider:` was metadata.
+    for (const trait of [
+      { type: "secrets", provider: "keepass", refs: { A: "vault://app/A" } },
+      { type: "secrets", refs: { A: "keepass://app/A" } },
+      { type: "secrets", refs: { A: "sops://app/A" } },
+      { type: "secrets", refs: { A: "file:///tmp/a" } },
+      { type: "secrets", refs: { A: "env://A" } },
+    ]) {
+      expect(TraitConfigSchema.safeParse(trait).success).toBe(false);
+    }
+    // …and the permitted shape still parses.
+    expect(
+      TraitConfigSchema.safeParse({ type: "secrets", refs: { A: "vault://app/A" } }).success,
+    ).toBe(true);
+  });
+
   it("applies default provider='vault' on secrets trait", () => {
     const result = parse({
       traits: [{ type: "secrets", refs: { DB_PASS: "vault://DB_PASS" } }],
@@ -358,7 +378,7 @@ describe("discriminated union", () => {
       { type: "gpu", variant: "nvidia" },
       { type: "auth" },
       { type: "hooks", pattern: "init" },
-      { type: "secrets", refs: { A: "env://A" } },
+      { type: "secrets", refs: { A: "vault://app/A" } },
       { type: "backup", schedule: "0 * * * *" },
       { type: "scoped-env", vars: { FOO: "${{project.FOO}}" } },
     ];
