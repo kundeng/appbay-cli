@@ -370,6 +370,18 @@ mechanically guarded — `pnpm check:docs-manifests` fails on a documented manif
 rejects. `overlays.qmd` had documented §5.2's defect as the intended design; `scope-model.qmd`
 described two variable stores that never existed.
 
+**Catalog data (2026-08-31) — 10 entries were uninstallable and warned on every command.**
+`appbay catalog list` printed ten `Invalid catalog.yaml` warnings on every run, and those ten
+apps were absent from the resolved catalog (143 of 153). Nine used a `required_inputs`
+shorthand the schema does not have; `cfd` declared `source.type: docker`, which is not in the
+enum. Fixed in `appbay-catalog@4cabeaa`; `discoverCatalog` now reports 0 parse errors and 153
+entries.
+
+⚠️ All nine are EXTERNAL provider credentials, so they are `type: secret` with **no**
+`auto_generate` — appbay mints its own keys but cannot mint an OpenAI one, and setting the
+flag would have it generate a random string the provider rejects. Permanent warning noise is
+its own defect: it trains an operator past the block where real warnings appear.
+
 **Maintenance sweep (2026-08-31) — reachability before coverage.** Asking "does anything
 call this?" before "how do I test it?" across the untested core modules produced three
 different answers, and only one of them was "write tests":
