@@ -221,7 +221,16 @@ export function rotateVaultPassword(
     const newVault = new Vault(tempVaultPath, finalPassword);
     for (const entry of entries) {
       const value = oldVault.get(entry.key, entry.scope);
-      if (value === null) throw new Error(`Vault entry disappeared during rotation: ${entry.scope}/${entry.key}`);
+      if (value === null) {
+        // ⚠️ "Disappeared" suggests a race, and the likelier cause is a malformed entry key
+        // that `vaultEntryKey` never wrote — see `Vault.listAll`. Say both, since the operator
+        // cannot read the file to find out which.
+        throw new Error(
+          `Vault entry ${entry.scope}/${entry.key} could not be read during rotation. ` +
+            `Either it was removed mid-rotation, or the vault holds an entry key this version ` +
+            `did not write. Nothing was changed; the original vault is untouched.`,
+        );
+      }
       newVault.set(entry.key, value, entry.scope);
     }
 

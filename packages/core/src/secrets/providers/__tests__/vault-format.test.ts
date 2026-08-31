@@ -136,6 +136,41 @@ describe("v2 is per-vault salted — the defect §2.5 exists to fix", () => {
   });
 });
 
+describe("an entry key the writer never wrote", () => {
+  /** Write a v2 vault with an arbitrary payload, bypassing `vaultEntryKey`. */
+  function writeRawVault(entries: Record<string, string>): void {
+    const salt = randomBytes(16);
+    const key = scryptSync(PASSWORD, salt, 32, { N: 16384 });
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(JSON.stringify(entries), "utf8"),
+      cipher.final(),
+    ]);
+    writeFileSync(
+      vaultPath,
+      Buffer.concat([V2_MAGIC, Buffer.from([2]), salt, iv, cipher.getAuthTag(), ciphertext]),
+    );
+  }
+
+  it("🚨 reports an unslashed key verbatim, not the key minus its last character", () => {
+    // `lastIndexOf("/")` returns -1, so the old code produced `scope = k.slice(0, -1)`:
+    // "NOSLASH" was listed as scope "NOSLAS", key "NOSLASH". An entry that enumerates and
+    // then reads back as null, naming a scope that does not exist anywhere.
+    writeRawVault({ NOSLASH: "the-value", "default/OK": "fine" });
+    const listed = new Vault(vaultPath, PASSWORD).listAll();
+    expect(listed).toContainEqual({ scope: "default", key: "NOSLASH" });
+    expect(listed.map((e) => e.scope)).not.toContain("NOSLAS");
+  });
+
+  it("still lists the well-formed entries alongside it", () => {
+    writeRawVault({ NOSLASH: "the-value", "default/OK": "fine" });
+    const vault = new Vault(vaultPath, PASSWORD);
+    expect(vault.listAll()).toContainEqual({ scope: "default", key: "OK" });
+    expect(vault.get("OK")).toBe("fine");
+  });
+});
+
 describe("corrupt and future files fail legibly", () => {
   it("names a FUTURE format version instead of blaming the password", () => {
     // Reading a newer file with these offsets would produce "Wrong vault password" on a file

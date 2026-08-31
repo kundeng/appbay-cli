@@ -376,11 +376,28 @@ export class Vault {
       .map((k) => ({ key: k.slice(prefix.length), scope }));
   }
 
-  /** List all secrets across all scopes. */
+  /**
+   * List all secrets across all scopes — the inverse of `vaultEntryKey`.
+   *
+   * ⚠️ An entry key with NO slash cannot have come from `vaultEntryKey`, which always writes
+   * `${scope}/${key}`. It used to be split with a bare `lastIndexOf("/")`, which returns -1 and
+   * therefore produced `scope = k.slice(0, -1)` — the key minus its last character. `NOSLASH`
+   * was reported as scope `NOSLAS`, key `NOSLASH`, an entry that enumerates and then reads back
+   * as null.
+   *
+   * That failed SAFE rather than losing data: `rotateVaultPassword` checks for a null value and
+   * aborts before touching the real vault. But it aborted naming a scope that does not exist,
+   * so the one operator who ever hit it would have had no idea what to look at.
+   *
+   * Now such a key is reported verbatim under the default scope. It still will not resolve —
+   * nothing can read a key the writer never wrote — but the report names the thing that is
+   * actually in the file.
+   */
   listAll(): Array<{ key: string; scope: string }> {
     return Object.keys(this.data).map((k) => {
       // Vault keys are the final URI segment; scopes may contain `/`.
       const slashIdx = k.lastIndexOf("/");
+      if (slashIdx === -1) return { scope: "default", key: k };
       return {
         scope: k.slice(0, slashIdx),
         key: k.slice(slashIdx + 1),
