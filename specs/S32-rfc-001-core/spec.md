@@ -532,8 +532,31 @@ for anything touching the runtime, a journey on both VMs.
   - [ ] 5.4 Import any existing `users.yaml` accounts and print what happened
     - **Depends**: 5.3
 
-- [ ]* 6. Vault format (2.5)
-  - [ ]* 6.1 Per-vault salt with a format version byte and a read path accepting both shapes
+- [x]* 6. Vault format (2.5)
+  - [x]* 6.1 Per-vault salt with a format version byte and a read path accepting both shapes
+    - v1 was `IV(12) + tag(16) + ciphertext` with the CONSTANT salt `appbay-vault-v1`, so every
+      appbay vault ever created shared one key space and ONE scrypt precomputation for a
+      candidate password attacked all of them. v2 is
+      `MAGIC(8) + version(1) + salt(16) + IV(12) + tag(16) + ciphertext`.
+    - ⚠️ Precisely: a stolen v2 file still carries its own salt and is still openable with its
+      password. No self-describing format can avoid that. The gain is that the work is per file.
+    - 🚨 **The v1 read path is the load-bearing part.** Every vault on disk is v1, and dropping
+      that branch does not fail loudly — it fails as "Wrong vault password" on an intact file,
+      which is the worst shape a secrets bug takes. No migration command could rescue it either:
+      by then the operator cannot read the file to migrate it.
+    - Reading NEVER rewrites; the upgrade happens on the first `set`/`delete`. A read-only
+      operation must not touch the one file whose corruption is unrecoverable.
+    - A future version byte reports itself by name rather than as a bad password — otherwise a
+      newer file sends the operator to rotate a credential that works.
+    - v1 test fixtures are encrypted with `node:crypto` directly, not by a v1 code path that no
+      longer exists: a fixture produced by the code under test only proves it agrees with itself.
+      Verified the algorithm against `git show HEAD:...vault.ts`.
+    - 13 tests, plus an end-to-end run of the compiled binary against a genuine v1 file: reads
+      it, does not rewrite it on read, upgrades on first write, and all three entries survive.
+      Two vaults with the same master password now carry different salts.
+    - ⚠️ Caught by that run and not by the suite: a **stale `packages/core/dist`** made the
+      binary look unchanged. Same trap as 3.1. Build core before testing the binary.
+    - **Depends**: 2.2 · **Pillar**: MVP, Test
     - `SCRYPT_SALT` is the constant `"appbay-vault-v1"`, so two hosts sharing a password hold
       interchangeable vault files. Not a one-line change: the file is `IV(12) + tag(16) +
       ciphertext` with no header.

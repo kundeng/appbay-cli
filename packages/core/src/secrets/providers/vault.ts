@@ -40,17 +40,52 @@ import { splitScopedKey } from "../scoped-key.js";
 // ---------------------------------------------------------------------------
 
 const SCHEME = "vault";
-const SCRYPT_SALT = "appbay-vault-v1";
 const SCRYPT_KEYLEN = 32; // AES-256
 const SCRYPT_COST = 16384;
 const VAULT_FILENAME = "vault.enc";
+
+/**
+ * The v1 salt — a CONSTANT, which is the defect RFC-001 §2.5 exists to fix.
+ *
+ * 🚨 With a fixed salt the AES key is a pure function of the password, so every appbay vault
+ * ever created shares one key space. Two installations with the same password hold files
+ * either key opens, and — the part that actually matters — ONE scrypt precomputation for a
+ * candidate password attacks every appbay vault in existence rather than one.
+ *
+ * ⚠️ What a per-vault salt does NOT buy: a stolen file still carries its own salt, so it is
+ * still openable with its password. No self-describing format can do otherwise. The gain is
+ * that the work must be redone per file.
+ *
+ * Kept, and never used for writing, because every existing vault on disk is encrypted with it.
+ */
+const SCRYPT_SALT_V1 = "appbay-vault-v1";
+
+/**
+ * v2 header magic.
+ *
+ * ⚠️ A v1 file has NO header — its first bytes are a random IV — so the two formats are told
+ * apart by whether the file starts with this string. A v1 IV whose first 8 bytes spell
+ * `APPBAYV2` would be misread, at probability 2^-64; the consequence is a "wrong password"
+ * error on a file that is intact, not data loss, and the alternative (no discriminator at all)
+ * is not distinguishable either.
+ */
+const V2_MAGIC = Buffer.from("APPBAYV2", "ascii");
+const V2_VERSION = 2;
+const SALT_LENGTH = 16;
+const IV_LENGTH = 12;
+const TAG_LENGTH = 16;
+/** MAGIC(8) + version(1) + salt(16) + IV(12) + tag(16) */
+const V2_HEADER_LENGTH =
+  V2_MAGIC.length + 1 + SALT_LENGTH + IV_LENGTH + TAG_LENGTH;
+/** IV(12) + tag(16) */
+const V1_HEADER_LENGTH = IV_LENGTH + TAG_LENGTH;
 
 // ---------------------------------------------------------------------------
 // Encryption
 // ---------------------------------------------------------------------------
 
-function deriveKey(password: string): Buffer {
-  return scryptSync(password, SCRYPT_SALT, SCRYPT_KEYLEN, {
+function deriveKey(password: string, salt: Buffer | string): Buffer {
+  return scryptSync(password, salt, SCRYPT_KEYLEN, {
     N: SCRYPT_COST,
   }) as Buffer;
 }
@@ -184,24 +219,74 @@ function vaultEntryKey(key: string, scope: string): string {
   return `${scope}/${key}`;
 }
 
-function readVaultFile(filePath: string, encKey: Buffer): VaultData {
+/** What a read recovered: the entries, and the salt the file was encrypted with. */
+interface VaultFileContents {
+  data: VaultData;
+  /** `null` for a v1 file, which has no salt of its own. */
+  salt: Buffer | null;
+}
+
+function isV2(raw: Buffer): boolean {
+  return raw.length >= V2_MAGIC.length && raw.subarray(0, V2_MAGIC.length).equals(V2_MAGIC);
+}
+
+/**
+ * Read a vault file in EITHER format — RFC-001 §2.5.
+ *
+ * 🚨 THE V1 PATH IS NOT LEGACY CRUFT TO TIDY AWAY. Every vault written before this change is
+ * v1, and dropping the branch does not fail loudly — it fails as "Wrong vault password" on an
+ * intact file, which is the worst shape a secrets bug takes: the data is there and nothing can
+ * open it. There is no migration command that could help, because by then the operator cannot
+ * read the file to migrate it.
+ *
+ * Reading NEVER rewrites. A v1 file is upgraded on the next WRITE, so a read-only operation on
+ * a vault cannot alter the one file whose corruption is unrecoverable.
+ */
+function readVaultFile(filePath: string, password: string): VaultFileContents {
   if (!existsSync(filePath)) {
-    return {};
+    return { data: {}, salt: null };
   }
 
   const raw = readFileSync(filePath);
-  // File format: 12 bytes IV + 16 bytes auth tag + rest is ciphertext
-  if (raw.length < 28) {
-    throw new Error("Vault file is corrupted (too short)");
+
+  let salt: Buffer | null;
+  let iv: Buffer;
+  let tag: Buffer;
+  let ciphertext: Buffer;
+
+  if (isV2(raw)) {
+    if (raw.length < V2_HEADER_LENGTH) {
+      throw new Error("Vault file is corrupted (v2 header is truncated)");
+    }
+    const version = raw[V2_MAGIC.length];
+    if (version !== V2_VERSION) {
+      // Forward-compatibility: a NEWER file must not be read with these offsets and reported
+      // as a bad password. Say what it is.
+      throw new Error(
+        `Vault file is format version ${String(version)}; this build understands ${String(V2_VERSION)}. Upgrade appbay.`,
+      );
+    }
+    let at = V2_MAGIC.length + 1;
+    salt = raw.subarray(at, (at += SALT_LENGTH));
+    iv = raw.subarray(at, (at += IV_LENGTH));
+    tag = raw.subarray(at, (at += TAG_LENGTH));
+    ciphertext = raw.subarray(at);
+  } else {
+    // v1: IV(12) + tag(16) + ciphertext, no header, constant salt.
+    if (raw.length < V1_HEADER_LENGTH) {
+      throw new Error("Vault file is corrupted (too short)");
+    }
+    salt = null;
+    iv = raw.subarray(0, IV_LENGTH);
+    tag = raw.subarray(IV_LENGTH, V1_HEADER_LENGTH);
+    ciphertext = raw.subarray(V1_HEADER_LENGTH);
   }
 
-  const iv = raw.subarray(0, 12);
-  const tag = raw.subarray(12, 28);
-  const ciphertext = raw.subarray(28);
+  const encKey = deriveKey(password, salt ?? SCRYPT_SALT_V1);
 
   try {
     const json = decryptData(ciphertext, iv, tag, encKey);
-    return JSON.parse(json) as VaultData;
+    return { data: JSON.parse(json) as VaultData, salt };
   } catch {
     throw new Error(
       "Wrong vault password. Set the correct APPBAY_VAULT_PASSWORD.",
@@ -209,10 +294,18 @@ function readVaultFile(filePath: string, encKey: Buffer): VaultData {
   }
 }
 
+/**
+ * Write a vault file. Always v2 — there is no way to ask for v1.
+ *
+ * A v1 vault therefore upgrades on its first write, with no migration command and nothing for
+ * the operator to run. The salt is the one the Vault instance holds, so the key it was
+ * constructed with matches what is written here.
+ */
 function writeVaultFile(
   filePath: string,
   data: VaultData,
   encKey: Buffer,
+  salt: Buffer,
 ): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
@@ -222,8 +315,14 @@ function writeVaultFile(
   const json = JSON.stringify(data);
   const { ciphertext, iv, tag } = encryptData(json, encKey);
 
-  // File format: IV (12) + auth tag (16) + ciphertext
-  const buf = Buffer.concat([iv, tag, ciphertext]);
+  const buf = Buffer.concat([
+    V2_MAGIC,
+    Buffer.from([V2_VERSION]),
+    salt,
+    iv,
+    tag,
+    ciphertext,
+  ]);
   writeFileSync(filePath, buf);
 }
 
@@ -234,18 +333,25 @@ function writeVaultFile(
 export class Vault {
   private filePath: string;
   private encKey: Buffer;
+  private salt: Buffer;
   private data: VaultData;
 
   constructor(filePath: string, password: string) {
     this.filePath = filePath;
-    this.encKey = deriveKey(password);
-    this.data = readVaultFile(filePath, this.encKey);
+    const contents = readVaultFile(filePath, password);
+    this.data = contents.data;
+    // A v1 file (or no file at all) gets a fresh per-vault salt, and the write path is v2
+    // only — so the upgrade happens on the first `set`/`delete` with no migration command.
+    // The in-memory entries were already decrypted with the v1 key, so re-deriving here is
+    // safe: nothing reads the file again with this key.
+    this.salt = contents.salt ?? randomBytes(SALT_LENGTH);
+    this.encKey = deriveKey(password, this.salt);
   }
 
   /** Store a secret. Overwrites if exists. */
   set(key: string, value: string, scope = "default"): void {
     this.data[vaultEntryKey(key, scope)] = value;
-    writeVaultFile(this.filePath, this.data, this.encKey);
+    writeVaultFile(this.filePath, this.data, this.encKey, this.salt);
   }
 
   /** Retrieve a secret. Returns null if not found. */
@@ -258,7 +364,7 @@ export class Vault {
     const entryKey = vaultEntryKey(key, scope);
     if (!(entryKey in this.data)) return false;
     delete this.data[entryKey];
-    writeVaultFile(this.filePath, this.data, this.encKey);
+    writeVaultFile(this.filePath, this.data, this.encKey, this.salt);
     return true;
   }
 
