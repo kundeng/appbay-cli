@@ -1,0 +1,72 @@
+record: probe-88-the-two-podman-blockers-are-separable
+type: probe
+title: the-two-podman-blockers-are-separable
+timestamp: "2026-08-31T12:20:00-04:00"
+claim: "S34 is one decision between three answers that each change what the D-6 model means"
+verdict: 'refines'
+key_evidence: 'probe-87 found the D-6 account cannot run podman and stopped there. Isolating the
+  two causes shows they are SEPARABLE and only one is a decision. (1) The missing $HOME blocks
+  everything — it fails BEFORE podman considers the connection, so it defeats the rootful path
+  too, not just rootless. Setting HOME to the tree the account already owns clears it, and is
+  not a privilege grant. (2) What remains then splits by model: rootless still fails on absent
+  subuid ranges, but the ROOTFUL path gets all the way to a connection attempt —
+  "Cannot connect to Podman" against a `srw-rw---- root root` socket. As root with the identical
+  environment the same command succeeds (Version: 5.6.2), so the only remaining barrier on the
+  rootful path is socket PERMISSION. ⇒ Granting that is the same privilege class the docker path
+  already grants unconditionally: `usermod -aG docker` against a root:docker 0660 socket. So
+  option B is parity with existing behaviour rather than a new policy, which makes the choice
+  much narrower than probe-87 left it.'
+exit_code: 0
+duration_s: 150
+command: >-
+  sudo -u appbay env HOME=/var/lib/appbay CONTAINER_HOST=unix:///run/podman/podman.sock podman info;
+  sudo -u appbay env HOME=/var/lib/appbay podman info;
+  env CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+output_kind: text
+output:
+  text: |
+    host: appbay-rhel (multipass), Fedora Linux 43, podman 5.6.2, no docker
+    account: appbay:x:950:991::/home/appbay:/usr/sbin/nologin  (D-6, --no-create-home)
+
+    == blocker 1 — $HOME, and it is NOT rootless-specific ==
+      $ sudo -u appbay env CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+        cannot resolve /home/appbay: lstat /home/appbay: no such file or directory
+      $ sudo -u appbay env DOCKER_HOST=unix:///run/podman/podman.sock podman info
+        cannot resolve /home/appbay: lstat /home/appbay: no such file or directory
+
+      ⇒ It fails before the connection is attempted, so pointing at the rootful socket does
+        not avoid it. probe-87 read this as a rootless problem; it is not.
+
+    == with HOME set to the tree the account already owns ==
+      A. rootful socket
+         $ sudo -u appbay env HOME=/var/lib/appbay \
+             CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+           OS: linux/amd64
+           version: 5.6.2
+           Cannot connect to Podman. Please verify your connection ...   <- a CONNECTION failure
+
+      B. rootless
+         $ sudo -u appbay env HOME=/var/lib/appbay podman info
+           no subuid ranges found for user "appbay" in /etc/subuid
+           cannot chdir to /home/ubuntu: Permission denied
+
+    == is A just permission? same env, as root ==
+      $ env CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+        Version: 5.6.2                                              <- works
+
+      $ ls -l /run/podman/podman.sock
+        srw-rw----. 1 root root 0 ...        <- root:root, and no podman/containers group exists
+
+    == what this changes about the decision ==
+      probe-87 framed three answers each redefining D-6. Refined:
+
+        - HOME is not a decision. It is machine state for a service account, it can live inside
+          the tree the account owns, and it grants nothing. Required under BOTH models.
+        - subuid ranges are only needed for the ROOTLESS model.
+        - the rootful model needs one thing: access to a root-owned socket — which is exactly
+          what the docker path already grants unconditionally via `usermod -aG docker` against
+          a root:docker 0660 socket.
+
+      ⇒ Option B is parity with what init-system already does on docker, not a new grant of
+        privilege. Still the owner's call because it IS root-equivalent container control — but
+        the question is now "match docker, or diverge", not "pick between three philosophies".

@@ -52,12 +52,27 @@ nothing currently grants the account access to it.
 
 | | what it means | cost |
 |---|---|---|
-| **A. Make the account rootless-capable** | allocate subuid/subgid ranges and give it a home under the tree | D-6 says "no home"; this softens it. Rootless podman also cannot bind :80/:443 without extra config |
+| **A. Make the account rootless-capable** | allocate subuid/subgid ranges | D-6 says "no home"; rootless podman also cannot bind :80/:443 without extra config |
 | **B. Grant it the rootful socket** | ACL or group on `/run/podman/podman.sock` | keeps D-6 intact, but hands a no-login account root-equivalent control of the host's containers |
 | **C. Run the unit as root** | drop `User=` on podman hosts | simplest; abandons the reason the service account exists |
 
-**A** is the most faithful to D-6's intent and the most work. **B** is what the docker path
-already does in spirit (the `docker` group is likewise root-equivalent). **C** is a retreat.
+## 🚦 probe-88 narrowed this after the spec was written
+
+Isolating the two causes shows they are **separable**, and only one is a decision:
+
+- **`$HOME` is not a decision.** It fails BEFORE podman attempts a connection, so it defeats
+  the rootful path too — probe-87 read it as a rootless problem and it is not. It is machine
+  state for a service account, it can live inside the tree the account already owns, and it
+  grants nothing. Required under A, B and C alike.
+- **subuid ranges are needed only for A.**
+- **With `HOME` set, the rootful path reaches a connection attempt** against a
+  `srw-rw---- root root` socket. As root with the identical environment the same command
+  succeeds (`Version: 5.6.2`), so the only remaining barrier there is socket **permission**.
+
+⇒ **B is parity with what `init-system` already does on docker**, not a new grant: the docker
+path runs `usermod -aG docker` against a `root:docker 0660` socket unconditionally. It is still
+the owner's call because it IS root-equivalent container control — but the question is now
+"match docker, or deliberately diverge", not "choose between three philosophies".
 
 ## Requirements
 
@@ -98,8 +113,29 @@ To be written at activation, after the owner picks A, B or C.
 - [ ] 2. Implement it in `init-system`, per runtime
   - [ ] 2.1 The mechanism itself
     - **Depends**: 1.1 · **Requirements**: 1.1, 2.1
-  - [ ] 2.2 A `doctor` check that fails before `server start` does
-    - **Depends**: 2.1 · **Requirements**: 2.2 · **Pillar**: Test
+  - [x] 2.2 A `doctor` check that reports it before `server start` does
+    - ⚠️ Deliberately does NOT depend on 1.1. The check reports the CONDITION, which is the
+      same under A, B and C; only the remedy differs. Blocking it on the decision would have
+      left the session idle behind a task the decision does not actually gate.
+    - 🚨 `checkDockerAccessible` answers for the CURRENT USER, and on a service install that is
+      the wrong principal — the tree is owned by a no-login account the unit runs as, and the
+      operator running `doctor` is somebody else. Doctor reported a healthy runtime while the
+      account that mattered could not reach it; the failure surfaced later as `server start`
+      exiting 1.
+    - Reports **unknown, never pass**, when it cannot probe. `required: false`, because an
+      operator install has no second account and a host without passwordless sudo is not broken.
+    - 🚨 **The first version was wrong, and only running it showed that.** It probed with
+      `sudo -n true`, but `tryExec` returns null when stdout is EMPTY even on exit 0
+      (`.trim() || null`) — so it read "no passwordless sudo" on every host that has it and
+      reported "cannot verify" always. The unit tests inject the probe and could not see it.
+      Now `sudo -n id -un`.
+    - Verified on appbay-rhel against ground truth: doctor prints
+      `✗ appbay owns /var/lib/appbay but cannot reach podman — the control plane runs as
+      appbay, not as you`, while `sudo -n -u appbay podman info` prints
+      `cannot resolve /home/appbay`.
+    - 8 tests on the decision (owner vs invoker vs probe result), plus the VM run for the
+      plumbing the injected tests cannot cover.
+    - **Requirements**: 2.2 · **Pillar**: Test, MVP
   - [ ] 2.3 Say what it grants, where the D-6 model is documented
     - **Depends**: 2.1 · **Requirements**: 1.2 · **Pillar**: Docs
 - [ ] 3. Verify on a real host, by hand and through the unit

@@ -16,7 +16,7 @@
  */
 
 import { stat } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
@@ -161,6 +161,7 @@ export type HealthCheckId =
   | "platform"
   | "runtime"
   | "runtime-access"
+  | "service-account-runtime-access"
   | "store-binding"
   | "compose"
   | "compose-version"
@@ -386,6 +387,119 @@ export async function checkAppbayHome(appbayHome: string): Promise<HealthCheckRe
     fix: 'Run "appbay init" to create the Appbay home directory',
     required: true,
   };
+}
+
+/**
+ * Can the account that will actually RUN the control plane reach the container runtime?
+ *
+ * ⭐ `checkDockerAccessible` above answers this for the CURRENT USER, and on a service install
+ * that is the wrong principal. `appbay init-system --owner service` creates a no-login account
+ * that owns `$APPBAY_HOME` and that the systemd unit runs as; the operator running
+ * `appbay doctor` is somebody else. So doctor reported a healthy runtime while the account that
+ * matters could not reach it at all — the failure only surfaced later, as `server start`
+ * exiting 1.
+ *
+ * 🚨 MEASURED, on Fedora 43 with podman (probe-87, probe-88). The D-6 account fails twice over:
+ *
+ *     sudo -u appbay podman info
+ *       cannot resolve /home/appbay: lstat /home/appbay: no such file or directory
+ *
+ * because `useradd --no-create-home` leaves `$HOME` pointing at a directory that does not
+ * exist — which defeats the ROOTFUL path too, since it fails before the connection is even
+ * attempted. With `HOME` set, rootless then fails on absent subuid ranges, and rootful reaches
+ * a `srw-rw---- root root` socket it has no permission for.
+ *
+ * ⚠️ REPORTS "unknown", NEVER "pass", WHEN IT CANNOT TELL. Probing another account needs
+ * passwordless sudo. Where that is unavailable this check must not claim the access is fine —
+ * that would be the same false green it exists to remove. It is `required: false` for the same
+ * reason: an operator install has no second account, and a host without `sudo -n` is not broken.
+ */
+export function checkServiceAccountRuntimeAccess(
+  appbayHome: string,
+  deps: {
+    ownerOf?: (path: string) => string | null;
+    currentUser?: () => string | null;
+    probe?: (user: string, bin: string) => "ok" | "denied" | "cannot-probe";
+  } = {},
+): HealthCheckResult {
+  const name = "Service account runtime access";
+  const bin = containerBin(appbayHome);
+
+  const ownerOf = deps.ownerOf ?? defaultOwnerOf;
+  const currentUser = deps.currentUser ?? defaultCurrentUser;
+  const probe = deps.probe ?? defaultProbeAs;
+
+  const owner = ownerOf(appbayHome);
+  const me = currentUser();
+
+  if (!owner || !me) {
+    return { name, passed: true, detail: "cannot determine the owning account (skip)", required: false };
+  }
+  if (owner === me) {
+    // An operator install: the account that runs the control plane is the one asking, and
+    // `checkDockerAccessible` already answered for it.
+    return { name, passed: true, detail: `runs as you (${me})`, required: false };
+  }
+
+  const result = probe(owner, bin);
+  if (result === "ok") {
+    return { name, passed: true, detail: `${owner} can reach ${bin}`, required: false };
+  }
+  if (result === "cannot-probe") {
+    return {
+      name,
+      passed: true,
+      detail: `cannot verify ${owner}'s access from here (needs passwordless sudo)`,
+      fix: `Check it directly:  sudo -u ${owner} ${bin} info`,
+      required: false,
+    };
+  }
+
+  return {
+    name,
+    passed: false,
+    detail: `${owner} owns ${appbayHome} but cannot reach ${bin} — the control plane runs as ${owner}, not as you`,
+    fix:
+      `Reproduce with:  sudo -u ${owner} ${bin} info\n` +
+      `      Two causes are usual, and the first defeats both access models: the account is ` +
+      `created --no-create-home, so $HOME does not exist. Then rootless needs subuid ranges ` +
+      `(/etc/subuid), and rootful needs permission on a root-owned socket.`,
+    required: false,
+  };
+}
+
+/** Login name that owns a path, or null when it cannot be determined. */
+function defaultOwnerOf(path: string): string | null {
+  try {
+    const uid = statSync(path).uid;
+    const out = tryExec("getent", ["passwd", String(uid)]);
+    return out?.split(":")[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function defaultCurrentUser(): string | null {
+  const out = tryExec("id", ["-un"]);
+  return out?.trim() || null;
+}
+
+/**
+ * Ask whether `user` can reach the runtime, without becoming them permanently.
+ *
+ * `sudo -n` so this never prompts inside a health check.
+ */
+function defaultProbeAs(user: string, bin: string): "ok" | "denied" | "cannot-probe" {
+  // ⚠️ `id -un`, NOT `true`. `tryExec` returns null when stdout is EMPTY even on exit 0
+  // (`.trim() || null`), so probing with `sudo -n true` — which succeeds silently — read as
+  // "no passwordless sudo" on every host that has it. The check then reported "cannot verify"
+  // always, which is a different false answer from the one it exists to remove but no less
+  // useless. Caught by running it on a real service install, not by the unit tests, which
+  // inject the probe.
+  const canSudo = tryExec("sudo", ["-n", "id", "-un"]);
+  if (canSudo === null) return "cannot-probe";
+  const out = tryExec("sudo", ["-n", "-u", user, bin, "info", "--format", "{{.ServerVersion}}"]);
+  return out !== null ? "ok" : "denied";
 }
 
 /**
@@ -871,6 +985,7 @@ export async function runChecks(appbayHome: string): Promise<IdentifiedHealthChe
     tag("platform", checkPlatform(appbayHome)),
     tag("runtime", checkDocker(appbayHome)),
     tag("runtime-access", checkDockerAccessible(appbayHome)),
+    tag("service-account-runtime-access", checkServiceAccountRuntimeAccess(appbayHome)),
     tag("store-binding", checkStoreBinding(appbayHome)),
     tag("compose", checkComposeInstalled(appbayHome)),
     tag("compose-version", checkComposeVersion(appbayHome)),
