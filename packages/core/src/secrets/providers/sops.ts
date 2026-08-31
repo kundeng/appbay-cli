@@ -68,16 +68,54 @@ export function parseSopsUri(uri: string): ParsedSopsUri {
 }
 
 /**
+ * Characters that would change the SHAPE of the extract path rather than name a key.
+ *
+ * 🚨 THE PATH IS BUILT BY CONCATENATION, so a key containing any of these rewrites the
+ * structure instead of being quoted into it. Measured:
+ *
+ *     toExtractPath('a"]["b')  ->  ["a"]["b"]
+ *     toExtractPath('a.b')     ->  ["a"]["b"]      ← identical
+ *
+ * Two different URIs therefore select the SAME secret, silently. And a lone quote produces
+ * `["x"]"]`, which is not valid jq at all — sops then fails with a syntax complaint that
+ * names neither the key nor the character responsible.
+ *
+ * ⚠️ This is not shell injection: `execFile` takes an argv array, so nothing reaches a shell.
+ * It is path injection into sops's own extract expression, and the fix is the same shape —
+ * refuse the input rather than try to escape it, because the correct escaping is sops's to
+ * define and guessing it is how the next version of this bug gets written.
+ */
+const PATH_BREAKING = /["[\]]/;
+
+/**
  * Convert a dot-notation key to a `--extract` jq-style path.
  *
  * "database.password" → `["database"]["password"]`
  * "DB_PASSWORD"        → `["DB_PASSWORD"]`
+ *
+ * Throws when a segment carries a character that would alter the path structure — see
+ * PATH_BREAKING. An empty segment (`a..b`, `.a`) is refused for the same reason: it would
+ * emit `[""]`, which addresses a key nobody can have written deliberately.
  */
 export function toExtractPath(key: string): string {
-  return key
-    .split(".")
-    .map((part) => `["${part}"]`)
-    .join("");
+  const parts = key.split(".");
+  for (const part of parts) {
+    if (part === "") {
+      throw new Error(
+        `Invalid sops key "${key}" — empty path segment. Use dots to separate keys, ` +
+          `not to pad them.`,
+      );
+    }
+    const bad = PATH_BREAKING.exec(part);
+    if (bad) {
+      throw new Error(
+        `Invalid sops key "${key}" — the character ${JSON.stringify(bad[0])} would change ` +
+          `the extract path rather than name a key. Quotes and brackets are not permitted ` +
+          `in a sops key.`,
+      );
+    }
+  }
+  return parts.map((part) => `["${part}"]`).join("");
 }
 
 // ---------------------------------------------------------------------------
