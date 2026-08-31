@@ -480,11 +480,27 @@ for anything touching the runtime, a journey on both VMs.
       with the `auth` trait" — and marks it as authored in the private tree. S32 listed 5.2
       and 5.3 without it, so following the task order literally would have removed the
       password check while the direct port was still open.
-    - Work: a manifest for the web UI with `ingress` + `auth`, and the published port bound to
-      loopback (or dropped) so the edge is the only route in. Until that lands, 5.2/5.3/5.4
-      cannot be done safely — and `appbay admin reset-password` must NOT be deleted either,
-      because it is the recovery path for the account that is still the live credential.
-    - **Depends**: 5.1b · **Pillar**: MVP, Design
+    - Three parts, and only the first is done:
+      - [x] **the `APPBAY_BIND` control, and the gate that keeps the two compose copies honest**
+      - [ ] a manifest for the web UI with `ingress` + `auth`, so the edge is a route in at all
+      - [ ] flip the bind default to `127.0.0.1`, so the edge is the ONLY route in
+    - 🚨 The order matters both ways. Flipping the bind before an edge route exists locks
+      operators out with nothing in its place; cutting over the auth before flipping it is the
+      bypass above. So the default stays `0.0.0.0` for now — the knob exists, the flip is a
+      precondition of 5.2 rather than a change to make today.
+    - 🚨 **Found while doing part one: the build harness and what an install runs were never
+      compared.** `docker-compose.server.yml` is what `build-server.sh` and
+      `test-compose-deploy.sh` exercise; `appbay init` writes its own copy from an embedded
+      template. The repo already knew — that file's header records a `socket-proxy` service
+      deleted in S19 which CI kept standing up for two sprints, and names the cause: "the two
+      copies are never compared." `scripts/check-server-compose.mjs` is the comparison, and it
+      found a second divergence immediately: the embedded template hardcoded `3000:3000` while
+      the harness honoured `${APPBAY_PORT}`, so the port was configurable in CI and fixed on
+      every real install. It runs the BINARY rather than regex-extracting the template, because
+      comparing a reconstruction instead of the artifact is the same mistake in a new place.
+    - ⚠️ `appbay admin reset-password` must NOT be deleted before 5.2 either — it is the
+      recovery path for the account that is still the live credential.
+    - **Depends**: 5.1b · **Pillar**: MVP, Design, Test
   - [ ] 5.2 Cut `apps/web` over to the edge identity store
     - **Depends**: 5.1c · **Requirements**: 4.1
   - [ ] 5.3 Only now: delete `admin.ts`, the schema module, `hashControlPlanePassword`, the
