@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { discoverApps, isSystemApp } from "@appbay/core";
+import { discoverApps, partitionByBootOrder } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -68,10 +68,18 @@ export const downCommand = new Command("down")
       process.exit(0);
     }
 
-    // Reverse boot order: user apps first, system apps last.
-    const userApps = targetApps.filter((a) => !isSystemApp(a.name));
-    const systemApps = targetApps.filter((a) => isSystemApp(a.name)).reverse();
-    const orderedApps = [...userApps, ...systemApps];
+    // Reverse boot order: user apps first, then system apps in the reverse of the order
+    // they boot in — the edge everything routes through goes last.
+    //
+    // 🚨 This used to be `targetApps.filter(isSystemApp).reverse()`, which reverses the
+    // INPUT order, and `discoverApps` sorts alphabetically. Alphabetical reversed is not
+    // reverse-boot-order: with both providers present it produced [traefik, caddy], which is
+    // BOOT order — the exact opposite of what the comment claimed. Latent only because one
+    // ingress provider is installed at a time, so the list had one element. Derive the order
+    // from SYSTEM_APP_BOOT_ORDER instead of assuming the caller supplied it.
+    const { system, user } = partitionByBootOrder(targetApps.map((a) => a.name));
+    const byName = new Map(targetApps.map((a) => [a.name, a]));
+    const orderedApps = [...user, ...system.reverse()].map((n) => byName.get(n)!);
 
     console.log("Stopping apps...\n");
 
