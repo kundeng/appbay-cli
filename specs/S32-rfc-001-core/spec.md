@@ -1,8 +1,9 @@
 ---
 spec_id: S32-rfc-001-core
-status: DRAFT
+status: ACTIVE
 closed_as: null
 since: 2026-08-31
+activated: 2026-08-31
 until: null
 epic: security
 features: [namespace-axis, system-home-consolidation, identity-collapse, when-semantics]
@@ -14,7 +15,7 @@ anchors: [data-architecture]
 
 # S32: RFC-001 core — identity, system home, namespace, `when`
 
-<!-- DRAFT. Carrier for everything S30 deferred. Not started; no code.
+<!-- ACTIVE 2026-08-31, on S30's FORK-FORWARD close. Carrier for everything S30 deferred.
      ⚠️ S31 is the PRIVATE queue's S31-alpha-remainder. Sprint numbers are one global
      sequence across two queues, so the CLI's next number is 32. -->
 
@@ -60,6 +61,38 @@ Carried from S30, because they were learned the expensive way and still apply:
   `discoverRunningApps` at `server/docker-utils.ts:25`, feeding `activeApps` into the same
   compiler from `queue/workers/eject.ts:51` and `routers/deployments.ts:20`. Land both sides
   in one private commit, then cherry-pick the public half.
+
+## Decisions & Corrections (log)
+
+**2026-08-31 — §4 is NOT one text edit; it is two changes with different costs.** Measured
+before touching anything:
+
+- The **declaration fields** are free, as the RFC says. All 155 manifests declare
+  `project: default` / `environment: default` and carry no information. Confirmed by
+  execution that the invocation value is unreachable: `AppbayYamlSchema.parse({})` yields
+  `project: "default"`, so `config?.project ?? "uom.sim"` returns `"default"` [F51/F52].
+- The **reference vocabulary is a 234-site migration across two repos.** `${{project.` appears
+  **234** times in the real catalogs, the UOM fixtures and `system-apps/`; `${{environment.`
+  and `${{service.` appear **zero** times. RFC 4.2 says to collapse `ScopeValues` and
+  `VALID_SCOPES` (`scope-resolver.ts:20-22`, `:50`), which renames that vocabulary and breaks
+  all 234. F51's "the fields carry no information" is true of the *declaration*, and the RFC
+  carries it over to the *vocabulary*, which is a different surface.
+
+⇒ Split: task 1.1 does the declaration fields, which are separable — `appProject` feeds only
+`resolveMagicVars`' key tuple (`compile.ts:446`) and the trait context (`:555`), never the
+resolver, which is fed from the separate `projectVars` input. The vocabulary rename becomes
+its own task with an alias period, and needs a decision before it runs.
+
+**2026-08-31 — 🚨 collapsing the generated-value key changes `?gen=hash` VALUES.**
+`generateHash(project, environment, service, key)` is returned *as the value* at
+`generated-values.ts:223` for `type === "hash"` — never stored. So a 4-tuple → 3-tuple
+collapse silently changes every hash-derived secret on every host. The RFC's "migration cost
+is nil" rests on `generated-values.yaml` being `values: []`, which proves nothing here,
+because hash values are recomputed each render rather than persisted.
+
+Current exposure measured as **zero**: `?gen=hash` appears nowhere in `appbay-catalog`, the
+UOM fixtures, or `system-apps/` — all 54 generated values are `gen=password`, which *is*
+stored. So this is safe to land now and would not have been later. Task 1.2 carries the note.
 
 ## Requirements
 
@@ -133,11 +166,31 @@ for anything touching the runtime, a journey on both VMs.
 
 ## Tasks
 
+- [ ] 0. Carried from S30
+  - [ ] 0.1 Verify a converge path end-to-end with the PACKAGED binary
+    - S30's 4.4. Needs a release tag to exist first. Expect `bundled(150), local(5)` and two
+      override lines from `appbay catalog list`. Covers S30's changes and this sprint's.
+    - **Depends**: —
+
 - [ ] 1. Namespace (§4) — first, while it is still a text edit
   - [ ] 1.1 `namespace: z.string().optional()` replaces `project` + `environment`
     - **Depends**: — · **Requirements**: 2.1
   - [ ] 1.2 Collapse the pair-keyed sites and the generated-values key from 4-tuple to 3-tuple
+    - Sites: `compile.ts:370,371,380,381,446,447,555,556`; `state.ts` `GeneratedValueKeySchema`
+      and `ActiveAppEntrySchema`; `generated-values.ts` `generateHash` + `keyString`;
+      `status.ts:49,50,67,68,86,87`; `list.ts:28,29,70,71`.
+    - ⚠️ Changes every `?gen=hash` value (see the log). Exposure is zero today and will not
+      stay that way — land it now or not at all.
+    - ⚠️ Do NOT touch `svc.environment` in `secrets.ts`, `scoped-env.ts` or
+      `vault-service.ts`: that is Compose's service environment, which RFC §4 explicitly
+      keeps.
     - **Depends**: 1.1 · **Requirements**: 2.2
+  - [ ] 1.2b 🚦 Decide the `${{project.KEY}}` → `${{namespace.KEY}}` vocabulary rename
+    - 234 references across two catalog repos plus `system-apps/`. Needs an alias period in
+      `scope-resolver.ts` (accept both, warn on the old) and a sweep of both catalogs, or an
+      explicit decision to keep `project` as the reference scope name while the declaration
+      field is `namespace`. Not free, and not this task.
+    - **Depends**: 1.1
   - [ ] 1.3 Namespace into container/network/ingress identity, with `dnsSafe()`
     - **Depends**: 1.2 · **Requirements**: 2.3
   - [ ] 1.4 Fix the `compile.ts:435`/`:517` suggestion — it names two files nothing reads and

@@ -1,14 +1,14 @@
 ---
 spec_id: S30-rfc-001-consolidation
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: FORK-FORWARD
 since: 2026-08-31
 activated: 2026-08-31
 until: null
 epic: security
 features: [catalog-collision-rule, keepassxc-argv-containment, rfc-001-record]
 supersedes: []
-superseded_by: null
+superseded_by: S32-rfc-001-core
 depends_on: []
 anchors: [data-architecture]
 ---
@@ -518,7 +518,7 @@ edit` has no `--password` option at all — the old command died with `Unknown o
       schema field is a speculative flag. Made visible so the decision can be deliberate.
     - **Depends**: 3.4 · **Requirements**: 2.5 · **Properties**: 2
 
-- [ ] 4. Verification against the real deployment scenario
+- [x] 4. Verification against the real deployment scenario
   - [x] 4.1 Clone the fixtures to `~/Projects/appbay-ansible-test`
     - `llm-stack@pre-appbay-removal`; confirmed `provision-appbay.yml:692` and the five
       catalog entries match the RFC's citations.
@@ -540,16 +540,16 @@ edit` has no `--password` option at all — the old command died with `Unknown o
       provisioning one. What was moved is the part that needed a VM: the package install and
       the external contract. Running the packaged binary in a VM is 4.4.
     - **Depends**: 2.5, 3.3 · **Pillar**: Test
-  - [ ] 4.4 Verify a converge path end-to-end with the PACKAGED binary
+  - [>] 4.4 → S32-rfc-001-core · Verify a converge path end-to-end with the PACKAGED binary
     - The logic is verified end to end against the real fixtures through the real
       registration path (4.2). What remains is the packaged binary on a host: cut a release
       tag, point `appbay_release_tag` at it, re-converge, and read `appbay catalog list` back
       expecting `bundled(150), local(5)` and the two override lines.
-    - ⚠️ Kept as a PENDING task in this sprint rather than deferred. It has no other spec to
-      go to — a `[>]` naming "the release" would be a dangling deferral (Rule 20) — and it is
-      the only thing standing between this sprint and CLOSED/SHIPPED. It cannot run until a
-      tag exists, which is the RFC's own release step ("each landed group gets a release
-      tag"), so this sprint stays ACTIVE until then.
+    - ⚠️ Now carried to S32, which is a real spec id. Holding S30 ACTIVE for it was the
+      wrong call: it cannot run until a release tag exists, that tag is the owner's to cut,
+      and an ACTIVE sprint parked on someone else's action blocks the queue for no gain.
+      S32 will need the same converge verification for its own changes, so one run covers
+      both.
     - **Depends**: 3.4, 4.3
 
 - [x] 5. Land it
