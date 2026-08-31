@@ -100,11 +100,6 @@ export const upCommand = new Command("up")
             : `  Started ${app.appName}`,
         );
 
-        if (app.hookResult?.ran && app.hookResult.error) {
-          console.error(`  Post-deploy hook failed for ${app.appName}: ${app.hookResult.error}`);
-        } else if (app.hookResult?.ran) {
-          console.log(`  Post-deploy verified ${app.appName}`);
-        }
       } else if (app.status === "failed") {
         console.error(`  Failed: ${app.appName} — ${app.error}`);
       } else {

@@ -28,7 +28,6 @@ import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
 import { containerBin } from "../runtime/container-runtime.js";
-import { runPostDeployHook } from "../post-deploy.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -283,7 +282,6 @@ export interface AppDeployResult {
   containerStartedWithoutRoutes?: boolean;
   error?: string;
   shepherdErrors?: string[];
-  hookResult?: { ran: boolean; error?: string };
 }
 
 /** Full deploy pipeline result. */
@@ -856,12 +854,6 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         }
       }
 
-      // Legacy post-deploy hook (will migrate to trait-emitted shepherd actions)
-      appResult.hookResult = await runPostDeployHook({
-        appName: app.appName,
-        appbayHome,
-        secretEnv,
-      });
 
       appResult.status = "deployed";
       result.deployed++;

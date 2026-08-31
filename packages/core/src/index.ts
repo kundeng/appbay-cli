@@ -38,8 +38,6 @@ export * from "./catalog/index.js";
 // Re-export boot ordering
 export * from "./boot-order.js";
 
-// Re-export post-deploy orchestration
-export * from "./post-deploy.js";
 
 
 // Re-export runtime facts detection
