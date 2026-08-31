@@ -44,6 +44,38 @@ import { readFileSync } from "node:fs";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
 
+/**
+ * What an operator can actually do about an unresolved `${{scope.KEY}}` reference.
+ *
+ * 🚨 THE OLD TEXT NAMED FOUR THINGS AND THREE DID NOT EXIST: "Define the variable in
+ * project.yaml or environment.yaml, or use --project-vars / --env-vars flags." Measured —
+ * `--project-vars` and `--env-vars` are not commander options anywhere in the CLI, and
+ * nothing reads `environment.yaml`. The one message a stuck operator gets sent them to two
+ * flags the binary rejects and a file it never opens. RFC-001 §4.8.
+ *
+ * What is real: `loadProjectVars` reads a single `domain:` line from
+ * `$APPBAY_HOME/project.yaml` and exposes it as `${{project.DOMAIN}}`. The `environment` and
+ * `service` maps are threaded through the compiler but nothing populates them, so a
+ * reference to either can never resolve — and saying that is more use than naming a file to
+ * go and edit.
+ */
+function scopeErrorSuggestion(scope: string): string {
+  if (scope === "project") {
+    return (
+      "Only ${{project.DOMAIN}} is available today, from the `domain:` line in " +
+      "$APPBAY_HOME/project.yaml. No other project-level variables are loaded."
+    );
+  }
+  if (scope === "environment" || scope === "service") {
+    return (
+      `The \`${scope}\` scope is declared but nothing populates it, so no ` +
+      `\${{${scope}.KEY}} reference can resolve. Use \${{project.DOMAIN}}, or a plain ` +
+      "Compose ${VAR} read from the app's .env."
+    );
+  }
+  return "Valid scopes are: project, environment, service.";
+}
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -441,7 +473,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       appName: app.name,
       stage: "resolve-variables",
       message: scopeErr.message,
-      suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+      suggestion: scopeErrorSuggestion(scopeErr.scope),
     });
   }
 
@@ -522,7 +554,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         message: service
           ? `${scopeErr.message} (service trait: ${service}/${trait.type})`
           : `${scopeErr.message} (app trait: ${trait.type})`,
-        suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+        suggestion: scopeErrorSuggestion(scopeErr.scope),
       });
     }
     return result as { type: string; [key: string]: unknown };

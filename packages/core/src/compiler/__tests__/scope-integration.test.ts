@@ -200,3 +200,63 @@ traits:
     expect(result.apps[0].rendered).toContain("PORT=${PORT:-3000}");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Unresolved-reference guidance — RFC-001 §4.8
+// ---------------------------------------------------------------------------
+
+describe("suggestions for an unresolved ${{scope.KEY}}", () => {
+  // 🚨 The old text named `--project-vars` / `--env-vars` and `environment.yaml`. None of
+  // the three exist — measured: zero commander options match either flag, and nothing reads
+  // environment.yaml. These assertions exist so a suggestion cannot drift back into naming
+  // something imaginary; each one names only a thing that is real today.
+
+  async function suggestionsFor(compose: string): Promise<Map<string, string>> {
+    const home = await mkdtemp(join(tmpdir(), "appbay-suggest-"));
+    const appsDir = join(home, "apps");
+    await mkdir(join(appsDir, "a"), { recursive: true });
+    await writeFile(join(appsDir, "a", "docker-compose.yml"), compose, "utf-8");
+    const result = await compile({
+      appsDir,
+      rendersDir: join(home, "renders"),
+      stateDir: join(home, "state"),
+    });
+    const out = new Map<string, string>();
+    for (const err of result.errors.filter((e) => e.stage === "resolve-variables")) {
+      out.set(err.message, err.suggestion ?? "");
+    }
+    return out;
+  }
+
+  it("never names a flag or file that does not exist", async () => {
+    const all = [
+      ...(await suggestionsFor(
+        "services:\n  web:\n    image: nginx\n    environment:\n" +
+          "      - A=${{project.NOPE}}\n      - B=${{environment.X}}\n      - C=${{bogus.Y}}\n",
+      )).values(),
+    ].join("\n");
+
+    expect(all).not.toContain("--project-vars");
+    expect(all).not.toContain("--env-vars");
+    expect(all).not.toContain("environment.yaml");
+  });
+
+  it("tells the truth per scope", async () => {
+    const s = await suggestionsFor(
+      "services:\n  web:\n    image: nginx\n    environment:\n" +
+        "      - A=${{project.NOPE}}\n      - B=${{environment.X}}\n      - C=${{bogus.Y}}\n",
+    );
+    const find = (needle: string) =>
+      [...s.entries()].find(([msg]) => msg.includes(needle))?.[1] ?? "";
+
+    // project: one key resolves, and it says which and from where.
+    expect(find('scope "project"')).toContain("${{project.DOMAIN}}");
+    expect(find('scope "project"')).toContain("$APPBAY_HOME/project.yaml");
+
+    // environment: the store is not populated, so say that rather than name a file to edit.
+    expect(find('scope "environment"')).toContain("nothing populates it");
+
+    // an unknown scope is a typo — list the valid ones.
+    expect(find('Unknown scope "bogus"')).toContain("project, environment, service");
+  });
+});
