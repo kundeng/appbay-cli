@@ -215,6 +215,19 @@ for anything touching the runtime, a journey on both VMs.
       fix it (`appbay.<app>.<svc>` and `appbay.<ns>.<app>` are the same shape), so the
       compiler stamps `com.appbay.app` and the reader uses it, with the name as fallback.
     - **Depends**: 1.3
+  - [x] 1.5 🆕 Removed scope fields fail instead of vanishing, and the docs stop teaching them
+    - Not in the original plan; found by the docs pillar check. Zod strips unknown keys, so
+      after 1.1 a manifest saying `project: homelab` parsed clean and the value disappeared
+      with no error. `default` is still accepted (all 162 real declarations said it, and it
+      carried nothing); anything else is a parse error naming `namespace:`.
+    - Three system apps declared `project: system` and it was load-bearing — apps/web's
+      command palette keys its icon off it — so they migrated to `namespace: system`. The
+      other nine dropped a dead `default`.
+    - `docs/guide/overlays.qmd` and `docs/reference/scope-model.qmd` rewritten. The first
+      documented §5.2's defect as the design ("the active app set is determined from CLI
+      arguments"); the second taught a syntax that now errors, plus two variable stores that
+      never existed.
+    - **Depends**: 1.1, 1.3 · **Pillar**: Docs, Design
   - [ ] 1.4 Fix the `compile.ts:435`/`:517` suggestion — it names two files nothing reads and
         two flags that do not exist
     - **Depends**: 1.1
@@ -366,6 +379,12 @@ never tested what they claimed: `searxng` is not in `SYSTEM_APPS`, so the AND-ov
 had never installed the peer it asserted on; and `result.apps[0]` stopped being the app under
 test once installing a peer meant compiling it too ("caddy" sorts before "myapp"). Both were
 my bugs, both surfaced by running it.
+
+**2026-08-31 — the docs check found a code defect, not a docs defect.** Verifying whether
+`scope-model.qmd` still matched the code turned up that a removed field was being silently
+stripped by Zod rather than rejected — so the doc was teaching syntax that failed quietly
+rather than loudly. The doc fix was the smaller half. Rung 3 before rung 4 is why it
+surfaced: checking the build against the design first is what made the doc gap legible.
 
 ## Log
 
