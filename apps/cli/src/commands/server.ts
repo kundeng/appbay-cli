@@ -159,23 +159,45 @@ async function waitForHealth(): Promise<boolean> {
  * a local installation legitimately has neither and a warning on every `server start` trains
  * operators to ignore warnings.
  */
-function writeControlPlaneEdgeRoute(appbayHome: string): void {
+function writeControlPlaneEdgeRoute(appbayHome: string): string | null {
   const caddyDir = join(appbayHome, "etc", "apps", "caddy");
-  if (!existsSync(caddyDir)) return; // Traefik installs and pre-edge installs have no target.
+  if (!existsSync(caddyDir)) return null; // Traefik installs and pre-edge installs have no target.
 
   const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
   const cfg = parseInstanceConfig(raw);
-  if (cfg.ingress_provider === "traefik") return; // The auth portal is Caddy Security only.
+  if (cfg.ingress_provider === "traefik") return null; // The auth portal is Caddy Security only.
 
   const host = controlPlaneHost(cfg.domain, cfg.server_host);
-  if (!host) return; // No domain and no explicit host — nothing to serve it at.
+  if (!host) return null; // No domain and no explicit host — nothing to serve it at.
 
   for (const fragment of controlPlaneEdgeFragments(host)) {
     const target = join(appbayHome, fragment.path);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, fragment.content, "utf-8");
   }
-  console.log(`  Edge route: https://${host} -> the control plane (admins only)`);
+  return host;
+}
+
+/**
+ * Decide which interface the control plane's port binds to — RFC-001 §1, task 5.1c part three.
+ *
+ * 🚨 LOOPBACK ONLY WHEN THERE IS SOMEWHERE ELSE TO GO IN. Binding to 127.0.0.1 with no edge
+ * route is a lockout, not a hardening: the operator loses the UI and gains nothing. So the
+ * default follows the route — if `writeControlPlaneEdgeRoute` produced a host, the edge is a
+ * way in and the direct port stops being one; if it did not, nothing changes.
+ *
+ * ⚠️ THIS IS DECIDED PER START, NOT BAKED INTO THE COMPOSE FILE. `appbay init` writes
+ * docker-compose.server.yml only when it is ABSENT, so a value chosen at init time would
+ * never reach an existing installation — and this is exactly the setting existing
+ * installations need before RFC-001 §1 can hand authentication to the edge.
+ *
+ * An explicit `APPBAY_BIND` in the environment always wins. That is the escape hatch for an
+ * operator whose edge is configured but not yet actually working.
+ */
+function resolveServerBind(edgeHost: string | null): string {
+  const explicit = process.env.APPBAY_BIND?.trim();
+  if (explicit) return explicit;
+  return edgeHost ? "127.0.0.1" : "0.0.0.0";
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +226,17 @@ const startCommand = new Command("start")
     ensureNetwork();
 
     // 3b. Give the edge a route to the control plane (RFC-001 §1, task 5.1c).
-    writeControlPlaneEdgeRoute(resolveAppbayHome());
+    const edgeHost = writeControlPlaneEdgeRoute(resolveAppbayHome());
+    const bind = resolveServerBind(edgeHost);
+    if (edgeHost) {
+      console.log(`  Edge route: https://${edgeHost} -> the control plane (admins only)`);
+    }
+    if (bind === "127.0.0.1") {
+      console.log(
+        "  Port 3000 is bound to loopback — the edge is the way in. " +
+          "Override with APPBAY_BIND=0.0.0.0.",
+      );
+    }
 
     // 4. Start the compose stack.
     console.log("Starting Appbay server...");
@@ -216,6 +248,7 @@ const startCommand = new Command("start")
       APPBAY_GID: String(process.getgid?.() ?? 1000),
       APPBAY_RUNTIME_SOCKET: resolveRuntimeSocket(),
       APPBAY_SERVER_CONTAINER_RUNTIME: "docker",
+      APPBAY_BIND: bind,
     });
 
     if (result.exitCode !== 0) {

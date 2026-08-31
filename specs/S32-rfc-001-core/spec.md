@@ -468,7 +468,7 @@ for anything touching the runtime, a journey on both VMs.
       seeded file itself passes `caddy validate`.
     - **Depends**: 5.1a · **Requirements**: 4.1 · **Pillar**: MVP, Test, Docs
     - **Evidence**: `docs/rfc/evidence/probe-84-*.yaml`
-  - [ ] 5.1c 🚦 PREREQUISITE the spec did not list: put the web UI behind the edge first
+  - [x] 5.1c 🚦 PREREQUISITE the spec did not list: put the web UI behind the edge first
     - 🚨 **5.2 as written is an authentication bypass, and it is measured, not theoretical.**
       "Cut `apps/web` over to the edge identity store" means trusting the identity Caddy
       Security forwards in request headers. That is only sound if the app is reachable
@@ -495,11 +495,18 @@ for anything touching the runtime, a journey on both VMs.
             13 tests, mostly cross-file couplings (policy name ↔ `authorize with`, auth glob ↔
             fragment filename, portal name ↔ shipped Caddyfile, signing key ↔ portal). Verified
             with the binary in all three cases and `caddy validate`d the config it produced.
-      - [ ] flip the bind default to `127.0.0.1`, so the edge is the ONLY route in
-    - 🚨 The order matters both ways. Flipping the bind before an edge route exists locks
-      operators out with nothing in its place; cutting over the auth before flipping it is the
-      bypass above. So the default stays `0.0.0.0` for now — the knob exists, the flip is a
-      precondition of 5.2 rather than a change to make today.
+      - [x] **the bind follows the route** — loopback when an edge route was written, all
+            interfaces when it was not. Decided PER START rather than baked into the compose
+            file, because `init` writes `docker-compose.server.yml` only when it is ABSENT, so
+            a value chosen at init time could never reach an existing installation — and that
+            is exactly who needs it before the cutover. `APPBAY_BIND` always wins, as the
+            escape hatch for an edge that is configured but not yet serving. Verified with the
+            binary: caddy+domain → `127.0.0.1:3000`, no domain → `0.0.0.0:3000`, override →
+            `0.0.0.0:3000`, each read back from `docker port`.
+    - 🚨 The order matters both ways, and the implementation encodes it rather than relying on
+      whoever does 5.2 remembering: the bind is loopback IF AND ONLY IF a route exists, so
+      neither half can land without the other. 5.2 can now require `127.0.0.1` as a runtime
+      precondition instead of a documented one.
     - 🚨 **Found while doing part one: the build harness and what an install runs were never
       compared.** `docker-compose.server.yml` is what `build-server.sh` and
       `test-compose-deploy.sh` exercise; `appbay init` writes its own copy from an embedded

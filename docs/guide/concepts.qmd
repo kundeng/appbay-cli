@@ -157,11 +157,23 @@ Nothing is written when the installation runs Traefik (the auth portal is Caddy 
 or when there is no `domain:` and no `server_host:` — a local install has no name to serve it
 at, and that is normal rather than an error.
 
-⚠️ **The edge is a way in, not yet the only one.** The server still publishes port 3000 and the
-web UI still checks its own password. Closing that is `APPBAY_BIND=127.0.0.1` in the server
-compose, and it is the precondition for RFC-001 §1's plan to hand authentication to the edge —
-with the port open, trusting an identity the edge forwards in a header would let anyone who can
-reach 3000 set that header themselves.
+When that route is written, `appbay server start` also binds port 3000 to **loopback**, so the
+edge becomes the only way in from the network. Without a route it stays on all interfaces —
+closing the port when there is nowhere else to go in is a lockout, not a hardening.
+
+| install | edge route | port 3000 |
+|---|---|---|
+| Caddy + a domain | written | `127.0.0.1:3000` |
+| Caddy, no domain | none | `0.0.0.0:3000` |
+| Traefik | none | `0.0.0.0:3000` |
+
+`APPBAY_BIND` always wins, either way — `APPBAY_BIND=0.0.0.0 appbay server start` is the escape
+hatch if your edge is configured but not yet actually serving.
+
+⚠️ **The web UI still checks its own password.** Handing authentication to the edge is the rest
+of RFC-001 §1; the loopback bind is its precondition, because with the port open on every
+interface, trusting an identity the edge forwards in a header would let anyone who can reach
+3000 set that header themselves.
 
 ::: {.callout-note}
 ## Two files used to be called `project.yaml`
