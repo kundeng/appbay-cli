@@ -16,7 +16,8 @@
     "check:system-apps": "node scripts/generate-system-apps.mjs --check",
     "check:docs-cli": "node scripts/check-docs-cli.mjs",
     "check:straddle": "node scripts/check-straddle.mjs",
-    "check:docs-manifests": "node scripts/check-docs-manifests.mjs"
+    "check:docs-manifests": "node scripts/check-docs-manifests.mjs",
+    "check:subset": "node scripts/check-subset.mjs"
   },
   "devDependencies": {
     "turbo": "^2.9.8"
