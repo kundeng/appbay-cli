@@ -53,13 +53,23 @@ Install an app from the catalog into `$APPBAY_HOME/etc/apps/<name>/`.
 ```bash
 appbay install jellyfin
 appbay install nextcloud --set ADMIN_USER=me --set TZ=Europe/Berlin
+appbay install adminer --as adminer-staging      # a second copy
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--set <pairs...>` | — | Input values as `KEY=VALUE`, repeatable |
+| `--as <name>` | the catalog name | Install under a different app name |
 | `--force` | `false` | Overwrite an app of the same name |
 | `--no-validate` | `false` | Skip post-install validation |
+
+`--as` splits the catalog lookup from the install location, which is what makes a second copy
+possible: without it both were the same value, so installing an entry twice overwrote it.
+
+⚠️ Not the same axis as `namespace:`. A namespace disambiguates two *deployments* of one
+installed app; `--as` gives you two *installations*, each with its own directory, manifest and
+config. Use `--as` when the copies should differ in what they are, `namespace:` when they differ
+only in where they run.
 
 Installing copies the upstream files unmodified and writes an `appbay.yaml` beside them.
 Nothing is deployed until you run [`appbay up`](#appbay-up).

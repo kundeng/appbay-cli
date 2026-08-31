@@ -411,7 +411,7 @@ for anything touching the runtime, a journey on both VMs.
       spoke about activation.
     - **Depends**: 4.1
 
-- [ ] 5. Identity (§1) — last, and as a migration
+- [x] 5. Identity (§1) — last, and as a migration
   - [x] 5.1a Make `renderEdgeSecurityBlock` faithful FIRST — it was not "complete"
     - 🚨 **The spec's premise was wrong.** "Complete and unreachable" — it is unreachable and
       INCOMPLETE. It is an earlier draft of the block that actually ships at
@@ -520,18 +520,64 @@ for anything touching the runtime, a journey on both VMs.
     - ⚠️ `appbay admin reset-password` must NOT be deleted before 5.2 either — it is the
       recovery path for the account that is still the live credential.
     - **Depends**: 5.1b · **Pillar**: MVP, Design, Test
-  - [ ] 5.2 Cut `apps/web` over to the edge identity store
-    - **Depends**: 5.1c · **Requirements**: 4.1
-  - [ ] 5.3 Only now: delete `admin.ts`, the schema module, `hashControlPlanePassword`, the
-        `retired.ts` branch, and the `passwordHash` column
-    - ⚠️ The RFC says the non-column half "can go first". It cannot: `admin.ts` is the recovery
-      path for the control-plane account, which stays the LIVE credential until 5.2 lands.
-      Deleting the recovery for an account still in use is worse than the broken-in-CLI-mode
-      state F39 describes. All of 5.3 waits for 5.2.
-    - **Depends**: 5.2 · **Requirements**: 4.1
-  - [ ] 5.4 Import any existing `users.yaml` accounts and print what happened
-    - **Depends**: 5.3
-
+  - [x] 5.2 Cut `apps/web` over to the edge identity store
+    - 🚦 **Owner decision 2026-08-31: trust the `Remote-User` header** (the reverse-proxy
+      pattern), and **full cutover**. The RFC never specified the mechanism; the alternative
+      was verifying the edge JWT with the shared signing secret.
+    - `createContext` resolves the user from the edge's headers. Header trust is gated on
+      `APPBAY_EDGE_AUTH=1`, which `server start` sets ONLY when it also bound the port to
+      loopback — one decision in one place, so neither half can be enabled alone by accident.
+    - 🚨 "Not behind the edge" now FAILS CLOSED, and it falls out of the existing middleware:
+      no user → all 73 `protectedProcedure`s reject. An installation on Traefik or with no
+      domain has no way in until it moves to the Caddy edge. That is the cost of the decision
+      and it is not silent — `AuthGate` names which of the two "no user" states it is.
+    - 🚨 The header's VALUE carries no privilege. Authorization comes from having passed the
+      edge; the policy admits `authp/admin` only. That is what makes the one thing probe-85
+      did not establish — whether Caddy overwrites `Remote-User` for an already-authenticated
+      user — unable to affect authorization.
+    - probe-85: through the edge, a forged header on an unauthenticated request gets 302 and
+      the backend never sees it; reached directly on the shared network the same header sails
+      through. The control is what makes the first line mean anything.
+    - `?token=` removed from `authenticateRouteRequest` — it put a live credential in a URL,
+      and the edge injects the header on SSE too.
+    - **Depends**: 5.1c · **Requirements**: 4.1 · **Pillar**: MVP, Test, Docs
+    - **Evidence**: `docs/rfc/evidence/probe-85-*.yaml`
+  - [x] 5.3 Delete `admin.ts`, the schema module, `hashControlPlanePassword`, the `retired.ts`
+        branch, and the `passwordHash` column
+    - 🚨 The RFC said to delete "the control-plane branch of `retired.ts`". The opposite was
+      right: `appbay admin` BECOMES a retirement notice, which is exactly what that module is
+      for — an operator with a runbook is told the credential domain was removed and what
+      replaced it, and still exits non-zero so a provisioning script fails rather than appears
+      to succeed. What needed fixing was the two EXISTING entries, which named
+      `appbay admin reset-password` as the recovery path.
+    - `apps/web/src/server/auth.ts` 294 → 47 lines. A hasher with no verifier is worse than no
+      hasher: it leaves a working-looking credential path that authenticates nobody.
+    - Nothing inserts into `users` or `sessions` any more — grepped, not assumed. Both are
+      vestigial; dropping tables is a migration and buys nothing while they hold no credential.
+    - `check-docs-cli` caught four stale flags the moment `admin.ts` went. Six docs updated,
+      including the credentials guide's "three domains" (now two).
+    - **Depends**: 5.2 · **Requirements**: 4.1 · **Pillar**: MVP, Docs
+  - [x] 5.4 Import any existing `users.yaml` accounts and print what happened
+    - 🚨 Without this, upgrading LOCKS THE OPERATOR OUT: the file is no longer read and the
+      edge store has never heard of those people.
+    - ⚠️ **The passwords cannot come across.** `users.yaml` held `salt:scrypt-hash`; Caddy
+      Security holds bcrypt. A hash cannot be converted to another scheme's hash. Each account
+      gets a NEW generated password, printed once, with an explicit note that the old one will
+      not work — silently importing accounts whose old passwords appear to still work is the
+      cruellest available outcome.
+    - Imported as `authp/admin`, because the control plane's route admits that role only.
+      Importing them as ordinary users would move everyone across and leave nobody able to
+      sign in — success reported, operator stranded.
+    - A disabled account is NOT re-enabled: the edge store has no disabled state, so importing
+      one would restore access somebody deliberately removed.
+    - The legacy file is archived only when every record resolved; an unnamed record keeps it,
+      because archiving would destroy the only trace of an account nobody can identify.
+    - Failure is reported, never thrown — hashing shells out to the Caddy image, so it fails on
+      a host without the runtime, and that must not abort an `init` whose other stages worked.
+    - 10 tests plus an end-to-end binary run: alice imported with a real bcrypt hash and
+      `[{organization: authp, name: admin}]`, mallory (disabled) skipped, file archived, second
+      `init` a no-op.
+    - **Depends**: 5.3 · **Pillar**: MVP, Test
 - [x]* 6. Vault format (2.5)
   - [x]* 6.1 Per-vault salt with a format version byte and a read path accepting both shapes
     - v1 was `IV(12) + tag(16) + ciphertext` with the CONSTANT salt `appbay-vault-v1`, so every

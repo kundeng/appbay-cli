@@ -9,7 +9,17 @@ import { loadProjectVars, resolveScopedVars } from "./instance-vars.js";
 
 export interface InstallOptions {
   appbayHome: string;
+  /** Catalog entry to install — the name as it appears in the catalog. */
   name: string;
+  /**
+   * Directory to install it AS, when it should differ from the catalog name — RFC-001 §4.7.
+   *
+   * These were one value, so a second copy of an app was impossible: the lookup and the target
+   * directory were both `name`, and installing `open-webui` twice meant overwriting it. The
+   * namespace axis (§4) disambiguates two *deployments*, not two *installations* — an app
+   * directory is still one per name.
+   */
+  as?: string;
   values?: Record<string, string>;
   force?: boolean;
 }
@@ -92,8 +102,11 @@ export async function catalogGet(
  */
 export async function catalogInstall(options: InstallOptions): Promise<InstallResult> {
   const { appbayHome, name, values = {}, force = false } = options;
+  // The catalog name and the installed name are separate: `name` looks the entry up, `as`
+  // decides where it lands. Defaulting to `name` keeps every existing caller identical.
+  const installAs = options.as?.trim() || name;
   const appsDir = join(appbayHome, "etc", "apps");
-  const targetDir = join(appsDir, name);
+  const targetDir = join(appsDir, installAs);
 
   // Check if already installed
   try {
@@ -102,7 +115,7 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
       return {
         success: false,
         appDir: targetDir,
-        message: `App "${name}" already installed. Use force to overwrite.`,
+        message: `App "${installAs}" already installed. Use force to overwrite.`,
       };
     }
   } catch {
@@ -259,10 +272,19 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
         "# followed by `appbay secrets set <app>/<NAME>`, then delete these lines.\n" +
         fallbackSecrets.join("\n") + "\n";
     }
-    await writeFile(envLocalPath, body);
-    // 0600 whenever this file holds a secret — it is otherwise created world-readable by
-    // whatever the process umask happens to be.
-    if (fallbackSecrets.length > 0) {
+    // 🚨 THE MODE IS SET AT CREATE TIME, NOT AFTER — RFC-001 §3.6. `writeFile` then `chmod`
+    // leaves the file at whatever the process umask allows for the window between the two
+    // calls, and this is the file that holds a PLAINTEXT SECRET when the vault was
+    // unavailable. The window is short and entirely sufficient: any local process can open
+    // the file in it, and an open descriptor survives the later chmod.
+    //
+    // Same defect and same fix as the master password file in §2.2. `writeFile`'s `mode`
+    // applies only when the file is created, so an existing `.env.local` keeps its mode —
+    // hence the explicit chmod as well, which is now a correction rather than the only
+    // protection.
+    const holdsSecret = fallbackSecrets.length > 0;
+    await writeFile(envLocalPath, body, holdsSecret ? { mode: 0o600 } : {});
+    if (holdsSecret) {
       await chmod(envLocalPath, 0o600);
     }
   }

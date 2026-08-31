@@ -7,6 +7,7 @@ export const installCommand = new Command("install")
   .description("Install an app from the catalog")
   .argument("<name>", "catalog app to install")
   .option("--set <pairs...>", "set input values (KEY=VALUE)")
+  .option("--as <name>", "install under a different app name, for a second copy")
   .option("--force", "overwrite if app already exists")
   .option("--no-validate", "skip post-install validation")
   .action(
@@ -14,6 +15,7 @@ export const installCommand = new Command("install")
       name: string,
       options: {
         set?: string[];
+        as?: string;
         force?: boolean;
         validate?: boolean;
       },
@@ -27,7 +29,12 @@ export const installCommand = new Command("install")
         process.exit(1);
       }
 
-      console.log(`Installing ${name} (${info.entry.entry.readiness})...`);
+      const installAs = options.as?.trim() || name;
+      console.log(
+        installAs === name
+          ? `Installing ${name} (${info.entry.entry.readiness})...`
+          : `Installing ${name} as "${installAs}" (${info.entry.entry.readiness})...`,
+      );
       if (info.entry.entry.description) {
         console.log(`  ${info.entry.entry.description}`);
       }
@@ -102,6 +109,7 @@ export const installCommand = new Command("install")
       const result = await catalogInstall({
         appbayHome: home,
         name,
+        as: options.as,
         values: inputValues,
         force: options.force,
       });
