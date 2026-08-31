@@ -7,10 +7,27 @@ import {
   catalogUpdateSource,
   catalogListSources,
 } from "@appbay/core";
-import type { DiscoveredCatalogEntry } from "@appbay/core";
+import type { DiscoveredCatalogEntry, CatalogOverride } from "@appbay/core";
 
 export const catalogCommand = new Command("catalog")
   .description("Browse and manage the app catalog");
+
+/**
+ * Print every name where an added source replaced a bundled app.
+ *
+ * An override is a correct outcome — an explicitly added source outranks a shipped one —
+ * but a *silent* one is not. The two definitions can differ in ways that change the
+ * security posture of the host, so the operator is told which app, which source, and which
+ * directory won. RFC-001 §6.2.
+ */
+function reportOverrides(overrides: CatalogOverride[]): void {
+  for (const o of overrides) {
+    console.error(
+      `  override: "${o.name}" resolves to source "${o.source}" (${o.sourceDir}), ` +
+        `shadowing the bundled entry at ${o.shadowedDir}`,
+    );
+  }
+}
 
 catalogCommand
   .command("list")
@@ -27,11 +44,12 @@ catalogCommand
       category?: string;
     }) => {
       const home = resolveAppbayHome();
-      const { entries, errors } = await discoverCatalog(home);
+      const { entries, errors, overrides } = await discoverCatalog(home);
 
       for (const err of errors) {
         console.error(`  warning: ${err.dir}: ${err.message}`);
       }
+      reportOverrides(overrides);
 
       let filtered = entries;
       if (options.source) {
@@ -88,11 +106,12 @@ catalogCommand
   .option("--json", "output as JSON")
   .action(async (query: string, options: { json?: boolean }) => {
     const home = resolveAppbayHome();
-    const { entries, errors } = await discoverCatalog(home);
+    const { entries, errors, overrides } = await discoverCatalog(home);
 
     for (const err of errors) {
       console.error(`  warning: ${err.dir}: ${err.message}`);
     }
+    reportOverrides(overrides);
 
     const q = query.toLowerCase();
     const matches = entries.filter(

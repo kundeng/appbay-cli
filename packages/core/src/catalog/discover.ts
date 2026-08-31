@@ -24,9 +24,28 @@ export interface CatalogDiscoveryError {
   details?: unknown;
 }
 
+/**
+ * A name claimed by more than one catalog, resolved in favour of an added source.
+ *
+ * Surfaced rather than silent: an operator who added a source that quietly replaced a
+ * shipped app has no way to know it happened, and the two definitions can differ in ways
+ * that matter — see RFC-001 §6.2, where upstream's `litellm` and the UOM one disagree about
+ * whether the provider credential is a `required_input`.
+ */
+export interface CatalogOverride {
+  name: string;
+  /** The added source that won. */
+  source: string;
+  sourceDir: string;
+  /** The bundled entry it shadowed. */
+  shadowedDir: string;
+}
+
 export interface CatalogDiscoveryResult {
   entries: DiscoveredCatalogEntry[];
   errors: CatalogDiscoveryError[];
+  /** Names where an added source overrode `bundled`. Empty on a stock install. */
+  overrides: CatalogOverride[];
 }
 
 export async function discoverCatalog(
@@ -52,19 +71,78 @@ export async function discoverCatalog(
     // No sources dir — that's fine
   }
 
-  // Deduplicate: bundled wins on name collision
+  // Deduplicate. Three different collisions live here and they have three different right
+  // answers; the previous rule was the single expression `!existing || source === "bundled"`,
+  // which collapsed them into "bundled always wins" and left nowhere to report anything.
+  //
+  //   bundled vs source   → the SOURCE wins. Adding a source is an explicit act; shipping
+  //                         one is not. Recorded in `overrides` so it is never silent.
+  //   source  vs source   → ambiguous. Previously decided by readdir() order, i.e. undefined.
+  //                         Now an error naming both directories, and the name resolves to
+  //                         nothing rather than to a coin flip.
+  //   bundled vs bundled  → one catalog shipping two entries under one name. A packaging
+  //                         bug; error naming both directories.
+  //
+  // RFC-001 §6.2, §6.5, §6.6. Dedup keys on the `name` declared inside catalog.yaml, not on
+  // the directory name — so every message names the directory, or it is unactionable.
   const seen = new Map<string, DiscoveredCatalogEntry>();
+  const overrides: CatalogOverride[] = [];
+  const ambiguous = new Set<string>();
+
   for (const entry of entries) {
     const existing = seen.get(entry.name);
-    if (!existing || entry.source === "bundled") {
+    if (!existing) {
       seen.set(entry.name, entry);
+      continue;
+    }
+
+    const existingIsBundled = existing.source === "bundled";
+    const entryIsBundled = entry.source === "bundled";
+
+    if (existingIsBundled && !entryIsBundled) {
+      overrides.push({
+        name: entry.name,
+        source: entry.source,
+        sourceDir: entry.dir,
+        shadowedDir: existing.dir,
+      });
+      seen.set(entry.name, entry);
+    } else if (!existingIsBundled && entryIsBundled) {
+      // `bundled` is scanned first so this order should be unreachable, but the rule is
+      // stated by precedence and not by scan order — otherwise it is one refactor from wrong.
+      overrides.push({
+        name: existing.name,
+        source: existing.source,
+        sourceDir: existing.dir,
+        shadowedDir: entry.dir,
+      });
+    } else if (existingIsBundled && entryIsBundled) {
+      errors.push({
+        dir: entry.dir,
+        message:
+          `Duplicate name "${entry.name}" in the bundled catalog: ` +
+          `${existing.dir} and ${entry.dir} both declare it. One of them must be renamed.`,
+      });
+      ambiguous.add(entry.name);
+    } else {
+      errors.push({
+        dir: entry.dir,
+        message:
+          `Catalog name collision: "${entry.name}" is declared by source "${existing.source}" ` +
+          `(${existing.dir}) and source "${entry.source}" (${entry.dir}). Two added sources ` +
+          `cannot claim one name — remove or rename one. Until then "${entry.name}" resolves ` +
+          `to neither.`,
+      });
+      ambiguous.add(entry.name);
     }
   }
+
+  for (const name of ambiguous) seen.delete(name);
 
   const deduped = Array.from(seen.values());
   deduped.sort((a, b) => a.name.localeCompare(b.name));
 
-  return { entries: deduped, errors };
+  return { entries: deduped, errors, overrides };
 }
 
 async function scanCatalogSource(

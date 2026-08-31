@@ -21,10 +21,7 @@
  *   - keepassxc-cli is widely packaged (apt install keepassxc)
  */
 
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-
-const execAsync = promisify(exec);
+import { runKeepassxc, stdinLines } from "../keepassxc-cli.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CheckResult, SecretProvider } from "../types.js";
@@ -130,7 +127,7 @@ function resolveDbPassword(): string {
 
 async function isCliAvailable(): Promise<boolean> {
   try {
-    await execAsync("keepassxc-cli --version", { timeout: 5_000 });
+    await runKeepassxc(["--version"], "", 5_000);
     return true;
   } catch {
     return false;
@@ -144,13 +141,13 @@ async function cliShow(
   field: string,
   keyFile?: string,
 ): Promise<string> {
-  // Build the command — pipe password via echo to avoid interactive prompt.
-  // Shell escaping: use single quotes for the password.
-  const escapedPassword = password.replace(/'/g, "'\\''");
-  const keyFileArg = keyFile ? ` --key-file '${keyFile}'` : "";
-  const cmd = `echo '${escapedPassword}' | keepassxc-cli show --quiet --attributes '${field}'${keyFileArg} '${dbPath}' '${entryPath}'`;
+  // The master password goes down stdin, never into an argv. See keepassxc-cli.ts for why
+  // the `echo '<password>' | …` this replaces was a disclosure bug and not an escaping one.
+  const args = ["show", "--quiet", "--attributes", field];
+  if (keyFile) args.push("--key-file", keyFile);
+  args.push(dbPath, entryPath);
 
-  const { stdout } = await execAsync(cmd, { timeout: 15_000 });
+  const { stdout } = await runKeepassxc(args, stdinLines(password));
 
   const value = stdout.trim();
   if (!value) {

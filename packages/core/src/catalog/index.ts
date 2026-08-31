@@ -4,4 +4,5 @@ export {
   type DiscoveredCatalogEntry,
   type CatalogDiscoveryError,
   type CatalogDiscoveryResult,
+  type CatalogOverride,
 } from "./discover.js";

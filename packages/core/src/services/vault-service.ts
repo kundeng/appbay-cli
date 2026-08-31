@@ -20,12 +20,9 @@
 import { existsSync, readFileSync, mkdirSync, writeFileSync, chmodSync, renameSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { randomBytes } from "node:crypto";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { Vault } from "../secrets/providers/vault.js";
+import { runKeepassxc, stdinLines } from "../secrets/keepassxc-cli.js";
 import { discoverApps, type DiscoveredApp } from "../compiler/index.js";
-
-const execAsync = promisify(exec);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -420,7 +417,7 @@ export function listVaultSecrets(
  */
 export async function isKeePassCliAvailable(): Promise<boolean> {
   try {
-    await execAsync("keepassxc-cli --version", { timeout: 5_000 });
+    await runKeepassxc(["--version"], "", 5_000);
     return true;
   } catch {
     return false;
@@ -432,7 +429,7 @@ export async function isKeePassCliAvailable(): Promise<boolean> {
  */
 export async function getKeePassCliVersion(): Promise<string | null> {
   try {
-    const { stdout } = await execAsync("keepassxc-cli --version", { timeout: 5_000 });
+    const { stdout } = await runKeepassxc(["--version"], "", 5_000);
     return stdout.trim() || null;
   } catch {
     return null;
@@ -441,16 +438,25 @@ export async function getKeePassCliVersion(): Promise<string | null> {
 
 /**
  * Run a keepassxc-cli command with the database password piped via stdin.
+ *
+ * The name was already true of the intent and false of the implementation — it composed
+ * `echo '<password>' | …` into a `/bin/sh -c` argv. Now it is true of both.
+ *
+ * `entryPassword` is for the `--password-prompt` commands (`add`, `edit`), which read a
+ * second line: line 1 is the database password, line 2 is the entry's. Omit it for every
+ * other command. Both values travel on stdin so neither reaches an argv.
  */
 async function runKeePassCli(
   args: string[],
   password: string,
+  entryPassword?: string,
   timeoutMs = 15_000,
 ): Promise<string> {
-  const escapedPassword = password.replace(/'/g, "'\\''");
-  const escapedArgs = args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const cmd = `echo '${escapedPassword}' | keepassxc-cli ${escapedArgs}`;
-  const { stdout } = await execAsync(cmd, { timeout: timeoutMs });
+  const stdin =
+    entryPassword === undefined
+      ? stdinLines(password)
+      : stdinLines(password, entryPassword);
+  const { stdout } = await runKeepassxc(args, stdin, timeoutMs);
   return stdout.trim();
 }
 
@@ -507,12 +513,18 @@ export async function initKdbx(
   const dbDir = dirname(dbPath);
   mkdirSync(dbDir, { recursive: true });
 
-  // Create the .kdbx database
-  const escapedPassword = finalPassword.replace(/'/g, "'\\''");
-  const escapedPath = dbPath.replace(/'/g, "'\\''");
-  const cmd = `echo '${escapedPassword}' | keepassxc-cli db-create --set-password '${escapedPath}'`;
+  // Create the .kdbx database.
+  //
+  // ⚠️ The password is sent TWICE. `db-create --set-password` prompts "Enter password to
+  // encrypt database" and then "Repeat password", so a single line leaves the second read
+  // at EOF and the tool exits with "Passwords do not match. Failed to set database
+  // password." The `echo '<pw>' |` this replaces sent one line, which is why initKdbx
+  // could not create a database at all on keepassxc-cli 2.6.6 — measured, not inferred.
   try {
-    await execAsync(cmd, { timeout: 15_000 });
+    await runKeepassxc(
+      ["db-create", "--set-password", dbPath],
+      stdinLines(finalPassword, finalPassword),
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Failed to create KeePass database at ${dbPath}: ${msg}`);
@@ -546,11 +558,6 @@ export async function setKdbxSecret(
   const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
   const entryPath = `${scope}/${key}`;
 
-  const escapedPassword = password.replace(/'/g, "'\\''");
-  const escapedValue = value.replace(/'/g, "'\\''");
-  const escapedDbPath = dbPath.replace(/'/g, "'\\''");
-  const escapedEntry = entryPath.replace(/'/g, "'\\''");
-
   // Try to show the entry first to see if it exists
   let entryExists = false;
   try {
@@ -561,23 +568,32 @@ export async function setKdbxSecret(
   }
 
   if (entryExists) {
-    // Edit existing entry's password
-    const cmd = `echo '${escapedPassword}' | keepassxc-cli edit --password '${escapedValue}' '${escapedDbPath}' '${escapedEntry}'`;
-    await execAsync(cmd, { timeout: 15_000 });
+    // Update the existing entry's password.
+    //
+    // 🚨 `--password-prompt`, not `--password <value>`, for two independent reasons.
+    //
+    // Disclosure: `--password` takes the SECRET ITSELF as an argument, so dropping the
+    // shell would not have fixed it — the value would simply move from /bin/sh's argv into
+    // keepassxc-cli's own. Same /proc/<pid>/cmdline, same auditd record, same local
+    // readers. The exposure is the argv, not the shell.
+    //
+    // And it never worked: `keepassxc-cli edit` has no `--password` option. Against 2.6.6
+    // the old command died with "Unknown option 'password'." before touching the database,
+    // so updating an existing secret has been failing for as long as this code has run.
+    // `--password-prompt` reads from stdin, as the `add` branch below already did.
+    await runKeePassCli(["edit", "--password-prompt", dbPath, entryPath], password, value);
   } else {
     // Ensure the group exists
     try {
-      const mkdirCmd = `echo '${escapedPassword}' | keepassxc-cli mkdir '${escapedDbPath}' '${scope.replace(/'/g, "'\\''")}'`;
-      await execAsync(mkdirCmd, { timeout: 15_000 });
+      await runKeePassCli(["mkdir", dbPath, scope], password);
     } catch {
       // Group may already exist — that's fine
     }
 
     // Create new entry with the secret as its password.
     // keepassxc-cli add --password-prompt reads: line 1 = db password, line 2 = entry password
-    const cmd = `printf '%s\\n%s' '${escapedPassword}' '${escapedValue}' | keepassxc-cli add --password-prompt '${escapedDbPath}' '${escapedEntry}'`;
     try {
-      await execAsync(cmd, { timeout: 15_000 });
+      await runKeePassCli(["add", "--password-prompt", dbPath, entryPath], password, value);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Failed to add KeePass entry "${entryPath}": ${msg}`);
