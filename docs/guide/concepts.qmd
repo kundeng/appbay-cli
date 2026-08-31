@@ -90,6 +90,7 @@ Settings that describe **this installation** rather than any one app. Written by
 | `container_runtime` | `docker` \| `podman` | `docker` | which container binary every command invokes |
 | `ingress_provider` | `traefik` \| `caddy` | `traefik` | which reverse proxy the ingress trait emits for |
 | `edge_identity` | provider list | one local store | who the Caddy edge authenticates against |
+| `server_host` | hostname | `appbay.<domain>` | where the edge serves the control plane |
 
 ```yaml
 # $APPBAY_HOME/etc/system.yaml
@@ -145,6 +146,23 @@ after it.
 metadata *and* the signing keys while provisioning, so an unreachable IdP fails the whole edge
 rather than degrading logins. Keeping a `local` provider in the list is the break-glass path.
 
+### Reaching the control plane through the edge {#server-host}
+
+`appbay server start` writes a Caddy site block for the control plane itself, so the web UI is
+reachable at `appbay.<domain>` behind the same login portal as every other app — and behind an
+**admin-only** policy, because it is the one stack that can reach the container runtime socket.
+Set `server_host:` to serve it somewhere else.
+
+Nothing is written when the installation runs Traefik (the auth portal is Caddy Security only)
+or when there is no `domain:` and no `server_host:` — a local install has no name to serve it
+at, and that is normal rather than an error.
+
+⚠️ **The edge is a way in, not yet the only one.** The server still publishes port 3000 and the
+web UI still checks its own password. Closing that is `APPBAY_BIND=127.0.0.1` in the server
+compose, and it is the precondition for RFC-001 §1's plan to hand authentication to the edge —
+with the port open, trusting an identity the edge forwards in a header would let anyone who can
+reach 3000 set that header themselves.
+
 ::: {.callout-note}
 ## Two files used to be called `project.yaml`
 
@@ -153,7 +171,7 @@ nothing but a name and the root one held no project-scoped keys at all.
 
 | path | purpose | keys |
 |---|---|---|
-| `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider`, `edge_identity` |
+| `$APPBAY_HOME/etc/system.yaml` | **this installation** — the table above | `home`, `project`, `domain`, `catalog_source`, `container_runtime`, `ingress_provider`, `edge_identity`, `server_host` |
 | `$APPBAY_HOME/etc/projects/<name>/project.yaml` | **one project's variable scope**, described just below | `name`, `vars`, `defaults` |
 
 ⚠️ The old path `$APPBAY_HOME/project.yaml` is still READ for one release so an install that

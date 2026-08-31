@@ -198,6 +198,15 @@ export const InstanceConfigSchema = z.object({
    * through the ordinary path with no second mechanism.
    */
   edge_identity: EdgeIdentityConfigSchema.optional(),
+
+  /**
+   * Hostname the control plane is served at through the edge — RFC-001 §1 (task 5.1c).
+   *
+   * Absent derives `appbay.<domain>`. With no `domain:` either, there is no name to serve it
+   * at and no edge route is written — which is the normal state for a local install and not
+   * an error. The published port stays the way in until RFC-001 §1's cutover closes it.
+   */
+  server_host: z.string().optional(),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;

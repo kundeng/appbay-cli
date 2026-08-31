@@ -223,7 +223,13 @@ services:
       - appbay-home:/appbay:z
       - \${APPBAY_RUNTIME_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
 ${socketGroupBlock}${securityOptBlock}    networks:
-      - appbay_shared
+      # 🚨 THE ALIAS IS EXPLICIT AND IS NOT THE CONTAINER NAME. The edge dials this from its
+      # site block (services/control-plane-edge.ts). appbay.server contains dots, which read
+      # as label separators wherever a name reaches DNS; appbay_server matches the
+      # <app>_<service> shape every other upstream on this network uses.
+      appbay_shared:
+        aliases:
+          - appbay_server
     healthcheck:
       # Node is guaranteed to exist in the server image; curl is not present in
       # the minimal Alpine runner.

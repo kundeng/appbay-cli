@@ -482,7 +482,19 @@ for anything touching the runtime, a journey on both VMs.
       password check while the direct port was still open.
     - Three parts, and only the first is done:
       - [x] **the `APPBAY_BIND` control, and the gate that keeps the two compose copies honest**
-      - [ ] a manifest for the web UI with `ingress` + `auth`, so the edge is a route in at all
+      - [x] **an edge route for the web UI with `ingress` + `auth` semantics** — `server start`
+            now writes the site block, the portal route and the authorization policy, all from
+            the EXISTING trait renderers rather than a second copy of them. Admin-only
+            (`allow roles authp/admin`), deliberately narrower than an app's default, because
+            the control plane is the one stack that reaches the container runtime socket.
+            Server compose gained an explicit `appbay_server` alias on `appbay_shared` — NOT
+            the container name, whose dots read as DNS label separators. Silent no-op on
+            Traefik and on an install with no domain. `buildCaddySnippet` gained an optional
+            `upstreamAlias` rather than the call site string-replacing the upstream, because a
+            rewrite that stopped matching would emit a block pointing at a nonexistent host.
+            13 tests, mostly cross-file couplings (policy name ↔ `authorize with`, auth glob ↔
+            fragment filename, portal name ↔ shipped Caddyfile, signing key ↔ portal). Verified
+            with the binary in all three cases and `caddy validate`d the config it produced.
       - [ ] flip the bind default to `127.0.0.1`, so the edge is the ONLY route in
     - 🚨 The order matters both ways. Flipping the bind before an edge route exists locks
       operators out with nothing in its place; cutting over the auth before flipping it is the

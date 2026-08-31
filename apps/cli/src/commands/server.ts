@@ -21,6 +21,14 @@ import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js
 import { dockerCompose } from "../utils/docker.js";
 import { tryExec } from "../utils/exec.js";
 import { cliContainerBin } from "../utils/docker.js";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import {
+  controlPlaneEdgeFragments,
+  controlPlaneHost,
+  parseInstanceConfig,
+  readInstanceConfigText,
+} from "@appbay/core";
 
 /** Container name used by the server compose stack. */
 const SERVER_CONTAINER = "appbay.server";
@@ -139,6 +147,37 @@ async function waitForHealth(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Write the edge's route to the control plane — RFC-001 §1, task 5.1c.
+ *
+ * 🚨 THIS DOES NOT CLOSE THE PUBLISHED PORT, and the web UI still checks its own password.
+ * It makes the edge *a* way in so the cutover has somewhere to land; making it the ONLY way
+ * in is `APPBAY_BIND=127.0.0.1`, and doing that before this route existed would have locked
+ * operators out. Doing the cutover before the flip would be an authentication bypass.
+ *
+ * Silent on every path where there is nothing to do — no caddy install, no hostname — because
+ * a local installation legitimately has neither and a warning on every `server start` trains
+ * operators to ignore warnings.
+ */
+function writeControlPlaneEdgeRoute(appbayHome: string): void {
+  const caddyDir = join(appbayHome, "etc", "apps", "caddy");
+  if (!existsSync(caddyDir)) return; // Traefik installs and pre-edge installs have no target.
+
+  const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
+  const cfg = parseInstanceConfig(raw);
+  if (cfg.ingress_provider === "traefik") return; // The auth portal is Caddy Security only.
+
+  const host = controlPlaneHost(cfg.domain, cfg.server_host);
+  if (!host) return; // No domain and no explicit host — nothing to serve it at.
+
+  for (const fragment of controlPlaneEdgeFragments(host)) {
+    const target = join(appbayHome, fragment.path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, fragment.content, "utf-8");
+  }
+  console.log(`  Edge route: https://${host} -> the control plane (admins only)`);
+}
+
 // ---------------------------------------------------------------------------
 // Subcommands
 // ---------------------------------------------------------------------------
@@ -163,6 +202,9 @@ const startCommand = new Command("start")
 
     // 3. Ensure shared network exists.
     ensureNetwork();
+
+    // 3b. Give the edge a route to the control plane (RFC-001 §1, task 5.1c).
+    writeControlPlaneEdgeRoute(resolveAppbayHome());
 
     // 4. Start the compose stack.
     console.log("Starting Appbay server...");
