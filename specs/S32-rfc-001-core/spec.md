@@ -228,6 +228,18 @@ for anything touching the runtime, a journey on both VMs.
       arguments"); the second taught a syntax that now errors, plus two variable stores that
       never existed.
     - **Depends**: 1.1, 1.3 · **Pillar**: Docs, Design
+  - [x] 1.6 🆕 Docs guards: manifests are checked, and check:docs-cli is green again
+    - Bug sweep found zero open issues and zero TODO/FIXME in either tree, so the smallest
+      real defect was this session's own: `docs/reference/appbay-yaml.qmd` still taught
+      `project:`/`environment:`, which now hard-fail.
+    - `scripts/check-docs-manifests.mjs` parses every yaml block under `docs/guide` and
+      `docs/reference` through `AppbayYamlSchema`. It found FIVE more broken blocks beyond
+      the two known. 61 manifests now parse; proven to exit 1 on a reintroduced break.
+    - ⚠️ `check:docs-cli` had been exiting 1 since `8274ac1` — measured — because it scanned
+      `docs/rfc/` and `docs/history/`, where naming a proposed or removed command is the
+      point. Scoped to the 24 operator-facing files; 0 discrepancies, still catches a fake
+      flag and a fake command.
+    - **Depends**: 1.5 · **Pillar**: Docs, Test
   - [ ] 1.4 Fix the `compile.ts:435`/`:517` suggestion — it names two files nothing reads and
         two flags that do not exist
     - **Depends**: 1.1
