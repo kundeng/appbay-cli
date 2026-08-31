@@ -167,10 +167,12 @@ as they are, so that I do not delete the web UI or land a change that breaks the
 Deferred to a successor sprint, each with a destination:
 
 - RFC §1 (identity/password collapse), §2 (system home), §4 (namespace), §5 (`when`) —
-  `[>] → S31-rfc-001-core` (DRAFT, to be created when S30 closes).
+  `[>] → S32-rfc-001-core` (DRAFT). ⚠️ S31 is taken by the PRIVATE queue's
+  `S31-alpha-remainder`; numbers are one global sequence across both queues, so the CLI's
+  next is S32.
 - RFC 2.5 (the constant `SCRYPT_SALT`) — a vault file-format migration, needs its own sprint.
 - RFC 3.2/3.3 (narrowing the manifest `provider:` enum, routing `*-kdbx` through the neutral
-  commands) — the RFC sequences these after §2. `[>] → S31-rfc-001-core`.
+  commands) — the RFC sequences these after §2. `[>] → S32-rfc-001-core`.
 - The Ansible-native deployment path for the UOM stack — a separate track on
   `llm-stack@main`, per `SESSION-BRIEF.md`.
 
@@ -485,7 +487,7 @@ edit` has no `--password` option at all — the old command died with `Unknown o
   - [x] 2.5 `kdbx-crud.test.ts` — 6 tests against the real binary, with a loud skip
     - **Depends**: 2.3, 2.4 · **Properties**: 1 · **Pillar**: Test
 
-- [ ] 3. RFC §6 — catalog sourcing
+- [x] 3. RFC §6 — catalog sourcing
   - [x] 3.1 Replace the bundled-wins rule with precedence resolution (6.2, 6.5, 6.6)
     - Three collision classes, three outcomes; `overrides` added to the result.
     - **Depends**: — · **Requirements**: 2.1, 2.3, 2.4, 2.5 · **Properties**: 2, 3
@@ -506,8 +508,15 @@ edit` has no `--password` option at all — the old command died with `Unknown o
       registration, `bundled` left byte-untouched, no accumulation on re-run, and a
       non-directory still treated as a URL.
     - **Depends**: 3.4 · **Pillar**: Test
-  - [ ] 3.6 RFC 6.7 — resolve `openwebui` vs `open-webui` explicitly
-    - **Depends**: 3.4 · **Requirements**: 2.5
+  - [x] 3.6 RFC 6.7 — surface `openwebui` vs `open-webui`
+    - Once the operator's catalog is a source, both resolve: not a collision, so nothing
+      fired. `discoverCatalog` now returns `nearDuplicates` (case + `-`/`_` folding) and both
+      `catalog list` and `catalog search` print them. Normalization measured over all 155
+      real entries: exactly ONE group, the real case.
+    - NOT renaming and NOT adding an `aliases` field. Which name wins is a catalog-CONTENT
+      decision that breaks either the UOM manifests or upstream's convention, and an unused
+      schema field is a speculative flag. Made visible so the decision can be deliberate.
+    - **Depends**: 3.4 · **Requirements**: 2.5 · **Properties**: 2
 
 - [ ] 4. Verification against the real deployment scenario
   - [x] 4.1 Clone the fixtures to `~/Projects/appbay-ansible-test`
@@ -518,11 +527,25 @@ edit` has no `--password` option at all — the old command died with `Unknown o
     - Before: `litellm` and `portainer` resolved to bundled. After: all five resolve to
       `uom-ai-stack`. 10 upstream entries fail to parse either way, matching the RFC.
     - **Depends**: 3.1, 4.1 · **Properties**: 2
-  - [ ] 4.3 Run the full suite inside `appbay-docker` rather than on the host
-    - The owner's standing instruction: tests belong in a VM. `keepassxc` was installed on the
-      host to verify task 2; move that verification into the VM and remove it from the host.
+  - [x] 4.3 Move the keepassxc verification into `appbay-docker`; host restored
+    - ⭐ The VM ships keepassxc **2.7.6**, the host had **2.6.6**, which made this a stronger
+      check than intended: the fix was derived from 2.6.6 and had to be shown not to be tuned
+      to one build. On 2.7.6, identically — `edit` offers only `--password-prompt` and has no
+      `--password <value>`; single-line `db-create` still fails ("Failed to set database
+      password"); two lines succeed; the full round trip returns s3cret-v1 then s3cret-v2.
+      Both defects and both fixes are version-portable.
+    - `keepassxc` purged from the host. The vitest suite now skips there — loudly, printing
+      "The KeePass CRUD round trip was NOT verified by this run", counted as 6 skipped.
+    - ⚠️ The VM has no node/bun toolchain, so the vitest suite itself cannot run there without
+      provisioning one. What was moved is the part that needed a VM: the package install and
+      the external contract. Running the packaged binary in a VM is 4.4.
     - **Depends**: 2.5, 3.3 · **Pillar**: Test
-  - [ ] 4.4 Verify a converge path end-to-end with `catalog add-source`
+  - [>] 4.4 → S30 release · Verify a converge path end-to-end with `catalog add-source`
+    - The logic is verified end to end against the real fixtures through the real
+      registration path (4.2). What is left is the PACKAGED BINARY on a host: build a release
+      tag, point `appbay_release_tag` at it, re-converge, and read `appbay catalog list` back.
+      That is the release step the RFC already prescribes ("each landed group gets a release
+      tag"), not a code task — it cannot run until a tag exists.
     - **Depends**: 3.4, 4.3
 
 - [ ] 5. Land it
@@ -545,7 +568,7 @@ edit` has no `--password` option at all — the old command died with `Unknown o
     - **Depends**: 5.3
   - [x] 5.6 Cherry-pick the public-set code commits upstream
     - **Depends**: 5.4, 5.5
-  - [ ] 5.7 Open `S31-rfc-001-core` as DRAFT in `appbay-cli/specs/`, holding the deferred sections
+  - [x] 5.7 Open `S32-rfc-001-core` as DRAFT in `appbay-cli/specs/`, holding the deferred sections
     - Destination for every `[>]` in *Out of Scope*.
     - **Depends**: 5.6
 
