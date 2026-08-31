@@ -186,7 +186,22 @@ export function rotateVaultPassword(
   newPassword?: string,
 ): VaultRotateResult {
   const vaultPath = join(appbayHome, "var", "lib", "vault.enc");
-  const passwordPath = join(appbayHome, "etc", "vault-password");
+  // 🚨 THE MASTER PASSWORD PATH, NOT `etc/vault-password` — RFC-001 §2.2.
+  //
+  // This wrote the rotated password to the LEGACY file while `resolveMasterPassword` reads
+  // `var/lib/secrets/master-password` FIRST. On any installation created after §2.2 the
+  // rotation therefore re-encrypted the vault with a password the resolver would never
+  // return: `rotate-password` printed "re-encrypted N secret(s)" and the very next
+  // `secrets get` answered "Wrong vault password", permanently. The secrets were intact on
+  // disk and nothing could open them.
+  //
+  // Reproduced end to end before the fix: init -> set -> rotate -> get failed, with the two
+  // password files holding different values.
+  //
+  // ⚠️ Same regression as `initKdbx` had, and missed here because §2.2 fixed the two INIT
+  // paths and never looked at rotate/repair. A legacy `etc/vault-password` left behind stays
+  // harmless — it is tier 4, and the tier-2 file now written outranks it.
+  const passwordPath = join(appbayHome, MASTER_PASSWORD_REL);
 
   if (!existsSync(vaultPath)) {
     throw new Error("Vault not initialized. Run 'appbay secrets init' first.");
@@ -245,7 +260,9 @@ export function rotateVaultPassword(
 /** Restore the local password file after independently verifying a vault password. */
 export function repairVaultPasswordFile(appbayHome: string): { passwordPath: string } {
   const vaultPath = join(appbayHome, "var", "lib", "vault.enc");
-  const passwordPath = join(appbayHome, "etc", "vault-password");
+  // The master password path, for the same reason as `rotateVaultPassword` above: repairing
+  // into the legacy file would leave the resolver still returning whatever tier 2 holds.
+  const passwordPath = join(appbayHome, MASTER_PASSWORD_REL);
   if (!existsSync(vaultPath)) {
     throw new Error("Vault not initialized. Run 'appbay secrets init' first.");
   }
