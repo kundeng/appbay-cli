@@ -33,6 +33,7 @@ import {
 } from "node:crypto";
 import type { CheckResult, SecretProvider } from "../types.js";
 import { resolveMasterPassword } from "../master-password.js";
+import { splitScopedKey } from "../scoped-key.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -97,7 +98,11 @@ interface ParsedVaultUri {
 /**
  * Parse a vault:// URI into key + scope + generation hint.
  *
- * Supported forms:
+ * The LAST segment is the key; everything before it is the scope. ⚠️ The depth is UNBOUNDED
+ * — the forms below are examples, not a limit. `vault://a/b/c/d/FIELD` resolves `FIELD` under
+ * `a/b/c/d`, and nine-segment URIs round-trip through the real Vault.
+ *
+ * Examples:
  *   vault://KEY                          → scope: "default", key: KEY
  *   vault://APP/KEY                      → scope: "APP",     key: KEY
  *   vault://APP/ENV/KEY                  → scope: "APP/ENV", key: KEY
@@ -113,9 +118,11 @@ interface ParsedVaultUri {
 function parseVaultUri(uri: string): ParsedVaultUri {
   // Split off query string
   const [pathPart, queryPart] = uri.slice("vault://".length).split("?");
-  const parts = pathPart.split("/").filter((s) => s.length > 0);
 
-  if (parts.length === 0) {
+  let scoped;
+  try {
+    scoped = splitScopedKey(pathPart);
+  } catch {
     throw new Error(
       `Invalid vault:// URI — expected vault://KEY or vault://APP/KEY: ${uri}`,
     );
@@ -128,13 +135,7 @@ function parseVaultUri(uri: string): ParsedVaultUri {
     gen = params.get("gen");
   }
 
-  if (parts.length === 1) {
-    return { key: parts[0], scope: "default", gen };
-  }
-
-  const key = parts[parts.length - 1];
-  const scope = parts.slice(0, -1).join("/");
-  return { key, scope, gen };
+  return { key: scoped.key, scope: scoped.scope, gen };
 }
 
 // ---------------------------------------------------------------------------

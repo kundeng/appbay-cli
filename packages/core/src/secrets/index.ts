@@ -28,3 +28,4 @@ export {
 } from "./resolve-for-deploy.js";
 export type { SecretRef, SecretResolveResult } from "./resolve-for-deploy.js";
 export * from "./master-password.js";
+export * from "./scoped-key.js";

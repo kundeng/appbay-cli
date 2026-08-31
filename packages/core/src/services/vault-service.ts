@@ -23,6 +23,7 @@ import { randomBytes } from "node:crypto";
 import { Vault } from "../secrets/providers/vault.js";
 import { runKeepassxc, stdinLines } from "../secrets/keepassxc-cli.js";
 import { discoverApps, type DiscoveredApp } from "../compiler/index.js";
+import { splitScopedKey } from "../secrets/scoped-key.js";
 import {
   resolveMasterPassword,
   persistMasterPassword,
@@ -266,9 +267,7 @@ export function setSecret(
   const vaultPath = join(appbayHome, "var", "lib", "vault.enc");
   const password = resolveVaultPassword(appbayHome);
 
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
 
   const vault = new Vault(vaultPath, password);
   vault.set(key, value, scope);
@@ -294,9 +293,7 @@ export function getSecret(
   }
 
   const password = resolveVaultPassword(appbayHome);
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
 
   const vault = new Vault(vaultPath, password);
   return vault.get(key, scope);
@@ -316,9 +313,7 @@ export function deleteSecret(
   }
 
   const password = resolveVaultPassword(appbayHome);
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
 
   const vault = new Vault(vaultPath, password);
   const deleted = vault.delete(key, scope);
@@ -500,9 +495,7 @@ export async function setKdbxSecret(
   await requireKeePassCli();
 
   const password = resolveKdbxPassword(appbayHome);
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
   const entryPath = `${scope}/${key}`;
 
   // Try to show the entry first to see if it exists
@@ -572,9 +565,7 @@ export async function getKdbxSecret(
   await requireKeePassCli();
 
   const password = resolveKdbxPassword(appbayHome);
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
   const entryPath = `${scope}/${key}`;
 
   try {
@@ -606,9 +597,7 @@ export async function deleteKdbxSecret(
   await requireKeePassCli();
 
   const password = resolveKdbxPassword(appbayHome);
-  const parts = keyArg.split("/");
-  const key = parts[parts.length - 1];
-  const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+  const { scope, key } = splitScopedKey(keyArg);
   const entryPath = `${scope}/${key}`;
 
   try {

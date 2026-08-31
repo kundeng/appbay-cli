@@ -46,6 +46,7 @@ import {
 } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
+import { splitScopedKey } from "@appbay/core";
 
 /** A secret reference found in an app's compose environment variables. */
 interface SecretRef {
@@ -446,9 +447,7 @@ const getSubcommand = new Command("get")
     try {
       const value = getSecret(appbayHome, keyArg);
       if (value === null) {
-        const parts = keyArg.split("/");
-        const key = parts[parts.length - 1];
-        const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+        const { scope, key } = splitScopedKey(keyArg);
         console.error(`Secret "${key}" not found (scope: ${scope})`);
         process.exit(1);
       }
@@ -616,9 +615,7 @@ const getKdbxSubcommand = new Command("get-kdbx")
     try {
       const value = await getKdbxSecret(appbayHome, keyArg);
       if (value === null) {
-        const parts = keyArg.split("/");
-        const key = parts[parts.length - 1];
-        const scope = parts.length > 1 ? parts.slice(0, -1).join("/") : "default";
+        const { scope, key } = splitScopedKey(keyArg);
         console.error(`Secret "${key}" not found in KeePass (scope: ${scope})`);
         process.exit(1);
       }
