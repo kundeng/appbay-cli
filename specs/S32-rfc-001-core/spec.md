@@ -350,7 +350,28 @@ for anything touching the runtime, a journey on both VMs.
 
 ## Notes
 
-Carried from S30 on its close. Nothing here is started.
+Carried from S30 on its close.
+
+**Ship pillar (2026-08-31) — CI had never run in the public repo.** `ci.yml` is
+byte-identical across both trees and triggered on `branches: [master]`; the private repo is
+on `master`, the public one on `main`. `gh run list` on `appbay-cli` showed Release runs
+only, zero CI runs ever — so the repo that holds the shipped code and receives every
+cherry-pick was merging them with no test, no typecheck and no boundary check. Now
+`[main, master]`, docs job accepts either ref, and the three consistency checks that existed
+but ran nowhere (`check:system-apps`, `check:docs-cli`, `check:docs-manifests`) run in the
+test job. All pass in both trees, so enabling them does not land CI red.
+
+⚠️ This is why `check:docs-cli` had been red since `8274ac1` without anyone noticing:
+nothing ran it.
+
+**Docs pillar (2026-08-31).** `docs/guide/overlays.qmd`, `apps.qmd`, `concepts.qmd` and
+`docs/reference/scope-model.qmd`, `appbay-yaml.qmd` all match the code now, and the class is
+mechanically guarded — `pnpm check:docs-manifests` fails on a documented manifest the schema
+rejects. `overlays.qmd` had documented §5.2's defect as the intended design; `scope-model.qmd`
+described two variable stores that never existed.
+
+⚠️ Still unchecked: `traits.qmd`, `secrets.qmd`, `web-ui.qmd`. Their yaml blocks pass the
+manifest guard, but their prose has not been read against the code.
 
 **2026-08-31 — the verification gate was wrong, and it was mine, not the repo's.** The
 namespace commit landed in both trees reporting `pnpm -r test` green (core 857, cli 379, web
