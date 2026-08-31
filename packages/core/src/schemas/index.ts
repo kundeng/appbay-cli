@@ -136,6 +136,8 @@ export {
   AcmeDnsProviderSchema,
   type AcmeDnsProvider,
   parseInstanceConfig,
+  checkHomeAssertion,
+  type HomeMismatch,
 } from "./instance.js";
 
 export {

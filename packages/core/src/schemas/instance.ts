@@ -70,6 +70,24 @@ export type IngressProvider = z.infer<typeof IngressProviderSchema>;
 export const DEFAULT_INGRESS_PROVIDER: IngressProvider = "traefik";
 
 export const InstanceConfigSchema = z.object({
+  /**
+   * The absolute path this tree believes it lives at — RFC-001 §2.4.
+   *
+   * 🚨 SELF-DECLARATION, NOT DISCOVERY. Discovery answers "where is the tree" and must live
+   * OUTSIDE it (`$APPBAY_HOME`, `~/.config/appbay/home`). This answers "where does this tree
+   * think it is", is read after the tree is found, and exists to detect a MOVED OR COPIED
+   * home. It must be absolute: a relative path is true by construction and detects nothing.
+   *
+   * Nothing detected that before. `looksScaffolded()` is `existsSync(path/etc)` and that was
+   * the whole check, so a home copied to another machine kept working against whatever the
+   * copy contained — the same failure class the runtime socket gid is overridable for
+   * ("copying an APPBAY_HOME to another machine must not silently keep the old one").
+   *
+   * ⚠️ Provisional placement. RFC-001 §2.1 merges this file into `etc/system.yaml`; the field
+   * moves with it. It is here rather than in a new half-populated file because two config
+   * files mid-migration is the confusion §2 exists to end.
+   */
+  home: z.string().optional(),
   /** Project name — the compose project prefix and ingress label root. */
   project: z.string().optional(),
 
@@ -189,4 +207,36 @@ export function parseInstanceConfig(text: string): InstanceConfig {
   if (raw === null || typeof raw !== "object") return {};
   const result = InstanceConfigSchema.safeParse(raw);
   return result.success ? result.data : {};
+}
+
+/** A recorded home that disagrees with where the tree was actually found. */
+export interface HomeMismatch {
+  /** The absolute path recorded inside the tree. */
+  recorded: string;
+  /** The path this invocation resolved to. */
+  resolved: string;
+}
+
+/**
+ * Compare a tree's self-declared home against where it was found — RFC-001 §2.4.
+ *
+ * Returns null when they agree, when nothing is recorded (a pre-§2.4 install), or when the
+ * config cannot be read — absence is not disagreement, and a tree that has never recorded a
+ * home must keep working.
+ */
+export function checkHomeAssertion(
+  resolvedHome: string,
+  configText: string | null,
+): HomeMismatch | null {
+  if (!configText) return null;
+  let recorded: string | undefined;
+  try {
+    recorded = parseInstanceConfig(configText).home;
+  } catch {
+    return null;
+  }
+  if (!recorded) return null;
+  // Compare with trailing separators normalised; /home/x and /home/x/ are the same tree.
+  const norm = (p: string) => p.replace(/\/+$/, "");
+  return norm(recorded) === norm(resolvedHome) ? null : { recorded, resolved: resolvedHome };
 }

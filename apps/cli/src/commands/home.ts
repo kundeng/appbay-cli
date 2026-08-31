@@ -29,7 +29,7 @@
  */
 
 import { Command } from "commander";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   resolveAppbayHome,
@@ -40,6 +40,7 @@ import {
   CONFIG_FILE,
   type HomeTier,
 } from "../utils/appbay-home.js";
+import { checkHomeAssertion, type HomeMismatch } from "@appbay/core";
 
 /** Label shown per tier in `--explain`, in resolution order. */
 const TIER_LABEL: Record<string, string> = {
@@ -58,6 +59,15 @@ const TIER_LABEL: Record<string, string> = {
  */
 function looksScaffolded(path: string): boolean {
   return existsSync(resolve(path, "etc"));
+}
+
+/** The recorded-vs-resolved home disagreement for a tree, or null. RFC-001 §2.4. */
+function homeMismatchFor(path: string): HomeMismatch | null {
+  try {
+    return checkHomeAssertion(path, readFileSync(resolve(path, "project.yaml"), "utf-8"));
+  } catch {
+    return null; // no config to compare against — not a disagreement
+  }
 }
 
 function printExplanation(): void {
@@ -83,6 +93,16 @@ function printExplanation(): void {
   // command's idea of "home" with it.
   if (winner.source === "saved" && /^\/(tmp|var\/tmp)\//.test(winner.value as string)) {
     warnings.push("the saved pointer is under a temp directory and will not survive a reboot");
+  }
+  // RFC-001 §2.4: the tree records where it believes it lives. A disagreement means this home
+  // was moved or copied, and every path inside it now refers to somewhere it is not.
+  const mismatch = homeMismatchFor(winner.value as string);
+  if (mismatch) {
+    warnings.push(
+      `this tree records home: ${mismatch.recorded} but was found at ${mismatch.resolved} — ` +
+        "it was moved or copied, and anything that recorded an absolute path inside it " +
+        "(runtime socket gid, generated compose) may still point at the old location",
+    );
   }
   for (const w of warnings) console.log(`⚠️  ${w}`);
   if (warnings.length > 0) {
