@@ -56,8 +56,8 @@ Appbay takes your Docker Compose apps and adds:
 
 - **Namespace isolation** — run multiple apps with identical service names without conflicts
 - **Traits** — declarative capabilities (ingress, GPU, auth, hooks, backup) attached to apps
-- **Conditional overlays** — automatic cross-app wiring (e.g., "when ollama is running, inject its URL into webui")
-- **Scoped variables** — project → environment → service resolution chain
+- **Conditional overlays** — automatic cross-app wiring (e.g., "when ollama is *installed*, inject its URL into webui")
+- **Scoped variables** — ${{scope.KEY}} references resolved at compile time (see the caveat under Scope Model)
 - **Secret URI references** — `vault://`, `keepass://`, `file://`, `env://`, `sops://` resolved at deploy time
 - **Config overrides** — `.env.local` for catalog-installed apps, upstream `.env` stays frozen
 - **Plan/diff** — see exactly what will change before deploying, with secrets redacted
@@ -143,10 +143,16 @@ AppBay has three independent passwords. Each is recovered by a different command
 they are never synchronized — see [the credentials guide](docs/guide/credentials.qmd).
 
 ```
-appbay admin reset-password <user>       The AppBay control-plane account (the web UI)
 appbay secrets vault rotate-password     The vault password (unlocks vault.enc)
 appbay edge users reset-password <user>  An edge user (signs in to your deployed apps)
+appbay admin reset-password <user>       The AppBay control-plane account (the web UI)
 ```
+
+⚠️ `appbay admin reset-password` needs the control-plane database, which only the server
+creates. On a CLI-only install it crashes with a raw `SQLiteError` and leaves a zero-byte
+`var/lib/appbay.db` behind — verified 2026-08-31 against `v0.0.1-alpha.11`. If you have not
+deployed the web UI, the account it resets does not exist and this command has nothing to do.
+The credential you almost certainly want is `appbay edge users reset-password`.
 
 `appbay authelia` and `appbay auth` are retired; running either explains what replaced it
 and exits non-zero.
@@ -155,12 +161,16 @@ and exits non-zero.
 
 | Concept | Controls | Cardinality |
 |---------|----------|-------------|
-| **Project** | Naming isolation (container prefixes, networks) | Single per app |
-| **Environment** | Variable values (which .env gets rendered) | Single per deploy |
+| **Namespace** | Deployment identity — container, network and DNS-alias names | Single per app |
 | **Collection** | Which apps deploy together | Multi per app |
 
-Variable resolution: `service > environment > project`. Collections are selectors, not
-scope levels. See [the scope model reference](docs/reference/scope-model.qmd).
+`namespace` replaced `project` + `environment` in `v0.0.1-alpha.12`; a non-default value for
+either is now a parse error naming the migration. Collections are selectors, not scope levels.
+
+⚠️ Of the `${{scope.KEY}}` vocabulary, only `${{project.DOMAIN}}` resolves today — it reads
+the `domain:` line from `$APPBAY_HOME/project.yaml`. `${{environment.KEY}}` and
+`${{service.KEY}}` parse but resolve against empty maps. See
+[the scope model reference](docs/reference/scope-model.qmd).
 
 ## Project Structure
 
