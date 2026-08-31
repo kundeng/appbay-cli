@@ -226,13 +226,25 @@ for anything touching the runtime, a journey on both VMs.
   - [ ] 3.4 Fix the `vault.ts:96-101` comment — the depth is unbounded
     - **Depends**: —
 
-- [ ] 4. `when` (§5)
-  - [ ] 4.1 `installedApps` replaces `activeApps`; delete `discoverRunningApps` — SIX sites
-    - ⚠️ I6: two of them are in `apps/web`. One private commit, then cherry-pick.
-    - **Depends**: — · **Requirements**: 3.1
-  - [ ] 4.2 Use the full declared set, not the invocation's target set; needs a test
-    - **Depends**: 4.1 · **Requirements**: 3.1
-  - [ ] 4.3 `whenClauseLabel()` and the "Overlay skipped" warning say *installed*
+- [x] 4. `when` (§5)
+  - [x] 4.1 `installedApps` replaces `activeApps` — EIGHT sites, and the function survives
+    - Sites were up/apply/compile/eject (cli), plans/deployments/eject-worker/apps (web) —
+      the RFC lists four. `discoverRunningApps` is NOT deleted: it also drives the web UI's
+      running/stopped indicator, a real runtime question §5 does not touch. What died is
+      `deploy()`'s now-dead `discoverRunning` option.
+    - ⭐ The `apps.ts` overlay GRAPH was the one that mattered: it evaluated
+      `isWhenSatisfied` against the RUNNING set while the compiler used installed, so the UI
+      would have drawn an overlay inactive that the render applied. Two answers to one
+      question, disagreeing silently.
+    - **Depends**: — · **Requirements**: 3.1 · **Properties**: 3
+  - [x] 4.2 The set is derived INSIDE compile(), before the target filter
+    - This is what makes `appbay up open-webui` and `appbay up` byte-identical for
+      open-webui. Accepting it from the caller was the mechanism of the bug. Tested.
+    - **Depends**: 4.1 · **Requirements**: 3.1 · **Properties**: 3
+  - [x] 4.3 Overlay skip reasons say *installed*
+    - `missing app(s) X` → `app(s) not installed: X`; `none of X are active` → `are
+      installed`. `whenClauseLabel()` needed nothing — it renders `when: a + b` and never
+      spoke about activation.
     - **Depends**: 4.1
 
 - [ ] 5. Identity (§1) — last, and as a migration
@@ -291,11 +303,27 @@ the running/stopped indicator in the web UI. §5 replaces the overlay caller onl
 - **Test approach**: `appbay-yaml.test.ts` asserts `namespace` is `undefined` and the key
   absent on `parse({})` — a default there silently breaks every `--namespace` again.
 
+### Property 3: targeting does not change the artifact
+- **Statement**: *For any* app, `compile({apps: [X]})` and `compile({})` render X identically.
+- **Validates**: Requirement 3.1
+- **Test approach**: `overlay-integration.test.ts` "targeting one app does not change what it
+  renders", plus the same property in `compile.test.ts`. Both assert byte equality of the
+  rendered output, not just that the overlay fired.
+
 ### Property 2: the namespace is load-bearing in generated values
 - **Statement**: *For any* two namespaces, the same app + variable yields different values.
 - **Validates**: the two-instances-in-one-home goal of §4
 - **Test approach**: `generated-values.test.ts` "different inputs" varies one component per
   pair and asserts all four digests differ.
+
+**2026-08-31 — §5's test suite could express states the system cannot reach.** The overlay
+tests handed `compile()` an `activeApps` set, so "ollama is installed but not active" was a
+value a caller could pass and the compiler would honour. With the set derived from the tree,
+each case must build the tree it describes — and doing so exposed two fixtures that had
+never tested what they claimed: `searxng` is not in `SYSTEM_APPS`, so the AND-overlay case
+had never installed the peer it asserted on; and `result.apps[0]` stopped being the app under
+test once installing a peer meant compiling it too ("caddy" sorts before "myapp"). Both were
+my bugs, both surfaced by running it.
 
 ## Log
 
