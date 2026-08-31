@@ -258,6 +258,30 @@ for anything touching the runtime, a journey on both VMs.
 
 Carried from S30 on its close. Nothing here is started.
 
+**2026-08-31 — the verification gate was wrong, and it was mine, not the repo's.** The
+namespace commit landed in both trees reporting `pnpm -r test` green (core 857, cli 379, web
+474) while **`apps/cli` and `apps/web` both failed to typecheck** — 7 errors in web, 6 in
+cli. vitest transpiles; it does not typecheck. My first write-up blamed the repo ("no script
+here typechecks apps/cli or apps/web") and that is false: `pnpm typecheck` exists, is wired
+through turbo to all six packages, and passes. Both commit messages were corrected.
+
+⇒ **The gate for this sprint is `pnpm typecheck` AND `pnpm -r test`, not either alone.** And
+after cherry-picking core source into the public tree, run
+`pnpm --filter @appbay/core build` first — `apps/cli` resolves `@appbay/core` through
+`main: dist/index.js`, so a stale `dist` typechecks against the old `.d.ts` and hides the
+breakage a second time.
+
+**2026-08-31 — §4 reached further into `apps/web` than a rename.** The sidebar grouped apps
+*by environment*, an axis §4 deletes. So the collapse forced a UI model change, not a type
+patch: sidebar groups by namespace, scope-chips shows one `ns` pill instead of two, the
+config tab derives one field, the command palette keys off namespace. Invariant I4 fired on
+my own change — exactly the case it was written for.
+
+**2026-08-31 — `discoverRunningApps` has two purposes and §5.1 only kills one.** It feeds
+status display (`apps.ts:52`, `:89` — "is this app up?") *and* overlay `when:` evaluation
+(`apps.ts:295`). RFC 5.1 says "delete `discoverRunningApps()`"; deleting it would take out
+the running/stopped indicator in the web UI. §5 replaces the overlay caller only.
+
 ## Correctness Properties
 
 ### Property 1: the invocation reaches the compiler
