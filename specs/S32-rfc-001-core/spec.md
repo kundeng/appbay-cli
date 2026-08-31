@@ -240,9 +240,16 @@ for anything touching the runtime, a journey on both VMs.
       point. Scoped to the 24 operator-facing files; 0 discrepancies, still catches a fake
       flag and a fake command.
     - **Depends**: 1.5 · **Pillar**: Docs, Test
-  - [ ] 1.4 Fix the `compile.ts:435`/`:517` suggestion — it names two files nothing reads and
-        two flags that do not exist
-    - **Depends**: 1.1
+  - [x] 1.4 Fix the `compile.ts` scope-error suggestion — it named four things, three imaginary
+    - Was: "Define the variable in project.yaml or environment.yaml, or use --project-vars /
+      --env-vars flags." Measured: neither flag is a commander option anywhere, and nothing
+      reads `environment.yaml`. Only `project.yaml` was real, and only its `domain:` line.
+    - Now derived from the failing scope: `project` names `${{project.DOMAIN}}` and where it
+      comes from; `environment`/`service` say the store is unpopulated so no reference can
+      resolve; anything else lists the valid scopes.
+    - Test asserts no suggestion contains `--project-vars`, `--env-vars` or `environment.yaml`
+      — that assertion is the one that fails if a future hint invents something again.
+    - **Depends**: 1.1 · **Pillar**: MVP, Test
 
 - [ ] 2. System home (§2)
   - [ ] 2.1 Merge `InstanceConfigSchema` + `SystemConfig` into `etc/system.yaml`
