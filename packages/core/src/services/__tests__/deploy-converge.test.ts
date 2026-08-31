@@ -22,7 +22,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { deploy, type DockerComposeRunner } from "../deploy-service.js";
+import { deploy, findCrashedServices, type DockerComposeRunner } from "../deploy-service.js";
 
 let home: string;
 
@@ -199,5 +199,46 @@ describe("when compose cannot be asked, the unknown is recorded, not guessed", (
       dockerCompose: runnerWith([{ exitCode: 1, output: "" }]),
     });
     expect(result.failed).toBe(0);
+  });
+});
+
+describe("findCrashedServices — the contract apps/web now depends on", () => {
+  /**
+   * ⭐ EXPORTED FOR A SECOND CALLER, so its contract is pinned directly rather than only
+   * through `deploy()`. `apps/web`'s deploy worker used to answer "did the converge succeed"
+   * itself, by checking `compose up -d`'s exit code — which is 0 for a container that starts
+   * and immediately dies. It therefore reported "Successfully deployed" and a running badge.
+   * That is appbay-cli#4's defect, surviving in a second implementation.
+   */
+  const psRunner = (exitCode: number, output: string): DockerComposeRunner => () => ({
+    exitCode,
+    output,
+  });
+
+  it("names the services that exited non-zero", () => {
+    const out = findCrashedServices(
+      psRunner(0, row("exited", "id-1", 137)),
+      "/tmp/compose.yml",
+      {},
+    );
+    expect(out).toContain(APP);
+    expect(out).toContain("137");
+  });
+
+  it("returns null when everything is running", () => {
+    expect(findCrashedServices(psRunner(0, row("running")), "/tmp/compose.yml", {})).toBeNull();
+  });
+
+  it("treats exit 0 as a completed one-shot, not a crash", () => {
+    expect(
+      findCrashedServices(psRunner(0, row("exited", "id-1", 0)), "/tmp/compose.yml", {}),
+    ).toBeNull();
+  });
+
+  it("🚨 returns null when compose could not be ASKED — which is not 'nothing crashed'", () => {
+    // The distinction the export comment insists on. A caller that fails the deploy on any
+    // null would abort every deploy on a host where `ps` is unavailable; one that treats null
+    // as success reintroduces the original bug. Both callers must read it as "unknown".
+    expect(findCrashedServices(psRunner(1, ""), "/tmp/compose.yml", {})).toBeNull();
   });
 });

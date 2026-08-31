@@ -175,7 +175,19 @@ function parseComposePsJson(output: string): unknown[] {
   return rows;
 }
 
-function findCrashedServices(
+/**
+ * Which services exited non-zero after a converge, or null when compose could not be asked.
+ *
+ * ⭐ EXPORTED SO THERE IS ONE IMPLEMENTATION. `apps/web`'s deploy worker resolved on
+ * `compose up -d` exiting 0 and reported "Successfully deployed" plus a running badge — for a
+ * container that had started and immediately died. That is the same defect this function was
+ * written to fix in the CLI path, still live in the web path, because the two had separate
+ * implementations of "did the deploy work".
+ *
+ * ⚠️ null means COULD NOT INSPECT, not "nothing crashed". A caller that treats it as the
+ * latter reintroduces the bug in a new place.
+ */
+export function findCrashedServices(
   runDockerCompose: DockerComposeRunner,
   composePath: string,
   env: Record<string, string>,
