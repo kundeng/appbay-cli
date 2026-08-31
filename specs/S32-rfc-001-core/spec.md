@@ -370,6 +370,25 @@ mechanically guarded — `pnpm check:docs-manifests` fails on a documented manif
 rejects. `overlays.qmd` had documented §5.2's defect as the intended design; `scope-model.qmd`
 described two variable stores that never existed.
 
+**Maintenance sweep (2026-08-31) — reachability before coverage.** Asking "does anything
+call this?" before "how do I test it?" across the untested core modules produced three
+different answers, and only one of them was "write tests":
+
+| module | verdict |
+|---|---|
+| `post-deploy.ts` | every export dead, superseded by trait-emitted shepherd actions → **deleted** |
+| `config-service.ts` | 11/11 exports live, 0 tests → **16 tests**, and a prototype-pollution defect fixed |
+| `boot-order.ts` | live, 0 tests → **10 tests**, and `appbay down` was tearing down in BOOT order |
+| `edge-migration-service.ts` | 1/6 exports wired; `migrateEdge` unreachable → **appbay-cli#7** |
+| `edge-portal-config.ts` | 0/3 referenced — independently confirms RFC 1.4's "complete and unreachable" |
+
+⚠️ `edge-migration-service` is the opposite of `post-deploy`: not dead code but an ORPHANED
+CAPABILITY. A validate-backup-switch-restore migration exists for the one component whose
+failure costs the host all ingress, and no command exposes it — `init` hands the operator the
+manual `down`/`up` pair, which is the "stop, then hope" the module was written to replace.
+Filed rather than fixed here: wiring `appbay edge migrate` is a design decision and this
+sprint is RFC-001.
+
 **Test pillar (2026-08-31) — the §3.1 module had no direct tests, and my first attempt at
 one was theatre.** `secrets/keepassxc-cli.ts` was covered only by `kdbx-crud.test.ts`, which
 `describe.skipIf`s away without the binary — so on CI and on any machine without keepassxc,
