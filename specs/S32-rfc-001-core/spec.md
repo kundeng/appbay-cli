@@ -468,10 +468,31 @@ for anything touching the runtime, a journey on both VMs.
       seeded file itself passes `caddy validate`.
     - **Depends**: 5.1a · **Requirements**: 4.1 · **Pillar**: MVP, Test, Docs
     - **Evidence**: `docs/rfc/evidence/probe-84-*.yaml`
+  - [ ] 5.1c 🚦 PREREQUISITE the spec did not list: put the web UI behind the edge first
+    - 🚨 **5.2 as written is an authentication bypass, and it is measured, not theoretical.**
+      "Cut `apps/web` over to the edge identity store" means trusting the identity Caddy
+      Security forwards in request headers. That is only sound if the app is reachable
+      *exclusively* through the edge. It is not: `docker-compose.server.yml:34` publishes
+      `${APPBAY_PORT:-3000}:3000` on the host, so anyone who can reach port 3000 would set
+      `X-Token-User-Name: admin` and be admin. Today that port is protected by the very
+      password check 5.2/5.3 delete.
+    - The RFC has the prerequisite as **1.2** — "Register the web UI as a normal catalog entry
+      with the `auth` trait" — and marks it as authored in the private tree. S32 listed 5.2
+      and 5.3 without it, so following the task order literally would have removed the
+      password check while the direct port was still open.
+    - Work: a manifest for the web UI with `ingress` + `auth`, and the published port bound to
+      loopback (or dropped) so the edge is the only route in. Until that lands, 5.2/5.3/5.4
+      cannot be done safely — and `appbay admin reset-password` must NOT be deleted either,
+      because it is the recovery path for the account that is still the live credential.
+    - **Depends**: 5.1b · **Pillar**: MVP, Design
   - [ ] 5.2 Cut `apps/web` over to the edge identity store
-    - **Depends**: 5.1b · **Requirements**: 4.1
+    - **Depends**: 5.1c · **Requirements**: 4.1
   - [ ] 5.3 Only now: delete `admin.ts`, the schema module, `hashControlPlanePassword`, the
         `retired.ts` branch, and the `passwordHash` column
+    - ⚠️ The RFC says the non-column half "can go first". It cannot: `admin.ts` is the recovery
+      path for the control-plane account, which stays the LIVE credential until 5.2 lands.
+      Deleting the recovery for an account still in use is worse than the broken-in-CLI-mode
+      state F39 describes. All of 5.3 waits for 5.2.
     - **Depends**: 5.2 · **Requirements**: 4.1
   - [ ] 5.4 Import any existing `users.yaml` accounts and print what happened
     - **Depends**: 5.3
