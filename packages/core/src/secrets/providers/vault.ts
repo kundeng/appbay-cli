@@ -406,12 +406,17 @@ function resolveVaultPath(): string {
 }
 
 /**
- * Resolve the vault master password.
+ * The master password is resolved by `resolveMasterPassword` (RFC-001 §2.2), which is the
+ * single ladder for every store:
  *
- * Priority:
- *   1. APPBAY_VAULT_PASSWORD env var (explicit, overrides everything)
- *   2. $APPBAY_HOME/etc/vault-password file (set during appbay init)
- *   3. Error — user must set one of the above
+ *   1. `APPBAY_MASTER_PASSWORD`
+ *   2. `var/lib/secrets/master-password`          <- what `appbay init` writes
+ *   3. legacy env: APPBAY_VAULT_PASSWORD, APPBAY_KEEPASS_PASSWORD
+ *   4. legacy files: `etc/vault-password`, `etc/kdbx-password`
+ *
+ * ⚠️ This block used to describe a two-tier ladder ending at `etc/vault-password` "set during
+ * appbay init". Init has not written there since §2.2, and tiers 3–4 exist only so an
+ * installation predating the consolidation keeps opening.
  */
 // ---------------------------------------------------------------------------
 // Provider

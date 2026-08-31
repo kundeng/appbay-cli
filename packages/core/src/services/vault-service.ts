@@ -444,9 +444,14 @@ async function requireKeePassCli(): Promise<void> {
 /**
  * Initialize a KeePass .kdbx database file.
  *
- * Creates the .kdbx file at `$APPBAY_HOME/var/lib/secrets.kdbx` using
- * keepassxc-cli. Stores the master password at `$APPBAY_HOME/etc/kdbx-password`.
- * No-op if the database already exists.
+ * Creates the .kdbx file at `$APPBAY_HOME/var/lib/secrets.kdbx` using keepassxc-cli, opened
+ * with the ONE master password at `var/lib/secrets/master-password` (RFC-001 §2.2). No-op if
+ * the database already exists.
+ *
+ * ⚠️ This said `etc/kdbx-password` long after the code stopped writing there. That is not a
+ * cosmetic slip: a stale comment about WHERE a password lives is what let the same bug survive
+ * in `rotateVaultPassword` and `repairVaultPasswordFile`, where it made the vault permanently
+ * unreadable.
  */
 export async function initKdbx(
   appbayHome: string,
