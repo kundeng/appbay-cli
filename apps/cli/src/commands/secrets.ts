@@ -565,7 +565,7 @@ const initKdbxSubcommand = new Command("init-kdbx")
     try {
       const result = await initKdbx(appbayHome, options.password);
 
-      if (!result.generated && result.dbPath) {
+      if (!result.created && result.dbPath) {
         console.log(`KeePass database already exists at ${result.dbPath}`);
         process.exit(0);
       }
@@ -576,7 +576,7 @@ const initKdbxSubcommand = new Command("init-kdbx")
 
       console.log(`KeePass database initialized at ${result.dbPath}`);
       console.log(`Password stored at ${result.passwordPath}`);
-      console.log("\nUse 'appbay secrets set-kdbx KEY VALUE' to add secrets.");
+      console.log("\nUse 'printf %s \"$SECRET\" | appbay secrets set-kdbx KEY' to add secrets.");
       console.log("Reference secrets with keepass:// URIs in appbay.yaml.");
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
@@ -585,11 +585,37 @@ const initKdbxSubcommand = new Command("init-kdbx")
   });
 
 const setKdbxSubcommand = new Command("set-kdbx")
-  .description("Store a secret in the KeePass database (supports app/key scoping)")
+  .description(
+    "Store a secret in the KeePass database (supports app/key scoping). " +
+      "Omit VALUE to read it from stdin, which keeps it out of /proc/<pid>/cmdline.",
+  )
   .argument("<key>", "secret key — plain KEY or scoped APP/KEY")
-  .argument("<value>", "secret value")
-  .action(async (keyArg: string, value: string) => {
+  .argument("[value]", "secret value — omit to read from stdin (preferred for automation)")
+  .action(async (keyArg: string, valueArg: string | undefined) => {
     const appbayHome = resolveAppbayHome();
+
+    // 🚨 `<value>` USED TO BE REQUIRED HERE, WITH NO STDIN PATH — the exact exposure
+    // `secrets set` was already fixed for, left in place on the other backend. RFC-001 §3.3.
+    // A value passed as an argument is in /proc/<pid>/cmdline, readable by any local user for
+    // the life of the process, and in auditd's execve record afterwards. See
+    // readSecretFromStdin for why that is not acceptable for a configuration-management run.
+    let value: string;
+    try {
+      value = valueArg !== undefined ? valueArg : await readSecretFromStdin();
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+      return;
+    }
+
+    if (value === "") {
+      console.error(
+        `Refusing to store an empty value for "${keyArg}". An empty secret fails later, ` +
+          "somewhere unrelated, and looks like a different bug.",
+      );
+      process.exit(1);
+      return;
+    }
 
     try {
       const existing = await getKdbxSecret(appbayHome, keyArg);

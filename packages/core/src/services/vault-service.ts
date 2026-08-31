@@ -27,6 +27,7 @@ import { splitScopedKey } from "../secrets/scoped-key.js";
 import {
   resolveMasterPassword,
   persistMasterPassword,
+  hasMasterPassword,
   MASTER_PASSWORD_REL,
 } from "../secrets/master-password.js";
 
@@ -43,6 +44,16 @@ export interface VaultInitResult {
 export interface KdbxInitResult {
   dbPath: string;
   passwordPath: string;
+  /**
+   * Whether THIS call created the database.
+   *
+   * ⚠️ Separate from `generated`, which is about the PASSWORD. They were one field, so
+   * `!generated` was read as "the database already existed" — wrong whenever a password was
+   * supplied explicitly, and wrong in the common path once §2.2 made the master password
+   * pre-exist. One boolean cannot answer two questions.
+   */
+  created: boolean;
+  /** Whether this call generated a new master password (as opposed to reusing one). */
   generated: boolean;
 }
 
@@ -425,31 +436,30 @@ export async function initKdbx(
   password?: string,
 ): Promise<KdbxInitResult> {
   const dbPath = resolveKdbxPath(appbayHome);
-  const passwordFilePath = join(appbayHome, "etc", "kdbx-password");
+  const passwordFilePath = join(appbayHome, MASTER_PASSWORD_REL);
 
   if (existsSync(dbPath)) {
-    return { dbPath, passwordPath: passwordFilePath, generated: false };
+    return { dbPath, passwordPath: passwordFilePath, created: false, generated: false };
   }
 
   await requireKeePassCli();
 
-  // Resolve password: explicit > env var > auto-generate
-  let finalPassword = password ?? process.env.APPBAY_KEEPASS_PASSWORD ?? process.env.APPBAY_VAULT_PASSWORD;
-  let generated = false;
+  // 🚨 CREATE THE DATABASE WITH THE MASTER PASSWORD, NOT A FRESH ONE. This used to generate
+  // its own randomBytes(24) and store it at etc/kdbx-password. Once §2.2 made the resolver
+  // prefer var/lib/secrets/master-password, that produced a database NOTHING COULD OPEN:
+  // `appbay init` wrote the master password, `secrets init-kdbx` created the .kdbx with a
+  // different one, and every read resolved to the master. Caught by running it end to end on
+  // a VM — the unit tests passed throughout, because they create the database and read it
+  // back through the same call and never cross the two writers.
+  //
+  // `generate: true` so a home that has no master password yet gets one rather than failing.
+  const hadMaster = hasMasterPassword(appbayHome);
+  const finalPassword =
+    password ?? resolveMasterPassword(appbayHome, { generate: true });
+  const generated = password === undefined && !hadMaster;
 
-  if (!finalPassword) {
-    finalPassword = randomBytes(24).toString("base64url");
-    generated = true;
-  }
-
-  // Store password file (chmod 600)
-  mkdirSync(join(appbayHome, "etc"), { recursive: true });
-  writeFileSync(passwordFilePath, finalPassword, { mode: 0o600 });
-  try {
-    chmodSync(passwordFilePath, 0o600);
-  } catch {
-    // chmod may fail on some filesystems
-  }
+  // An explicit password becomes the master, so the two never diverge again.
+  if (password !== undefined) persistMasterPassword(appbayHome, password);
 
   // Ensure parent directory exists
   const dbDir = dirname(dbPath);
@@ -472,7 +482,7 @@ export async function initKdbx(
     throw new Error(`Failed to create KeePass database at ${dbPath}: ${msg}`);
   }
 
-  return { dbPath, passwordPath: passwordFilePath, generated };
+  return { dbPath, passwordPath: passwordFilePath, created: true, generated };
 }
 
 /**
