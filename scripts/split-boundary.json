@@ -68,7 +68,8 @@
     "apps/cli/src/commands/__tests__/server-compose-sync.test.ts",
     "scripts/test-deployment.sh",
     "scripts/test-vm.sh",
-    "scripts/test-compose-deploy.sh"
+    "scripts/test-compose-deploy.sh",
+    ".github/workflows/release-web.yml"
   ],
   "$shared": [
     "Files matching neither set are SHARED \u2014 root config (package.json, turbo.json,",
