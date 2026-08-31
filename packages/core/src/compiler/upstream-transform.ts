@@ -13,6 +13,13 @@
  */
 
 import type { ExposeEntry } from "../schemas/appbay-yaml.js";
+import {
+  containerName,
+  sharedNetworkAlias,
+  internalNetworkName,
+  APP_LABEL,
+  NAMESPACE_LABEL,
+} from "./identity.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -22,6 +29,8 @@ import type { ExposeEntry } from "../schemas/appbay-yaml.js";
 export interface UpstreamTransformInput {
   /** App name (directory name). */
   appName: string;
+  /** Deployment namespace; `undefined` or "default" produces un-namespaced names. */
+  namespace?: string;
   /** Parsed upstream docker-compose as a plain object. */
   compose: Record<string, unknown>;
   /** Upstream section from appbay.yaml. */
@@ -92,9 +101,10 @@ interface ServiceDef {
 export function transformUpstream(
   input: UpstreamTransformInput,
 ): UpstreamTransformOutput {
-  const { appName, compose, upstream, sharedNetworks, appsDir, appsRelPath } = input;
+  const { appName, namespace, compose, upstream, sharedNetworks, appsDir, appsRelPath } =
+    input;
 
-  const internalNetwork = `${appName}_internal`;
+  const internalNetwork = internalNetworkName(namespace, appName);
   const exclude = new Set(upstream.services?.exclude ?? []);
 
   // Build expose lookup: service name -> list of networks it should join
@@ -149,8 +159,16 @@ export function transformUpstream(
 
     const svc: ServiceDef = { ...service };
 
-    // Container name: appbay.<appname>.<service>
-    svc.container_name = `appbay.${appName}.${name}`;
+    // Container name: appbay.<appname>.<service>, namespaced when there is one.
+    svc.container_name = containerName(namespace, appName, name);
+
+    // Labels so consumers can ask which app/namespace a container belongs to instead of
+    // parsing its name — see identity.ts APP_LABEL for why parsing does not survive §4.
+    svc.labels = {
+      ...(typeof svc.labels === "object" && !Array.isArray(svc.labels) ? svc.labels : {}),
+      [APP_LABEL]: appName,
+      [NAMESPACE_LABEL]: namespace ?? "default",
+    };
 
     // Network configuration (skip if service uses network_mode)
     if (!svc.network_mode) {
@@ -164,7 +182,7 @@ export function transformUpstream(
       // If this service is exposed, add it to the specified shared networks
       const exposeNetworks = exposeMap.get(name);
       if (exposeNetworks) {
-        const alias = `${appName}_${name}`;
+        const alias = sharedNetworkAlias(namespace, appName, name);
         const aliases: string[] = [alias];
         exposedAliases.set(name, aliases);
 
@@ -257,7 +275,7 @@ export function transformUpstream(
 
   const transformedNetworks: Record<string, unknown> = {
     [internalNetwork]: {
-      name: `${appName}_internal`,
+      name: internalNetworkName(namespace, appName),
     },
   };
 

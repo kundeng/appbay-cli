@@ -403,6 +403,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       const appsRelPath = relative(join(rendersDir, app.name), appsDir);
       const transformed = transformUpstream({
         appName: app.name,
+        namespace: appNamespace,
         compose,
         upstream: config.upstream,
         sharedNetworks,
