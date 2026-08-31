@@ -1,0 +1,85 @@
+record: probe-82-namespace-collapse-touches-five-places-and-migrates-no-data
+type: probe
+title: namespace-collapse-touches-five-places-and-migrates-no-data
+timestamp: "2026-08-30T23:28:02-04:00"
+claim: collapsing project+environment into one namespace is a large refactor with real data to migrate
+verdict: 'refutes'
+key_evidence: 'it is small and migrates nothing. Five surfaces: the two field declarations (appbay-yaml.ts:19-20, :361-362), the pair-keyed sites in compile.ts (:370-371, :380-381, :446-447, :555-556, :976), the generated-values key (generated-values.ts:72, :131 and state.ts:27-28, :75-76), the resolver vocabulary (scope-resolver.ts:20-22, :50), and the identity fields that a namespace WOULD have to enter but does not today (upstream-transform.ts:153 container_name, :260 network, ingress.ts:147/:161 aux filename). Data to migrate: NONE — generated-values.yaml on the sim is "values: []", and all 150 manifests read default/default, so collapsing them is a text edit with no live values behind it. The key change is one word: z.string().default("default") becomes z.string().optional(), which is exactly what makes ABSENCE expressible and makes the existing ?? at compile.ts:380-381 correct as written. Also found: ScopeSchema already carries collection and tags beside project/environment — k8s labels and selectors sitting next to the namespace idea'
+exit_code: 0
+duration_s: 0
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/namespace_collapse_blast_radius.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/namespace_collapse_blast_radius.sh
+    sha256: a773d69ff8c4a4ab40d7130aa3aaa60a2d370e20d3148e60c1575ed8a10a2306
+    stored: raw/code/a773d69f-namespace_collapse_blast_radius.sh
+output_kind: text
+output:
+  text: |
+    tree: bd32116 v0.0.1-alpha.11
+
+    == the scope block conflates several unrelated axes ==
+      export const ScopeSchema = z.object({
+        project: z.string().default("default"),
+        environment: z.string().default("default"),
+        collection: z.array(z.string()).optional(),
+        operator: z.string().optional(),
+        shared_network: z.array(z.string()).default(["appbay_shared"]),
+        tags: z.record(z.string()).optional(),
+      });
+      namespace axis : project, environment
+      selector axis  : collection, tags        <- k8s labels+selectors, already here
+      placement      : operator
+      connectivity   : shared_network
+
+    == 1. the field declarations — .default() is what makes ABSENCE unexpressible ==
+      appbay-yaml.ts:19:  project: z.string().default("default"),
+      appbay-yaml.ts:20:  environment: z.string().default("default"),
+      appbay-yaml.ts:361:  project: z.string().default("default"),
+      appbay-yaml.ts:362:  environment: z.string().default("default"),
+      ⇒ z.string().optional() instead, and compile.ts:380-381's ?? starts working as written.
+
+    == 2. every site keyed on the pair ==
+      compile.ts:packages/core/src/compiler/compile.ts:370:    project: defaultProject,
+      compile.ts:packages/core/src/compiler/compile.ts:371:    environment: defaultEnvironment,
+      compile.ts:packages/core/src/compiler/compile.ts:380:  const appProject = config?.project ?? defaultProject;
+      compile.ts:packages/core/src/compiler/compile.ts:381:  const appEnvironment = config?.environment ?? defaultEnvironment;
+      compile.ts:packages/core/src/compiler/compile.ts:435:      suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+      compile.ts:packages/core/src/compiler/compile.ts:446:    appProject,
+      compile.ts:packages/core/src/compiler/compile.ts:447:    appEnvironment,
+      compile.ts:packages/core/src/compiler/compile.ts:517:        suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+      compile.ts:packages/core/src/compiler/compile.ts:555:        project: appProject,
+      compile.ts:packages/core/src/compiler/compile.ts:556:        environment: appEnvironment,
+      compile.ts:packages/core/src/compiler/compile.ts:976:      const storeKey = { project, environment, service: svcName, varName: key };
+      generated-values.ts:72:  const input = [project, environment, service, key].join(":");
+      generated-values.ts:130:function keyString(k: GeneratedValueKey): string {
+      generated-values.ts:131:  return `${k.project}\0${k.environment}\0${k.service}\0${k.varName}`;
+      generated-values.ts:137: * Values are keyed by `(project, environment, service, varName)` and persisted
+      generated-values.ts:168:        this.values.set(keyString(entry.key), entry);
+      generated-values.ts:187:    const entry = this.values.get(keyString(key));
+      generated-values.ts:232:    const existing = this.values.get(keyString(key));
+      generated-values.ts:247:    this.values.set(keyString(key), entry);
+      state.ts:27:  project: z.string(),
+      state.ts:28:  environment: z.string(),
+      state.ts:75:  project: z.string(),
+      state.ts:76:  environment: z.string(),
+
+    == 3. the resolver vocabulary that would shrink ==
+      scope-resolver.ts:20:  project: Record<string, string>;
+      scope-resolver.ts:21:  environment: Record<string, string>;
+      scope-resolver.ts:22:  service: Record<string, string>;
+      scope-resolver.ts:50:const VALID_SCOPES = ["service", "environment", "project"] as const;
+
+    == 4. IDENTITY — what a namespace would have to enter, and does not today ==
+      upstream-transform.ts:153:    svc.container_name = `appbay.${appName}.${name}`;
+      upstream-transform.ts:260:      name: `${appName}_internal`,
+      ingress.ts:146:export function traefikAuxPath(appName: string): string {
+      ingress.ts:147-  return `etc/apps/traefik/config/dynamic/${appName}.yml`;
+      ingress.ts:148-}
+      ingress.ts:--
+      ingress.ts:160:export function caddyAuxPath(appName: string): string {
+      ingress.ts:161-  return `etc/apps/caddy/config/dynamic/${appName}.caddy`;
+      ingress.ts:162-}
+
+    == 5. how much real data would migrate ==
+      generated-values.yaml on the sim (probe-66): 'values: []' — nothing to migrate
+      manifests carrying the pair: 150, all reading default/default

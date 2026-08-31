@@ -1,0 +1,66 @@
+record: probe-76-discovery-and-self-declaration-are-two-jobs-in-one-file
+type: probe
+title: discovery-and-self-declaration-are-two-jobs-in-one-file
+timestamp: "2026-08-30T22:47:40-04:00"
+claim: this project depends on /etc/appbay/config, so the system payload cannot move into APPBAY_HOME
+verdict: 'refutes'
+key_evidence: 'llm-stack has ZERO init-system calls and never reads /etc/appbay/config: every appbay invocation is wrapped with an explicit APPBAY_HOME env (provision-appbay.yml:120,639,656; verify-payload.yml:39; verify-stack.yml:42) and provision-substrate.yml:662 exports it from the systemd unit, so this project is tier 1 only and tier 2 is dead weight. Spec 25 decision 3 lets ansible write exactly two things outside APPBAY_HOME — the binary and the catalog source — and the system config is neither. Separately, a moved or copied tree is UNDETECTABLE today: looksScaffolded is existsSync(path/etc) and nothing compares the resolved path to any path recorded inside the tree (0 matches). Renders survive a move because compile.ts:395 writes a relative path back to appsDir, but init.ts:131-132 already documents the copied-home hazard for the runtime socket gid'
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/home_pointer_vs_self_declaration.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/home_pointer_vs_self_declaration.sh
+    sha256: 7afe2bddd7ddcfa2d15da88ed8a7ae8314c81b7cf76625f544ca5292c9ce40fc
+    stored: raw/code/7afe2bdd-home_pointer_vs_self_declaration.sh
+output_kind: text
+output:
+  text: |
+    == 1. which tier does OUR ansible use? ==
+      occurrences of 'init-system' in llm-stack: 0
+    0
+      every appbay call is wrapped with an explicit APPBAY_HOME env:
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/provision-appbay.yml:120:      {{ {'APPBAY_HOME': _appbay_home}
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/provision-appbay.yml:639:        APPBAY_HOME: "{{ _appbay_home }}"
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/provision-appbay.yml:656:        APPBAY_HOME: "{{ _appbay_home }}"
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/verify-payload.yml:39:      {{ {'APPBAY_HOME': _appbay_home}
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/verify-stack.yml:42:      {{ {'APPBAY_HOME': appbay_home}
+      and the systemd unit exports it too:
+      /Users/kundeng/Dropbox/Projects/work-splunk-ops/ansible/llm-stack/provision-substrate.yml:662:          Environment=APPBAY_HOME={{ substrate_appbay_home }}
+      ⇒ we are tier 1 only. Tier 2 (/etc/appbay/config) is unused by this project.
+
+    == 2. the two things ansible is allowed to write outside $APPBAY_HOME ==
+          _appbay_release_tag: "{{ appbay_release_tag | default('v0.0.1-alpha.6') }}"
+          _appbay_release_base: >-
+            https://github.com/{{ _appbay_release_repo }}/releases/download/{{ _appbay_release_tag }}
+          # Our catalog source on the CONTROL NODE. Staged to the host at `_appbay_catalog_dest`,
+          # which is OUTSIDE $APPBAY_HOME — one of exactly two things Ansible may write directly
+          # (spec 25 decision 3): the binary, and the catalog source. appbay copies or symlinks it
+          # into var/lib/catalog/bundled itself; we never reach in there.
+          appbay_catalog_src: "{{ playbook_dir }}/catalog"
+          # The checked-in catalog plus fetched server repos are assembled here on the control
+          # node, then pushed to the host as one catalog. This keeps each nested repo the owner
+          # of its app while eliminating multiple rsync writers over one staged tree.
+
+    == 3. is a MOVED tree detectable today? ==
+      59:function looksScaffolded(path: string): boolean {
+      60-  return existsSync(resolve(path, "etc"));
+      61-}
+      62-
+      63-function printExplanation(): void {
+      64-  const { tiers, winner } = explainAppbayHome();
+      65-  console.log("APPBAY_HOME resolution (first tier with a value wins):\n");
+      66-  for (const tier of tiers) {
+      67-    const mark = tier === winner ? "→" : " ";
+      68-    const label = TIER_LABEL[tier.source].padEnd(20);
+      69-    const value = tier.value ?? "(not set)";
+      70-    console.log(`  ${mark} ${label} ${value}`);
+      71-    console.log(`    ${" ".repeat(20)} ${tier.origin}`);
+      does anything compare the resolved path to a path recorded INSIDE the tree?
+        matches: 0
+
+    == 4. what breaks if the tree moves — absolute paths baked at compile time ==
+      compile.ts:395:      const appsRelPath = relative(join(rendersDir, app.name), appsDir);
+      compile.ts:402:        appsRelPath,
+      bind mounts written into the server compose:
+      init.ts:776:      console.log(`Initializing Appbay in ${appbayHome}\n`);
+      init.ts:1024:Appbay initialized at ${appbayHome}

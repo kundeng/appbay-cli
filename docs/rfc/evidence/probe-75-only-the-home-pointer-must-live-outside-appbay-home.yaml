@@ -1,0 +1,53 @@
+record: probe-75-only-the-home-pointer-must-live-outside-appbay-home
+type: probe
+title: only-the-home-pointer-must-live-outside-appbay-home
+timestamp: "2026-08-30T22:44:26-04:00"
+claim: all of /etc/appbay/config can move inside $APPBAY_HOME, as RFC-001 2.1 would need
+verdict: 'refutes'
+key_evidence: 'only one of the four fields must stay outside. readSystemConfig() has exactly two non-test callers, appbay-home.ts:101 and :147, and BOTH take .home and nothing else — owner and serviceUser are written and never read by any command, and writeSystemConfig() has zero non-test callers because init-system writes the file with sh -c mkdir+tee at init-system.ts:523. .home is the pointer TO $APPBAY_HOME, so it cannot live inside it; owner, service_user and the proposed secrets_backend are properties of the tree, read after it is located, and move cleanly to $APPBAY_HOME/etc/system. A non-root pointer already exists at ~/.config/appbay/home (tier 3), so /etc/appbay/config shrinks to a one-line pointer or disappears'
+exit_code: 0
+duration_s: 0
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/system_config_fields_split.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/system_config_fields_split.sh
+    sha256: b04c0c3e9a71c472145b1bcefd00a5f40fc95faac2c60c07348edc3bce1f7e6a
+    stored: raw/code/b04c0c3e-system_config_fields_split.sh
+output_kind: text
+output:
+  text: |
+    tree: bd32116 v0.0.1-alpha.11
+    note: nothing below touches the OS. /etc/appbay is never opened.
+
+    == what the file holds ==
+      export interface SystemConfig {
+        /** Who owns the appbay tree. */
+        owner: OwnerModel;
+        /** Service account name (only when owner === "service"). */
+        serviceUser?: string;
+        /** The resolved APPBAY_HOME path. */
+        home: string;
+      }
+
+    == who reads it, and for what ==
+      apps/cli/src/utils/appbay-home.ts:101:      value: readSystemConfig()?.home ?? null,
+      apps/cli/src/utils/appbay-home.ts:147:  const system = readSystemConfig();
+
+    == the four-tier home resolution — the reason one field cannot move ==
+      3:  if (process.env.APPBAY_HOME) return process.env.APPBAY_HOME;
+      8:  const system = readSystemConfig();
+      11:  const saved = readSavedAppbayHome();
+      14:  return join(homedir(), ".appbay");
+      apps/cli/src/utils/appbay-home.ts:22:export const CONFIG_FILE = join(CONFIG_DIR, "home");
+      apps/cli/src/utils/system-config.ts:24:export const SYSTEM_CONFIG_FILE = join(SYSTEM_CONFIG_DIR, "config");
+
+    == is there already a NON-ROOT pointer outside $APPBAY_HOME? ==
+      appbay-home.ts:21:export const CONFIG_DIR = join(homedir(), ".config", "appbay");
+      appbay-home.ts:43:  writeFileSync(CONFIG_FILE, homePath + "\n", "utf-8");
+      ⇒ yes: ~/.config/appbay/home, tier 3, written by 'appbay init', needs no root.
+
+    == verdict per field ==
+      FIELD          MOVABLE   WHY
+      home           NO        it is the pointer TO $APPBAY_HOME; inside it, it is circular
+      owner          YES       a property of the tree, read after the tree is located
+      service_user   YES       same
+      secrets_backend YES       RFC 2.1 proposes it; it decides how var/lib/secrets is read

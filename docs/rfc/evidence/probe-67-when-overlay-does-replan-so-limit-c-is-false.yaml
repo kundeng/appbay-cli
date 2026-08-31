@@ -1,0 +1,18 @@
+record: probe-67-when-overlay-does-replan-so-limit-c-is-false
+type: probe
+title: when-overlay-does-replan-so-limit-c-is-false
+timestamp: "2026-08-30T22:28:45-04:00"
+claim: 'a newly-true when: clause renders byte-identical, so the plan says UNCHANGED and the app is never recompiled (probe-65 limit c)'
+verdict: 'refutes'
+key_evidence: 'compiling the same app twice against one rendersDir — ollama absent, then active — gives plan status ''changed'', not ''unchanged''. The overlay''s OLLAMA_BASE_URL is in the second render and the two renders are not byte-identical, because overlay-engine merges into the compose service map before the render is hashed. probe-65 limit (c) does not exist; the surviving limit is (e), the app must be in this invocation''s target set'
+exit_code: 0
+duration_s: 1
+command: bash -c cd\ /Users/kundeng/Projects/appbay-cli\ \&\&\ bun\ run\ /Users/kundeng/Dropbox/Projects/work-splunk-ops/investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/when_overlay_replan_roundtrip.ts
+output_kind: json
+output:
+  pass1_status: new
+  pass2_status: changed
+  pass2_compared_against_pass1_render: true
+  renders_are_byte_identical: false
+  overlay_env_present_in_pass2_render: true
+  verdict: limit (c) FAILS — plan status is 'changed', the overlay reached the render

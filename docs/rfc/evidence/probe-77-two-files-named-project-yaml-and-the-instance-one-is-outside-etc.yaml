@@ -1,0 +1,105 @@
+record: probe-77-two-files-named-project-yaml-and-the-instance-one-is-outside-etc
+type: probe
+title: two-files-named-project-yaml-and-the-instance-one-is-outside-etc
+timestamp: "2026-08-30T22:48:55-04:00"
+claim: project and environment definitions already live under etc/, so nothing needs moving
+verdict: 'refutes'
+key_evidence: 'the project and environment tiers are SCHEMA-ONLY. ProjectConfigSchema and EnvironmentConfigSchema have zero non-test consumers, the string "projects" is never joined into a path anywhere in apps/ or packages/, so etc/projects/<name>/ is never constructed or read, and compile()''s environmentVars flows from its own default {} to line 422 with no caller ever passing it. No file named env.yaml or environments.yaml exists — 0 matches. What IS read, at 8+ sites, is the INSTANCE file at $APPBAY_HOME/project.yaml: domain, container_runtime, container_store, ingress_provider, acme_dns_provider, control_plane_selinux, catalog_source — none of them project-scoped — and it sits at the root while sharing a filename with a different schema, which instance.ts:4-16 carries a warning block about. Project vars actually come from that instance file via loadProjectVars (deploy-service.ts:320-323); env vars come from --project-vars/--env-vars flags'
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/config_hierarchy_levels.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/config_hierarchy_levels.sh
+    sha256: a4fe67b1df55bebfb300fe346f162998372e6f6c495692142b5b165d130e18b8
+    stored: raw/code/a4fe67b1-config_hierarchy_levels.sh
+output_kind: text
+output:
+  text: |
+    tree: bd32116 v0.0.1-alpha.11
+
+    == the collision the code itself flags ==
+       * ⚠️ THIS IS NOT `ProjectConfigSchema`. Two different files share the name
+       * `project.yaml` and they are not interchangeable:
+       *
+       *   $APPBAY_HOME/project.yaml                     <- THIS file. One per appbay
+       *                                                    installation. Written by
+       *                                                    `appbay init`. Keys:
+       *                                                    project, domain,
+       *                                                    catalog_source,
+       *                                                    container_runtime.
+       *   $APPBAY_HOME/etc/projects/<name>/project.yaml <- ProjectConfigSchema in
+       *                                                    ./project.ts. Per project,
+       *                                                    scope resolution. Keys:
+
+    == level 1 — INSTANCE: $APPBAY_HOME/project.yaml, at the ROOT, not in etc/ ==
+      instance.ts:74:  project: z.string().optional(),
+      instance.ts:77:  domain: z.string().optional(),
+      instance.ts:80:  catalog_source: z.string().optional(),
+      instance.ts:90:  container_runtime: ContainerRuntimeSchema.optional(),
+      instance.ts:114:  container_store: z.string().optional(),
+      instance.ts:121:  ingress_provider: IngressProviderSchema.optional(),
+      instance.ts:152:  control_plane_selinux: z.enum(["confined", "unconfined"]).optional(),
+      instance.ts:166:  acme_dns_provider: AcmeDnsProviderSchema.optional(),
+      ⇒ only 'project' is project-scoped, and it is merely the DEFAULT project name.
+
+    == level 2 — PROJECT: etc/projects/<name>/project.yaml ==
+      project.ts:20:  name: z.string(),
+      project.ts:23:  vars: z.record(z.string()).optional(),
+      project.ts:26:  defaults: z
+      project.ts:46:  name: z.string(),
+      project.ts:49:  vars: z.record(z.string()).optional(),
+
+    == level 3 — ENVIRONMENT: etc/projects/<name>/environments/<env>.yaml ==
+      project.ts:41:// Environment Config (etc/projects/<name>/environments/<env>.yaml)
+      is any file literally named env.yaml or environments.yaml?
+        matches in repo: 0
+
+    == level 4 — APP: etc/apps/<app>/.env{,.local} ==
+
+    == are projects/environments ENUMERATED, or discovered by readdir? ==
+      ⇒ no registry file found means the set is whatever directories exist.
+
+    == who actually READS the instance file ==
+      apps/cli/src/utils/system-config.ts:15: * plain `key: value` lines, not a schema — the same shape as project.yaml.
+      apps/cli/src/utils/docker.ts:27: * calling core's resolver directly would read the wrong project.yaml on any
+      apps/cli/src/commands/init.ts:112:    const raw = readFileSync(join(appbayHome, "project.yaml"), "utf-8");
+      apps/cli/src/commands/init.ts:139:    # control_plane_selinux: unconfined is set in project.yaml. Required on an Enforcing
+      apps/cli/src/commands/init.ts:451:/** Write project.yaml with project name and domain. */
+      apps/cli/src/commands/init.ts:461:  const configPath = join(appbayHome, "project.yaml");
+      apps/cli/src/commands/init.ts:487: * Set `container_runtime` in an EXISTING project.yaml.
+      apps/cli/src/commands/init.ts:560: * Set one key in an EXISTING project.yaml.
+      apps/cli/src/commands/init.ts:572:  const configPath = join(appbayHome, "project.yaml");
+      apps/cli/src/commands/init.ts:598:/** Read existing project.yaml to get project/domain for re-init. */
+      apps/cli/src/commands/init.ts:602:  const configPath = join(appbayHome, "project.yaml");
+      apps/cli/src/commands/init.ts:898:      // Stage 6: Write project.yaml.
+      apps/cli/src/commands/init.ts:915:        console.log("  Wrote project.yaml");
+      apps/cli/src/commands/init.ts:951:          // project.yaml — so the most common migration (default traefik -> caddy) would
+      apps/cli/src/commands/setup.ts:309:    { name: "Project config", ok: existsSync(join(appbayHome, "project.yaml")), detail: "project.yaml" },
+      apps/cli/src/commands/setup.ts:369:    "project.yaml",
+      apps/cli/src/commands/setup.ts:506:    // Prerequisite checks resolve the runtime before init writes project.yaml, which caches
+      apps/cli/src/index.ts:69://     -> core containerBin() resolved /root/.appbay (root's homedir, no project.yaml)
+      packages/core/src/traits/types.ts:43:   * $APPBAY_HOME/project.yaml.
+      packages/core/src/health/checks.ts:251:      readFileSync(join(appbayHome, "project.yaml"), "utf-8"),
+      packages/core/src/health/checks.ts:254:    // No project.yaml at all — an uninitialised install. `appbay-home` reports that.
+      packages/core/src/system-apps.ts:265:\`project.yaml\` (\`appbay init --acme-dns-provider cloudflare\`). A hand-written file is
+      packages/core/src/runtime/container-runtime.ts:21: *   2. `container_runtime` in $APPBAY_HOME/project.yaml   — the configured value
+      packages/core/src/runtime/container-runtime.ts:71:    config = parseInstanceConfig(readFileSync(join(home, "project.yaml"), "utf-8"));
+      packages/core/src/runtime/container-runtime.ts:73:    // No project.yaml — an uninitialised install, or a command that runs before init.
+      packages/core/src/runtime/container-runtime.ts:276:  /** Installation root, so the runtime resolves against the right project.yaml. */
+      packages/core/src/schemas/project.ts:2: * Zod schemas for project.yaml and environment.yaml configuration files.
+      packages/core/src/schemas/project.ts:5: *   - `project.yaml`                   -- project-level vars and defaults
+      packages/core/src/schemas/edge-identity-providers.ts:17: * plaintext credential in `project.yaml` is a credential in git, in the plan diff, and in
+      packages/core/src/schemas/appbay-yaml.ts:312: * Values are compared as strings against `$APPBAY_HOME/project.yaml`. All keys must match.
+      packages/core/src/schemas/instance.ts:2: * Zod schema for the instance-level config at `$APPBAY_HOME/project.yaml`.
+      packages/core/src/schemas/instance.ts:5: * `project.yaml` and they are not interchangeable:
+      packages/core/src/schemas/instance.ts:7: *   $APPBAY_HOME/project.yaml                     <- THIS file. One per appbay
+      packages/core/src/schemas/instance.ts:87:   * DEFAULT_CONTAINER_RUNTIME. Kept optional so an existing project.yaml keeps
+      packages/core/src/schemas/instance.ts:175: * or corrupt project.yaml must not take down commands that do not need it
+      packages/core/src/compiler/compile.ts:435:      suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+      packages/core/src/compiler/compile.ts:517:        suggestion: `Define the variable in project.yaml or environment.yaml, or use --project-vars / --env-vars flags.`,
+      packages/core/src/compiler/compile.ts:988: * Read $APPBAY_HOME/project.yaml for the build `when:` predicate.
+      packages/core/src/compiler/compile.ts:997:      readFileSync(join(appbayHome, "project.yaml"), "utf-8"),
+      packages/core/src/services/catalog-service.ts:471:    const raw = await readFile(join(home, "project.yaml"), "utf-8");
+      packages/core/src/services/edge-migration-service.ts:5: * project.yaml and nothing else. The old proxy kept running and kept holding :80/:443,
+      packages/core/src/services/deploy-service.ts:320: * Load project.yaml from APPBAY_HOME and return project-level variables.
+      packages/core/src/services/deploy-service.ts:323:  const configPath = join(appbayHome, "project.yaml");

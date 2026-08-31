@@ -1,0 +1,55 @@
+record: probe-83-a-dotted-namespace-breaks-the-appbay-name-parser
+type: probe
+title: a-dotted-namespace-breaks-the-appbay-name-parser
+timestamp: "2026-08-30T23:31:27-04:00"
+claim: a dot-delimited namespace drops cleanly into container names, which are already dot-delimited
+verdict: 'supports'
+key_evidence: 'the dot is safe in container names and filenames but must be normalised for DNS. Exactly ONE parser reads appbay.* names: docker.ts:72, /^appbay\.([^.]+)/, which takes the first segment — against appbay.uom.sim.litellm.litellm it extracts "uom", not "litellm", so every when: clause would fail and overlays would silently deactivate. That parser has to become namespace-aware regardless of delimiter, otherwise when:[litellm] would be satisfied by ANOTHER namespace litellm, so it is a requirement of namespacing rather than a cost of the dot. builds.ts:285 reconstructs the same name and needs the same treatment. THE ONE REAL DOT HAZARD is the shared-network alias: upstream-transform.ts:167 builds alias = appName_serviceName and that string is the DNS name other apps dial (ingress.ts:70, :195). A dotted namespace makes it uom.sim_litellm_litellm, where the dot is a DNS LABEL SEPARATOR, not a character — two labels, not one name. Normalise the dot to a hyphen wherever the namespace enters a DNS-bearing string; container names, aux filenames and volume prefixes can keep it'
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/dot_delimited_namespace_collisions.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/dot_delimited_namespace_collisions.sh
+    sha256: 311b43c2a4216c883f3232c5cf93303f503590cd3305ef410eef16ebc4a132af
+    stored: raw/code/311b43c2-dot_delimited_namespace_collisions.sh
+output_kind: text
+output:
+  text: |
+    tree: bd32116 v0.0.1-alpha.11
+
+    == the name that would be produced ==
+      upstream-transform.ts:153:    svc.container_name = `appbay.${appName}.${name}`;
+      today:            appbay.litellm.litellm
+      with uom.sim:     appbay.uom.sim.litellm.litellm     <- 5 dot-separated parts
+
+    == every place that PARSES an appbay.* name ==
+      apps/cli/src/utils/docker.ts:72:        const match = line.trim().match(/^appbay\.([^.]+)/);
+      apps/cli/src/utils/exec.ts:21:  const pa = a.replace(/^v/, "").split(".").map(Number);
+      apps/cli/src/utils/exec.ts:22:  const pb = b.replace(/^v/, "").split(".").map(Number);
+      packages/core/src/secrets/providers/sops.ts:78:    .split(".")
+      packages/core/src/health/checks.ts:45:  const pa = a.replace(/^v/, "").split(".").map(Number);
+      packages/core/src/health/checks.ts:46:  const pb = b.replace(/^v/, "").split(".").map(Number);
+      packages/core/src/services/config-service.ts:22:  const parts = key.split(".");
+      packages/core/src/services/config-service.ts:37:  const parts = key.split(".");
+
+    == the one that decides which apps are 'running' for when: overlays ==
+          // Signal 1: containers named appbay.<name>[.*] (system apps + compiled user apps)
+          const nameResult = spawnSync(
+            cliContainerBin(),
+            ["ps", "--format", "{{.Names}}", "--filter", "name=appbay."],
+            { encoding: "utf-8", timeout: 10_000 },
+          );
+          if (nameResult.status === 0) {
+            for (const line of (nameResult.stdout as string).trim().split("\n").filter(Boolean)) {
+              // "appbay.ollama" → "ollama", "appbay.caddy" → "caddy"
+              const match = line.trim().match(/^appbay\.([^.]+)/);
+              if (match) apps.add(match[1]!);
+
+    == other identity strings a namespace would enter ==
+      upstream-transform.ts:260:      name: `${appName}_internal`,
+      ingress.ts:161:  return `etc/apps/caddy/config/dynamic/${appName}.caddy`;
+      builds.ts:285:  const container = `appbay.${appName}.${build.service}`;
+
+    == and the shared-network alias used for service-to-service URLs ==
+      ingress.ts:70:  const serviceUrl = `http://${appName}_${serviceName}:${port}`;
+      ingress.ts:195:  const upstream = `${appName}_${serviceName}:${String(props.port)}`;

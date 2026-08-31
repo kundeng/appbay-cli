@@ -1,0 +1,51 @@
+record: probe-81-the-tier-fields-are-boilerplate-and-shadow-the-invocation
+type: probe
+title: the-tier-fields-are-boilerplate-and-shadow-the-invocation
+timestamp: "2026-08-30T23:14:14-04:00"
+claim: renaming the environment scope means touching every manifest that declares an environment
+verdict: 'refutes'
+key_evidence: 'the rename is free where it matters and the fields should be deleted, not renamed. Three surfaces: (1) Compose own environment: key, legitimately inside appbay.yaml because overrides (appbay-yaml.ts:370) and overlays services (:93) are free-form compose records — 93 occurrences in upstream manifests, and it CANNOT be renamed because it is Compose spec; (2) the scope name in the reference syntax — ZERO usages across both catalogs, so renaming it costs nothing today; (3) the top-level project:/environment: fields, present in 150 manifests and every single one reads "default" — zero information carried. AND A LIVE DEFECT: compile.ts:380-381 is config?.project ?? defaultProject, but the fields are Zod .default("default") so after parsing they are never undefined. The project and environment passed INTO compile() are therefore unreachable whenever an appbay.yaml exists, which is always. A future --environment flag would be silently ignored by every one of those 150 manifests'
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/environment_word_surfaces_and_precedence.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/environment_word_surfaces_and_precedence.sh
+    sha256: 142d105cfd31cd68724dc3b90b5272829665ebad2ab3d98a11790add0511502a
+    stored: raw/code/142d105c-environment_word_surfaces_and_precedence.sh
+output_kind: text
+output:
+  text: |
+    tree: bd32116 v0.0.1-alpha.11
+
+    == surface 1 — COMPOSE's environment:, inside appbay.yaml via free-form fragments ==
+      appbay-yaml.ts:70:export const OverrideSchema = z.record(z.any());
+      appbay-yaml.ts:93:  services: z.record(z.any()),
+      appbay-yaml.ts:370:  overrides: z.record(OverrideSchema).optional(),
+      appbay-yaml.ts:391:  services: z.record(ServiceTraitsSchema).optional(),
+      ⇒ overrides and overlays[].services are free-form compose, so a compose 'environment:'
+        key legitimately appears in appbay.yaml. Cannot be renamed; it is Compose's spec.
+      occurrences of an indented environment: in appbay.yaml — ours 0, upstream 93
+
+    == surface 2 — appbay's SCOPE NAME in ${{environment.KEY}} ==
+      scope-resolver.ts:50:const VALID_SCOPES = ["service", "environment", "project"] as const;
+      manifests actually using it — ours 0, upstream 0
+
+    == surface 3 — the top-level tier FIELDS in appbay.yaml ==
+      appbay-yaml.ts:19:  project: z.string().default("default"),
+      appbay-yaml.ts:20:  environment: z.string().default("default"),
+      appbay-yaml.ts:361:  project: z.string().default("default"),
+      appbay-yaml.ts:362:  environment: z.string().default("default"),
+      every distinct value across both catalogs:
+         150 environment: default
+         150 project: default
+
+    == who wins, the manifest or the invocation? ==
+      compile.ts:  const config = app.appbayConfig;
+      compile.ts:  const appProject = config?.project ?? defaultProject;
+      compile.ts:  const appEnvironment = config?.environment ?? defaultEnvironment;
+      compile.ts:  const sharedNetworks = config?.shared_network ?? ["appbay_shared"];
+      and the field is a Zod .default(), so after parsing it is NEVER undefined:
+      appbay-yaml.ts:20:  environment: z.string().default("default"),
+      appbay-yaml.ts:362:  environment: z.string().default("default"),
+      ⇒ config?.environment ?? defaultEnvironment can only ever yield config.environment
+        whenever an appbay.yaml exists. The value passed to compile() is unreachable.

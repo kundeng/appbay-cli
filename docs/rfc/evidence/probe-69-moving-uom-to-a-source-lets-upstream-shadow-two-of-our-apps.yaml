@@ -1,0 +1,40 @@
+record: probe-69-moving-uom-to-a-source-lets-upstream-shadow-two-of-our-apps
+type: probe
+title: moving-uom-to-a-source-lets-upstream-shadow-two-of-our-apps
+timestamp: "2026-08-30T22:29:55-04:00"
+claim: moving the UOM stack out of bundled into sources/uom-ai-stack leaves every UOM app resolving to our definition
+verdict: 'refutes'
+key_evidence: 'with the 150-app upstream catalog in bundled and our five apps in sources/uom-ai-stack, discoverCatalog() resolves ''litellm'' and ''portainer'' to the UPSTREAM definitions, not ours — discover.ts:55-62 keeps the bundled entry on a name collision. Only openwebui, mcp and sysinfo survive as ours, and openwebui survives solely because it was already renamed to dodge upstream''s ''open-webui''. The proposed move therefore swaps out the gateway config and the amd64-pinned portainer without any error. Also: 10 of the 150 upstream entries fail to parse, so bundled is not clean either'
+exit_code: 0
+duration_s: 0
+command: bash -c cd\ /Users/kundeng/Projects/appbay-cli\ \&\&\ bun\ run\ /Users/kundeng/Dropbox/Projects/work-splunk-ops/investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/catalog_source_shadowing.ts
+output_kind: json
+output:
+  upstream_bundled_apps: 150
+  our_source_apps: 5
+  total_after_dedup: 143
+  discovery_errors: 10
+  attribution:
+    - app: openwebui
+      also_in_upstream_bundled: false
+      source_that_wins: uom-ai-stack
+      shadowed: false
+    - app: portainer
+      also_in_upstream_bundled: true
+      source_that_wins: bundled
+      shadowed: true
+    - app: mcp
+      also_in_upstream_bundled: false
+      source_that_wins: uom-ai-stack
+      shadowed: false
+    - app: sysinfo
+      also_in_upstream_bundled: false
+      source_that_wins: uom-ai-stack
+      shadowed: false
+    - app: litellm
+      also_in_upstream_bundled: true
+      source_that_wins: bundled
+      shadowed: true
+  shadowed_apps:
+    - portainer
+    - litellm

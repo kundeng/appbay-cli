@@ -1,0 +1,35 @@
+record: probe-80-chained-multi-scope-ingress-host-already-resolves-in-appbay-yaml
+type: probe
+title: chained-multi-scope-ingress-host-already-resolves-in-appbay-yaml
+timestamp: "2026-08-30T23:06:56-04:00"
+claim: chaining scopes in an ingress host needs new resolver work
+verdict: 'refutes'
+key_evidence: 'the resolver already does all of it. resolve() uses a GLOBAL regex (scope-resolver.ts:64), so multiple refs in one string are all replaced and scopes may be mixed: "litellm.<environment.TIER>.<project.DOMAIN>" resolved to litellm.sim.example.org, and a two-segment environment reference resolved to sim-litellm.sim.example.org. appbay.yaml IS the right place — compile.ts:508 runs the SAME resolver over each trait object, which is how the existing host: "litellm.<project.DOMAIN>" resolves. End to end through compile() with ONE app directory and only environmentVars changed, the rendered Caddy aux file carried "litellm.sim.example.org {" and "litellm.prod.example.org {" with zero compile errors. Two corrections: the scope is named "environment", not "env" — <env.TIER> returns Unknown scope and is left literal; and the aux file path is <appName>.caddy in both runs, so two instances in ONE home still collide on that filename'
+exit_code: 0
+duration_s: 0
+command: bash -c cd\ /Users/kundeng/Projects/appbay-cli\ \&\&\ bun\ run\ /Users/kundeng/Dropbox/Projects/work-splunk-ops/investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/chained_ingress_host_across_scopes.ts
+output_kind: json
+output:
+  resolver_unit_cases:
+    - template: litellm.${{project.DOMAIN}}
+      resolved: litellm.example.org
+      errors: []
+    - template: litellm.${{environment.TIER}}.${{project.DOMAIN}}
+      resolved: litellm.sim.example.org
+      errors: []
+    - template: ${{environment.TIER}}-litellm.${{environment.TIER}}.${{project.DOMAIN}}
+      resolved: sim-litellm.sim.example.org
+      errors: []
+    - template: litellm.${{env.TIER}}.${{project.DOMAIN}}
+      resolved: litellm.${{env.TIER}}.example.org
+      errors:
+        - 'Unknown scope "env" in reference "${{env.TIER}}". Valid scopes are: service, environment, project'
+  end_to_end:
+    - tier: sim
+      errors: []
+      aux_path: etc/apps/caddy/config/dynamic/litellm.caddy
+      host_line: litellm.sim.example.org {
+    - tier: prod
+      errors: []
+      aux_path: etc/apps/caddy/config/dynamic/litellm.caddy
+      host_line: litellm.prod.example.org {

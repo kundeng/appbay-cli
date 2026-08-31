@@ -1,0 +1,41 @@
+record: probe-72-vault-uri-takes-arbitrary-depth-only-the-docblock-says-three
+type: probe
+title: vault-uri-takes-arbitrary-depth-only-the-docblock-says-three
+timestamp: "2026-08-30T22:31:33-04:00"
+claim: vault:// is limited to three segments, as the docblock lists
+verdict: 'refutes'
+key_evidence: 'nine-segment URIs round-trip through the real Vault: parseVaultUri takes the last segment as the key and joins the rest as the scope, and listAll() splits on the last slash and reconstructs the same pair. All five depths read back and listAll matches parse exactly. Only the docblock at vault.ts:96-101 stops at three, and it is an example list, not a limit — nothing to fix but the comment'
+exit_code: 0
+duration_s: 1
+command: bash -c cd\ /Users/kundeng/Projects/appbay-cli\ \&\&\ bun\ run\ /Users/kundeng/Dropbox/Projects/work-splunk-ops/investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/vault_uri_depth_roundtrip.ts
+output_kind: json
+output:
+  roundTrip:
+    - uri: vault://KEY
+      depth: 1
+      scope: default
+      key: KEY
+      reads_back: true
+    - uri: vault://APP/KEY
+      depth: 2
+      scope: APP
+      key: KEY
+      reads_back: true
+    - uri: vault://APP/ENV/KEY
+      depth: 3
+      scope: APP/ENV
+      key: KEY
+      reads_back: true
+    - uri: vault://uom/ai-stack/preprod02/litellm/MASTER_KEY
+      depth: 5
+      scope: uom/ai-stack/preprod02/litellm
+      key: MASTER_KEY
+      reads_back: true
+    - uri: vault://a/b/c/d/e/f/g/h/KEY
+      depth: 9
+      scope: a/b/c/d/e/f/g/h
+      key: KEY
+      reads_back: true
+  all_read_back: true
+  listAll_matches_parse: true
+  deepest_tested: 9

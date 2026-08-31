@@ -1,0 +1,17 @@
+record: probe-68-control-plane-reset-is-unusable-on-a-cli-only-host
+type: probe
+title: control-plane-reset-is-unusable-on-a-cli-only-host
+timestamp: "2026-08-30T22:29:31-04:00"
+claim: appbay admin reset-password works on a CLI-only host, where no server and no appbay.db exist
+verdict: 'refutes'
+key_evidence: 'on an APPBAY_HOME with no control-plane store and no cache, the command creates an empty 0-byte var/lib/appbay.db and exits 1 with a raw SQLiteError ''no such table: users'' and a bun stack trace, from admin.ts:41. The intended message, ''Local AppBay user admin not found'', is never reached: the legacy-migration query at admin.ts:41-47 is outside the try/catch that admin.ts:88 uses to tolerate a missing cache. This is the command an operator reaches for when locked out of appbay''s own web UI, and a CLI-only install never runs the server that builds the table'
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/admin_reset_on_cli_only_host.sh
+code:
+  - path: investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/admin_reset_on_cli_only_host.sh
+    sha256: 7b49bbf9d41622b9d3cc64ddeb32bf67236d44342d0896cdd85a249adec2fc62
+    stored: raw/code/7b49bbf9-admin_reset_on_cli_only_host.sh
+output_kind: text
+output:
+  text: "== APPBAY_HOME before ==\n  (no files above means the home is empty, as on a fresh CLI-only install)\n\n== appbay admin reset-password admin --generate --reveal ==\n  36 |     try {\n  37 |       db.exec(\"PRAGMA busy_timeout = 5000\");\n  38 |       const store = new ControlPlaneUserStore(appbayHome);\n  39 |       let document = await store.read();\n  40 |       if (!document) {\n  41 |         const legacyUsers = db.query<{\n                                      ^\n  SQLiteError: no such table: users\n        errno: 1,\n   byteOffset: -1,\n  \n        at prepare (bun:sqlite:345:37)\n        at query (bun:sqlite:367:28)\n        at <anonymous> (/Users/kundeng/Projects/appbay-cli/apps/cli/src/commands/admin.ts:41:32)\n  \n  Bun v1.3.14 (macOS arm64)\n  exit=1\n\n== APPBAY_HOME after ==\n$APPBAY_HOME/var/lib/appbay.db\n\n== did an empty sqlite file get created? ==\n  YES —        0 bytes\n  tables: \n"

@@ -1,0 +1,51 @@
+record: probe-79-app-dir-name-already-namespaces-a-second-instance
+type: probe
+title: app-dir-name-already-namespaces-a-second-instance
+timestamp: "2026-08-30T23:01:45-04:00"
+claim: deploying the same code twice with different env needs a new appbay concept, not just a second app directory
+verdict: 'refutes'
+key_evidence: 'the app DIRECTORY NAME already namespaces almost everything. Two copies of one catalog entry under different names compile to non-colliding container names (appbay.litellm-sim.litellm vs appbay.litellm-prod.litellm), internal networks (litellm-sim_internal vs litellm-prod_internal) and volumes (litellm-sim_litellm-db vs litellm-prod_litellm-db); the aux Caddy file is <appName>.caddy so it separates too. appbay_shared is the one shared name and it is shared BY DESIGN — it is the edge network both attach to, not a collision. THE ONE THING THAT DOES NOT SEPARATE IS THE HOSTNAME: ingress.ts:68 takes props.host as a literal from appbay.yaml, and our entry declares host: litellm.${{project.DOMAIN}} — one DOMAIN per APPBAY_HOME, so two instances in one home claim the same host. NOTE: the two auth-trait compile errors are a sandbox artifact, the temp home had no project.yaml declaring ingress_provider caddy, not a finding about instancing'
+exit_code: 0
+duration_s: 1
+command: bash -c cd\ /Users/kundeng/Projects/appbay-cli\ \&\&\ bun\ run\ /Users/kundeng/Dropbox/Projects/work-splunk-ops/investigations/2026-08-30-preprod02-sim-stack-review/src/preprod02-sim-stack-review/two_instances_one_catalog_entry.ts
+output_kind: json
+output:
+  compile_errors:
+    - The auth trait requires the Caddy Security edge. Re-run `appbay init --ingress-provider caddy`; Traefik remains supported for ingress but is not an authentication provider.
+    - The auth trait requires the Caddy Security edge. Re-run `appbay init --ingress-provider caddy`; Traefik remains supported for ingress but is not an authentication provider.
+  identity:
+    - app: litellm-prod
+      container_names:
+        - appbay.litellm-prod.litellm-db
+        - appbay.litellm-prod.litellm
+      networks:
+        - litellm-prod_internal
+        - appbay_shared
+      volumes:
+        - litellm-prod_litellm-db
+      compose_top_level_name: null
+      env_file:
+        - <appsDir>/litellm-prod/.env
+        - <appsDir>/litellm-prod/.env.local
+        - <appsDir>/litellm-prod/.env
+        - <appsDir>/litellm-prod/.env.local
+    - app: litellm-sim
+      container_names:
+        - appbay.litellm-sim.litellm-db
+        - appbay.litellm-sim.litellm
+      networks:
+        - litellm-sim_internal
+        - appbay_shared
+      volumes:
+        - litellm-sim_litellm-db
+      compose_top_level_name: null
+      env_file:
+        - <appsDir>/litellm-sim/.env
+        - <appsDir>/litellm-sim/.env.local
+        - <appsDir>/litellm-sim/.env
+        - <appsDir>/litellm-sim/.env.local
+  colliding_container_names: []
+  colliding_networks:
+    - appbay_shared
+  colliding_volumes: []
+  verdict: the directory name is NOT sufficient; something else collides
