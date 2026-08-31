@@ -63,6 +63,24 @@ export function clearSavedAppbayHome(): boolean {
  * writing `~/.config/appbay/home` while either is present changes nothing that
  * the next command will observe.
  */
+/**
+ * `APPBAY_HOME` exactly as the CLI was STARTED with — captured before anything synthesises it.
+ *
+ * 🚨 `index.ts` sets `process.env.APPBAY_HOME = resolveAppbayHome()` when it is absent, so
+ * that core (which reads the env var directly) agrees with the CLI about the home. Correct,
+ * and it destroys the distinction every caller downstream needs: by the time a command's
+ * action runs, the variable is ALWAYS set, and "the operator exported it" is indistinguishable
+ * from "we resolved it from ~/.config/appbay/home".
+ *
+ * `appbay init` branched on `process.env.APPBAY_HOME` before checking `--dir`, so once a
+ * saved home existed the env branch always won and **`--dir` was silently ignored** —
+ * `appbay init --dir /tmp/x` initialised the saved home and never created `/tmp/x`. The
+ * consuming project's converge passes `--dir` (`provision-appbay.yml:687`).
+ *
+ * This module is imported by `index.ts`, so its top level runs BEFORE that assignment.
+ */
+export const APPBAY_HOME_FROM_ENV: string | undefined = process.env.APPBAY_HOME;
+
 export type HomeSource = "env" | "system" | "saved" | "default";
 
 /** One tier of the resolution order, and what it currently holds. */

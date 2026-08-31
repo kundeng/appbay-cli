@@ -36,8 +36,15 @@ import {
   type ContainerRuntime,
   inspectEdgePorts,
   catalogAddSource,
+  persistMasterPassword,
+  hasMasterPassword,
+  MASTER_PASSWORD_REL,
 } from "@appbay/core";
-import { resolveAppbayHome, saveAppbayHome } from "../utils/appbay-home.js";
+import {
+  resolveAppbayHome,
+  saveAppbayHome,
+  APPBAY_HOME_FROM_ENV,
+} from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
 import { cliContainerBin, cliRuntimeProfile } from "../utils/docker.js";
 import { resolveRuntimeSocket } from "./server.js";
@@ -747,9 +754,12 @@ export const initCommand = new Command("init")
 
       // ── Resolve APPBAY_HOME (3-tier: env > --dir/prompt > default) ──────
       let appbayHome: string;
-      if (process.env.APPBAY_HOME) {
-        // Env var always wins — no prompt, no save (it's ephemeral by nature).
-        appbayHome = process.env.APPBAY_HOME;
+      if (APPBAY_HOME_FROM_ENV) {
+        // An APPBAY_HOME the OPERATOR exported still wins — no prompt, no save (it is
+        // ephemeral by nature). ⚠️ Read the captured value, NOT `process.env.APPBAY_HOME`:
+        // index.ts fills that in from the saved home when it is absent, so testing the live
+        // variable made this branch always true and `--dir` unreachable.
+        appbayHome = APPBAY_HOME_FROM_ENV;
       } else if (options.dir) {
         // Explicit --dir: use it and persist for future invocations.
         appbayHome = options.dir;
@@ -804,7 +814,7 @@ export const initCommand = new Command("init")
       if (!domain) domain = "local";
 
       // Stage 1: Create directory scaffold.
-      step(1, 6, "Creating directory scaffold");
+      step(1, 7, "Creating directory scaffold");
       const created: string[] = [];
       for (const rel of SCAFFOLD_DIRS) {
         const dir = join(appbayHome, rel);
@@ -825,7 +835,7 @@ export const initCommand = new Command("init")
       }
 
       // Stage 2: Docker network.
-      step(2, 6, `Ensuring shared ${cliRuntimeProfile().displayName} network`);
+      step(2, 7, `Ensuring shared ${cliRuntimeProfile().displayName} network`);
       const networkCreated = ensureDockerNetwork();
       if (networkCreated) {
         console.log(`  Created ${cliRuntimeProfile().displayName} network: ${SHARED_NETWORK}`);
@@ -834,7 +844,7 @@ export const initCommand = new Command("init")
       }
 
       // Stage 3: Seed system apps from embedded definitions.
-      step(3, 6, "Seeding system apps");
+      step(3, 7, "Seeding system apps");
       const sys = await seedSystemApps(appsDir, {
         refresh: options.refreshSystemApps === true,
         edge: ingressProvider ?? resolveIngressProvider(appbayHome),
@@ -860,7 +870,7 @@ export const initCommand = new Command("init")
       }
 
       // Stage 4: Seed catalog.
-      step(4, 6, "Seeding catalog");
+      step(4, 7, "Seeding catalog");
       const catalogSrc = resolveCatalogSource(options.catalog);
       const catalogResult = await seedCatalog(appbayHome);
       switch (catalogResult) {
@@ -906,8 +916,28 @@ export const initCommand = new Command("init")
         }
       }
 
-      // Stage 5: Write server compose file.
-      step(5, 6, "Writing server compose");
+      // Stage 5: Ensure the master password exists.
+      //
+      // 🚨 UNCONDITIONAL, AND THIS IS THE POINT OF RFC-001 §2.3. Before it, the credential
+      // was created by a separate `appbay secrets init`, so a fresh install that reached a
+      // `vault://` reference before anyone ran that step failed with "vault password
+      // required, run X" — a dead end produced by the tool's own setup path. The password
+      // costs nothing to create and is needed by every install that stores a secret, so
+      // `init` creates it.
+      //
+      // ⚠️ Also required for the §2.2 error message to be TRUE: `resolveMasterPassword`
+      // tells the operator to "run 'appbay init'", and until this stage existed, running it
+      // did not create the file.
+      step(5, 7, "Ensuring master password");
+      if (hasMasterPassword(appbayHome)) {
+        console.log(`  Master password already present (${MASTER_PASSWORD_REL}).`);
+      } else {
+        persistMasterPassword(appbayHome);
+        console.log(`  Generated master password at ${MASTER_PASSWORD_REL} (0600).`);
+      }
+
+      // Stage 6: Write server compose file.
+      step(6, 7, "Writing server compose");
       const composeWritten = await writeServerCompose(appbayHome);
       if (composeWritten) {
         console.log("  Wrote docker-compose.server.yml");
@@ -915,8 +945,8 @@ export const initCommand = new Command("init")
         console.log("  docker-compose.server.yml already exists.");
       }
 
-      // Stage 6: Write project.yaml.
-      step(6, 6, "Writing project config");
+      // Stage 7: Write project.yaml.
+      step(7, 7, "Writing project config");
       const configWritten = await writeProjectConfig(
         appbayHome,
         projectName,
