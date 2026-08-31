@@ -20,6 +20,7 @@ import { spawnSync } from "node:child_process";
 import { cp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { containerBin } from "../runtime/container-runtime.js";
+import { APP_LABEL } from "../compiler/identity.js";
 import type { IngressProvider } from "../schemas/instance.js";
 
 export interface EdgeMigrationStep {
@@ -62,7 +63,18 @@ export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string)
   const owners: PortOwner[] = [];
 
   // Container holders first: the common case, and the only one we can name precisely.
-  const ps = spawnSync(runtime, ["ps", "--format", "{{.Names}}\t{{.Ports}}"], {
+  //
+  // 🚨 LABELS, NOT THE NAME. Identifying the outgoing edge by a `appbay.${outgoing}.` name
+  // prefix was wrong the moment §4 landed: both system apps declare `namespace: system`, so
+  // the real container is `appbay.system.caddy.caddy` and the prefix never matched. The
+  // outgoing edge was therefore reported as a foreign holder of :80/:443 and step 1 of the
+  // migration aborted — every `--ingress-provider` switch refused, blaming a conflict with
+  // the very edge it was replacing.
+  //
+  // `identity.ts` already says why a name cannot answer this: `appbay.<app>.<service>` and
+  // `appbay.<ns>.<app>` have the same shape, so segment counting cannot disambiguate them
+  // either. APP_LABEL exists for exactly this question.
+  const ps = spawnSync(runtime, ["ps", "--format", "{{.Names}}\t{{.Ports}}\t{{.Labels}}"], {
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -70,19 +82,22 @@ export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string)
 
   for (const port of EDGE_PORTS) {
     let heldBy: string | null = null;
+    let isOutgoingEdge = false;
     for (const line of lines) {
-      const [name, ports] = line.split("\t");
+      const [name, ports, labels] = line.split("\t");
       // Match `:80->` and `:443->` specifically; `:8080->` must not match `:80`.
       if (name && ports && new RegExp(`:${port}->`).test(ports)) {
         heldBy = name;
+        // `{{.Labels}}` is a comma-separated `k=v` list. Match the whole pair so
+        // `com.appbay.app=caddy-old` cannot satisfy a search for `caddy`.
+        isOutgoingEdge = (labels ?? "")
+          .split(",")
+          .map((pair) => pair.trim())
+          .includes(`${APP_LABEL}=${outgoing}`);
         break;
       }
     }
-    owners.push({
-      port,
-      heldBy,
-      isOutgoingEdge: heldBy !== null && heldBy.startsWith(`appbay.${outgoing}.`),
-    });
+    owners.push({ port, heldBy, isOutgoingEdge });
   }
   return owners;
 }
