@@ -26,6 +26,7 @@ import {
   containerStoreRoot,
   resolveIngressProvider,
 } from "../runtime/container-runtime.js";
+import { podmanRootfulEnv } from "../runtime/podman-rootful.js";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
 
@@ -419,7 +420,7 @@ export function checkServiceAccountRuntimeAccess(
   deps: {
     ownerOf?: (path: string) => string | null;
     currentUser?: () => string | null;
-    probe?: (user: string, bin: string) => "ok" | "denied" | "cannot-probe";
+    probe?: (user: string, bin: string, appbayHome: string) => "ok" | "denied" | "cannot-probe";
   } = {},
 ): HealthCheckResult {
   const name = "Service account runtime access";
@@ -441,7 +442,7 @@ export function checkServiceAccountRuntimeAccess(
     return { name, passed: true, detail: `runs as you (${me})`, required: false };
   }
 
-  const result = probe(owner, bin);
+  const result = probe(owner, bin, appbayHome);
   if (result === "ok") {
     return { name, passed: true, detail: `${owner} can reach ${bin}`, required: false };
   }
@@ -450,7 +451,10 @@ export function checkServiceAccountRuntimeAccess(
       name,
       passed: true,
       detail: `cannot verify ${owner}'s access from here (needs passwordless sudo)`,
-      fix: `Check it directly:  sudo -u ${owner} ${bin} info`,
+      // The same argv the check would have run. A hand-typed `sudo -u appbay podman info`
+      // exercises the ROOTLESS path and fails on a correctly configured host, so handing the
+      // operator that command would send them chasing a problem they do not have.
+      fix: `Check it directly:  sudo -u ${owner} ${probeArgv(bin, appbayHome).join(" ")}`,
       required: false,
     };
   }
@@ -460,10 +464,8 @@ export function checkServiceAccountRuntimeAccess(
     passed: false,
     detail: `${owner} owns ${appbayHome} but cannot reach ${bin} — the control plane runs as ${owner}, not as you`,
     fix:
-      `Reproduce with:  sudo -u ${owner} ${bin} info\n` +
-      `      Two causes are usual, and the first defeats both access models: the account is ` +
-      `created --no-create-home, so $HOME does not exist. Then rootless needs subuid ranges ` +
-      `(/etc/subuid), and rootful needs permission on a root-owned socket.`,
+      `Run "appbay init-system" — it grants ${owner} access to the runtime.\n` +
+      `      Reproduce with:  sudo -n -u ${owner} ${probeArgv(bin, appbayHome).join(" ")}`,
     required: false,
   };
 }
@@ -489,7 +491,11 @@ function defaultCurrentUser(): string | null {
  *
  * `sudo -n` so this never prompts inside a health check.
  */
-function defaultProbeAs(user: string, bin: string): "ok" | "denied" | "cannot-probe" {
+function defaultProbeAs(
+  user: string,
+  bin: string,
+  appbayHome: string,
+): "ok" | "denied" | "cannot-probe" {
   // ⚠️ `id -un`, NOT `true`. `tryExec` returns null when stdout is EMPTY even on exit 0
   // (`.trim() || null`), so probing with `sudo -n true` — which succeeds silently — read as
   // "no passwordless sudo" on every host that has it. The check then reported "cannot verify"
@@ -498,8 +504,41 @@ function defaultProbeAs(user: string, bin: string): "ok" | "denied" | "cannot-pr
   // inject the probe.
   const canSudo = tryExec("sudo", ["-n", "id", "-un"]);
   if (canSudo === null) return "cannot-probe";
-  const out = tryExec("sudo", ["-n", "-u", user, bin, "info", "--format", "{{.ServerVersion}}"]);
+  const out = tryExec("sudo", ["-n", "-u", user, ...probeArgv(bin, appbayHome)]);
   return out !== null ? "ok" : "denied";
+}
+
+/**
+ * The argv that reproduces what the CONTROL PLANE does, not what a shell would do.
+ *
+ * 🚨 THIS PROBE USED TO EXERCISE THE WRONG CODE PATH. `sudo -n -u appbay podman info` runs with
+ * a reset environment, and podman with no `CONTAINER_HOST` goes ROOTLESS — while the systemd
+ * unit that actually runs the control plane points at the ROOTFUL socket (S34). On a host where
+ * everything was configured correctly, this check would have reported `denied`: a confident
+ * answer to a question nobody asked. The environment comes from `podmanRootfulEnv` so the
+ * checker and the runner cannot drift apart; `systemd-unit.ts` renders the same record into
+ * `Environment=` lines.
+ *
+ * Docker needs none of this — its group membership is the whole mechanism, and `docker info`
+ * with a bare environment is exactly what the daemon sees.
+ */
+export function probeArgv(bin: string, appbayHome: string): string[] {
+  if (!bin.endsWith("podman")) {
+    return [bin, "info", "--format", "{{.ServerVersion}}"];
+  }
+  // 🚨 `{{.ServerVersion}}` IS A DOCKER FIELD. podman's report is `system.infoReport`, which
+  // has no such key, so the template ERRORS (exit 125) on every podman host no matter what
+  // access the account has. `tryExec` then returns null and this check reported `denied` on a
+  // correctly configured host — the exact inversion this function was written to prevent,
+  // shipped because unifying the ENVIRONMENT left the ARGV still docker-shaped. Caught only by
+  // running `appbay doctor` on a host whose ground truth was known independently.
+  const format = ["info", "--format", "{{.Version.Version}}"];
+  // `env` rather than relying on sudo's environment handling: `sudo -u` sets HOME from the
+  // target account's passwd entry, which is the nonexistent `/home/<user>` that blocks podman
+  // in the first place. The home the account really has is the appbay tree it owns — the value
+  // `init-system` writes with `usermod -d`.
+  const env = podmanRootfulEnv(appbayHome);
+  return ["env", ...Object.entries(env).map(([k, v]) => `${k}=${v}`), bin, ...format];
 }
 
 /**

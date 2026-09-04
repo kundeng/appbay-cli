@@ -1,0 +1,72 @@
+record: probe-91-init-system-cannot-install-docker-on-modern-fedora
+type: probe
+title: init-system-cannot-install-docker-on-modern-fedora
+timestamp: "2026-09-01T01:54:00-04:00"
+claim: "`appbay init-system` bootstraps a Docker host on RHEL-family, which is its primary target"
+verdict: 'refutes'
+key_evidence: 'On Fedora 43 the FIRST step of the Docker path fails: `dnf config-manager
+  --add-repo` is dnf4 syntax and dnf5 rejects it with `Unknown argument "--add-repo" for command
+  "config-manager"`. The repo is therefore never added, and every package in the following
+  install reports `No match for argument: docker-ce`. Fedora has shipped dnf5 since 41, so
+  `init-system` could not install Docker on any current release of its own primary target
+  distro. Purely a syntax problem: Docker publishes an fc43 build (3:29.7.2-1.fc43), and the
+  dnf5 form `dnf config-manager addrepo --from-repofile=<url>` adds the repo successfully and
+  makes the package resolvable. Found only by trying to RUN the Docker branch — no test can
+  see it, because the command is data in a plan that is executed on a host.'
+exit_code: 1
+duration_s: 120
+command: >-
+  dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo;
+  dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin;
+  dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo;
+  dnf list --available docker-ce
+output_kind: text
+output:
+  text: |
+    host: appbay-rhel (multipass), Fedora Linux 43 Cloud, dnf5 5.2.17.0
+
+    == what init-system emits on the Docker path ==
+      • Add Docker CE repository (docker-ce is not in RHEL-family repos)
+        sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+
+    == running it ==
+      $ sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+        Unknown argument "--add-repo" for command "config-manager".
+        Add "--help" for more information about the arguments.
+
+      $ sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        Failed to resolve the transaction:
+        No match for argument: docker-ce
+        No match for argument: docker-ce-cli
+        No match for argument: containerd.io
+        No match for argument: docker-compose-plugin
+
+      ⇒ The repo step is not "best effort" — its failure makes every following package
+        unresolvable. init-system reports both steps and installs nothing.
+
+    == it is SYNTAX, not availability ==
+      $ dnf --version
+        dnf5 version 5.2.17.0
+
+      $ dnf config-manager addrepo --help
+        --from-repofile=REPO_CONFIGURATION_FILE_URL   Download repository configuration file,
+                                                      test it and put it in reposdir
+
+      $ sudo dnf config-manager addrepo \
+          --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+        https://download.docker.com/linux/fedo 100% | 5.3 KiB/s | 811.0 B
+
+      $ dnf list --available docker-ce
+        docker-ce.x86_64   3:29.7.2-1.fc43   docker-ce-stable      <- Docker DOES ship fc43
+
+    == scope ==
+      Fedora ships dnf5 from 41. EL8/EL9 (Rocky, Alma, OL) are still dnf4 and still need
+      `--add-repo`, so this is a per-host branch, not a replacement. `dnfMajorVersion()` reads
+      `dnf --version` at plan time and picks the form; it defaults to 4 when unparseable,
+      because a dnf4 host cannot use the dnf5 form at all while the reverse now works.
+
+    == why no test caught it, and why none can ==
+      The action is DATA — `command: ["dnf", "config-manager", "--add-repo", url]` — assembled
+      into a plan and executed by sudo on the host. A unit test can assert the argv matches
+      whatever the author believed; it cannot know dnf5 rejects it. The only instrument that
+      sees this is running the branch on the distro.

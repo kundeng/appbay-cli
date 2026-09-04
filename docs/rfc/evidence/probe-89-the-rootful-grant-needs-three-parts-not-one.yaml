@@ -1,0 +1,112 @@
+record: probe-89-the-rootful-grant-needs-three-parts-not-one
+type: probe
+title: the-rootful-grant-needs-three-parts-not-one
+timestamp: "2026-09-01T01:34:00-04:00"
+claim: "S34 option B is one step: put the service account on the podman socket's group"
+verdict: 'refines'
+key_evidence: 'Granting the socket group is necessary and NOT sufficient — measured, three
+  independent barriers, each of which alone leaves the account unable to reach podman.
+  (1) `/run/podman` is `drwx------ root root`, created that way by
+  `/usr/lib/tmpfiles.d/podman.conf:15` (`D! /run/podman 0700 root root`), so a `SocketGroup=`
+  drop-in produces a `root:appbay 0660` socket the account still cannot TRAVERSE to
+  (`dial unix /run/podman/podman.sock: connect: permission denied`). A tmpfiles override in
+  /etc that sorts after podman.conf (`z /run/podman 0750 root appbay -`) fixes it and SURVIVES A
+  REBOOT — verified by rebooting: the dir came back `drwxr-x--- root appbay`, so the `z` line
+  wins over the `D!` line at boot. (2) $HOME must exist, as probe-88 found; systemd sets HOME
+  from the passwd entry under `User=`, which is the nonexistent /home/appbay. (3) 🚨 THE ONE
+  THAT WOULD HAVE BEEN MISSED: without CONTAINER_HOST pointing at the rootful socket, `podman`
+  run by a non-root user goes ROOTLESS and fails on subuid regardless of the grant — so the
+  socket permission alone is INERT. All three together: `5.6.2`. Note /etc/subuid and
+  /etc/subgid still have zero appbay entries, confirming the rootful path needs none.'
+exit_code: 0
+duration_s: 400
+command: >-
+  # drop-in: SocketGroup=appbay on podman.socket; tmpfiles: z /run/podman 0750 root appbay
+  sudo -u appbay env HOME=/var/lib/appbay CONTAINER_HOST=unix:///run/podman/podman.sock podman info;
+  systemctl reboot; sudo -u appbay env HOME=... CONTAINER_HOST=... podman info
+output_kind: text
+output:
+  text: |
+    host: appbay-rhel (multipass), Fedora Linux 43, podman 5.6.2, no docker
+    account: appbay:x:950:991::/home/appbay:/usr/sbin/nologin  (D-6, recreated as init-system does)
+
+    == starting state ==
+      $ ls -ld /run/podman; ls -l /run/podman/podman.sock
+        drwx------. 2 root root  60 /run/podman
+        srw-rw----. 1 root root   0 /run/podman/podman.sock
+      $ systemctl cat podman.socket
+        [Socket]
+        ListenStream=%t/podman/podman.sock
+        SocketMode=0660            <- already 0660, but NO SocketGroup, so group is root
+
+    == step 1: SocketGroup drop-in — necessary, not sufficient ==
+      /etc/systemd/system/podman.socket.d/10-appbay.conf
+        [Socket]
+        SocketGroup=appbay
+        SocketMode=0660
+        DirectoryMode=0750
+
+      $ systemctl daemon-reload && systemctl restart podman.socket
+      $ ls -ld /run/podman; ls -l /run/podman/podman.sock
+        drwx------. 2 root root    60 /run/podman          <- ⚠️ DirectoryMode did NOT apply
+        srw-rw----. 1 root appbay   0 /run/podman/podman.sock   <- socket group granted
+
+      $ sudo -u appbay env HOME=/var/lib/appbay \
+          CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+        Error: unable to connect to Podman socket: dial unix /run/podman/podman.sock:
+               connect: permission denied
+
+      ⇒ DirectoryMode= only applies when systemd CREATES the parent. It did not, because:
+        $ grep podman /usr/lib/tmpfiles.d/podman.conf
+          D! /run/podman 0700 root root
+
+    == step 2: tmpfiles override for the DIRECTORY ==
+      /etc/tmpfiles.d/zz-appbay-podman.conf     (basename sorts AFTER podman.conf)
+        z /run/podman 0750 root appbay -
+
+      $ systemd-tmpfiles --create /etc/tmpfiles.d/zz-appbay-podman.conf
+      $ ls -ld /run/podman
+        drwxr-x---. 2 root appbay 60 /run/podman
+      $ sudo -u appbay env HOME=/var/lib/appbay \
+          CONTAINER_HOST=unix:///run/podman/podman.sock podman info --format '{{.Version.Version}}'
+        5.6.2                                              <- ✅
+
+    == step 3: which parts are load-bearing — one variable at a time ==
+      A. no HOME override (what systemd `User=` actually supplies, from the passwd entry)
+         $ sudo -u appbay env HOME=/home/appbay CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+           cannot resolve /home/appbay: lstat /home/appbay: no such file or directory
+
+      B. HOME fixed, but no CONTAINER_HOST
+         $ sudo -u appbay env HOME=/var/lib/appbay podman info
+           cannot chdir to /home/ubuntu: Permission denied
+           Error: setting up the process        <- went ROOTLESS; the socket grant is unused
+
+      C. both
+         $ sudo -u appbay env HOME=/var/lib/appbay CONTAINER_HOST=unix:///run/podman/podman.sock podman info
+           5.6.2
+
+      🚨 B IS THE FINDING. `podman` invoked by a non-root user defaults to ROOTLESS. Granting
+        the account the rootful socket and stopping there changes NOTHING it can do — the
+        grant is inert until something points it at the socket. An implementation that shipped
+        only the drop-in would have looked complete (`ls -l` shows the group!) and worked no
+        better than before.
+
+    == does the rootful path need subuid after all? no ==
+      $ grep -c appbay /etc/subuid /etc/subgid
+        /etc/subuid:0
+        /etc/subgid:0                           <- and C above still returned 5.6.2
+
+    == does the directory permission survive a reboot? ==
+      $ systemctl reboot ... $ uptime -p
+        up 0 minutes
+      $ ls -ld /run/podman
+        drwxr-x---. 2 root appbay 40 /run/podman    <- ✅ the `z` line wins over `D!` at boot
+
+      ⚠️ podman.socket was `disabled` on this host, so no socket existed until
+        `systemctl enable --now podman.socket` — which is init-system step 2, and already
+        shipped. After enabling: srw-rw---- root appbay, and the probe returns 5.6.2.
+
+    ⇒ S34 option B is THREE actions on the podman + service-account path, not one:
+        1. an existing $HOME for the account          (grants nothing)
+        2. socket group + directory traversal          (the actual privilege grant)
+        3. CONTAINER_HOST in the execution environment (without it, 2 is inert)

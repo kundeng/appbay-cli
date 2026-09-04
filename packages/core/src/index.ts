@@ -47,6 +47,10 @@ export * from "./runtime/facts.js";
 // binary is chosen. Spawn sites must use containerBin()/containerExec(), never "docker".
 export * from "./runtime/container-runtime.js";
 
+// Re-export the rootful-podman environment. One definition shared by the systemd unit that
+// runs the control plane and the doctor check that predicts whether it can — see S34.
+export * from "./runtime/podman-rootful.js";
+
 // Re-export service modules (shared business logic for CLI + tRPC)
 export * from "./services/index.js";
 

@@ -16,6 +16,8 @@
  * whatever user it runs as. Stating it makes the unit independent of the tiers below.
  */
 
+import { podmanRootfulEnv } from "@appbay/core";
+
 /** Where the unit is installed. */
 export const SERVER_UNIT_NAME = "appbay-server.service";
 export const SERVER_UNIT_PATH = `/etc/systemd/system/${SERVER_UNIT_NAME}`;
@@ -59,6 +61,20 @@ export function renderServerUnit(options: ServerUnitOptions): string {
     "Type=oneshot",
     "RemainAfterExit=yes",
     `Environment=APPBAY_HOME=${home}`,
+    // 🚨 PODMAN + A SERVICE ACCOUNT NEEDS TWO MORE. Without them the unit starts, reaches
+    // ExecStart, and fails there — which is exactly what probe-87 measured.
+    //   HOME:           systemd sets it from the passwd entry, and the D-6 account is created
+    //                   --no-create-home, so that path does not exist. podman fails on it
+    //                   before it considers a connection, so this defeats rootful too.
+    //   CONTAINER_HOST: podman run by a non-root user defaults to ROOTLESS. Granting the
+    //                   account the rootful socket's group is INERT without this — measured
+    //                   in probe-89, where `ls -l` showed a correctly granted socket and
+    //                   podman still went rootless and failed on subuid.
+    // Not applied on an operator install: that user's rootless podman works, and forcing it
+    // onto the rootful socket would break a setup that is fine.
+    ...(user && runtimeUnit.startsWith("podman")
+      ? Object.entries(podmanRootfulEnv(home)).map(([k, v]) => `Environment=${k}=${v}`)
+      : []),
     ...(user ? [`User=${user}`] : []),
     `ExecStart=${binaryPath} server start`,
     `ExecStop=${binaryPath} server stop`,

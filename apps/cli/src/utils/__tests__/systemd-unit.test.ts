@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { podmanRootfulEnv } from "@appbay/core";
 import { renderServerUnit, SERVER_UNIT_NAME, SERVER_UNIT_PATH } from "../systemd-unit.js";
 
 const BASE = {
@@ -39,6 +40,40 @@ describe("the parts that decide runtime behaviour", () => {
     expect(unit).toContain("After=network-online.target docker.service");
     expect(unit).toContain("Wants=network-online.target docker.service");
     expect(unit).not.toMatch(/^Requires=/m);
+  });
+
+  it("🚨 on podman + a service account, states HOME and CONTAINER_HOST", () => {
+    // Without these the unit starts, reaches ExecStart, and fails there — probe-87.
+    //   HOME: systemd sets it from the passwd entry, and the D-6 account is --no-create-home,
+    //         so that path does not exist. podman refuses before it tries to connect.
+    //   CONTAINER_HOST: podman run by a NON-ROOT user defaults to ROOTLESS. Without this, the
+    //         socket group init-system grants is never touched — measured in probe-89, where
+    //         `ls -l` showed a correctly granted socket and podman still failed on subuid.
+    const unit = renderServerUnit({ ...BASE, runtimeUnit: "podman.socket", user: "appbay" });
+    expect(unit).toContain("Environment=HOME=/var/lib/appbay");
+    expect(unit).toContain("Environment=CONTAINER_HOST=unix:///run/podman/podman.sock");
+  });
+
+  it("uses the SAME environment the doctor probe uses", () => {
+    // One record, two renderings. If they drift, the checker exercises a different code path
+    // from the runner and reports confidently about a question nobody asked.
+    const unit = renderServerUnit({ ...BASE, runtimeUnit: "podman.socket", user: "appbay" });
+    for (const [k, v] of Object.entries(podmanRootfulEnv(BASE.home))) {
+      expect(unit).toContain(`Environment=${k}=${v}`);
+    }
+  });
+
+  it("adds neither on docker — the group membership IS the mechanism there", () => {
+    const unit = renderServerUnit({ ...BASE, user: "appbay" });
+    expect(unit).not.toContain("CONTAINER_HOST");
+    expect(unit).not.toMatch(/^Environment=HOME=/m);
+  });
+
+  it("adds neither on an operator install, even on podman", () => {
+    // That user's rootless podman works. Forcing them onto the rootful socket would break a
+    // setup that is fine, and they have no group on it anyway.
+    const unit = renderServerUnit({ ...BASE, runtimeUnit: "podman.socket" });
+    expect(unit).not.toContain("CONTAINER_HOST");
   });
 
   it("uses the runtime unit it is given — podman is a socket, not a service", () => {

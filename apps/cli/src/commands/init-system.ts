@@ -44,6 +44,14 @@ import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { SYSTEM_CONFIG_FILE, SYSTEM_CONFIG_DIR } from "../utils/system-config.js";
 import { renderServerUnit, SERVER_UNIT_NAME, SERVER_UNIT_PATH } from "../utils/systemd-unit.js";
 import { cliContainerBin } from "../utils/docker.js";
+import {
+  PODMAN_ROOTFUL_SOCKET_DIR,
+  PODMAN_SOCKET_DROPIN,
+  PODMAN_SOCKET_DROPIN_DIR,
+  PODMAN_TMPFILES_OVERRIDE,
+  renderPodmanSocketDropin,
+  renderPodmanTmpfilesOverride,
+} from "../utils/podman-access.js";
 
 /** Default service account name. */
 export const DEFAULT_SERVICE_USER = "appbay";
@@ -136,6 +144,23 @@ function userExists(name: string): boolean {
   return spawnSync("id", [name], { stdio: "pipe" }).status === 0;
 }
 
+/**
+ * Major version of `dnf` on this host, or 4 when it cannot be determined.
+ *
+ * ⚠️ The two are NOT command-line compatible, and the incompatibility is silent in the worst
+ * way: dnf5 rejects `config-manager --add-repo` with `Unknown argument`, after which every
+ * package in the following install is "No match for argument". Fedora ships dnf5 from 41.
+ * Defaulting to 4 keeps EL8/EL9 (dnf4) working when `dnf --version` is unparseable, which is
+ * the conservative direction — those hosts are the ones that cannot use the dnf5 form at all.
+ */
+function dnfMajorVersion(): number {
+  const r = spawnSync("dnf", ["--version"], { stdio: "pipe" });
+  if (r.status !== 0) return 4;
+  // dnf5 prints "dnf5 version 5.2.17.0"; dnf4 prints a bare "4.14.0" on the first line.
+  const match = String(r.stdout).match(/(\d+)\.\d+/);
+  return match ? Number(match[1]) : 4;
+}
+
 /** Whether a group exists. */
 function groupExists(name: string): boolean {
   return spawnSync("getent", ["group", name], { stdio: "pipe" }).status === 0;
@@ -146,6 +171,20 @@ function userInGroup(user: string, group: string): boolean {
   const r = spawnSync("id", ["-nG", user], { stdio: "pipe" });
   if (r.status !== 0) return false;
   return String(r.stdout).split(/\s+/).includes(group);
+}
+
+/**
+ * The home directory recorded in a user's passwd entry, or null when the user does not exist.
+ *
+ * ⚠️ This is the FIELD, not a directory that exists. The D-6 account is created
+ * `--no-create-home`, so on every host bootstrapped before S34 the field says `/home/appbay`
+ * and nothing is there — which podman rejects before it considers a connection, defeating both
+ * the rootless and the rootful path (probe-88).
+ */
+function passwdHome(user: string): string | null {
+  const r = spawnSync("getent", ["passwd", user], { stdio: "pipe" });
+  if (r.status !== 0) return null;
+  return String(r.stdout).trim().split(":")[5] ?? null;
 }
 
 /** Whether a directory is owned by the given user. */
@@ -250,16 +289,25 @@ export function planSystemBootstrap(opts?: {
     } else {
       // ⚠️ The repo step is NOT optional. Without it the install below fails outright on
       // any RHEL-family host; see the measurement above.
+      // Docker publishes a fedora repo and a centos repo; every other RHEL-family distro
+      // (rocky, alma, ol, amzn) is served by the centos one.
+      const repoUrl =
+        `https://download.docker.com/linux/${detectDistro().id === "fedora" ? "fedora" : "centos"}/docker-ce.repo`;
       actions.push({
         id: "add-docker-repo",
         label: "Add Docker CE repository (docker-ce is not in RHEL-family repos)",
         wouldChange: true,
-        command: [
-          "dnf", "config-manager", "--add-repo",
-          // Docker publishes a fedora repo and a centos repo; every other RHEL-family
-          // distro (rocky, alma, ol, amzn) is served by the centos one.
-          `https://download.docker.com/linux/${detectDistro().id === "fedora" ? "fedora" : "centos"}/docker-ce.repo`,
-        ],
+        // 🚨 `--add-repo` IS DNF4 SYNTAX AND DNF5 REJECTS IT OUTRIGHT:
+        //   Unknown argument "--add-repo" for command "config-manager"
+        // Fedora has shipped dnf5 since 41, so on the newest release of appbay's own primary
+        // target distro the FIRST step of the Docker path failed, every subsequent package was
+        // "No match for argument: docker-ce", and `init-system` could not install Docker at
+        // all. Found by trying to run the Docker branch on appbay-rhel (Fedora 43, dnf5
+        // 5.2.17) — never by a test, because the command is only ever executed on a host.
+        // Docker does publish an fc43 build (3:29.7.2-1.fc43), so this was purely syntax.
+        command: dnfMajorVersion() >= 5
+          ? ["dnf", "config-manager", "addrepo", `--from-repofile=${repoUrl}`]
+          : ["dnf", "config-manager", "--add-repo", repoUrl],
       });
       actions.push({
         id: "install-runtime",
@@ -379,7 +427,13 @@ export function planSystemBootstrap(opts?: {
         label: `Create no-login system service account ${serviceUser} (uid ${serviceUid})`,
         wouldChange: true,
         command: [
-          "useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin",
+          // `--home-dir` sets the passwd FIELD without creating anything (`--no-create-home`
+          // still applies). It points at the appbay tree the account owns, because podman
+          // resolves $HOME before it does anything else and refuses when it does not exist —
+          // which is what probe-87 hit. `appbay init` creates the tree; the field may name a
+          // path that does not exist yet, and that is fine.
+          "useradd", "--system", "--no-create-home", "--home-dir", home,
+          "--shell", "/usr/sbin/nologin",
           "--uid", String(serviceUid), "--gid", serviceUser, serviceUser,
         ],
       });
@@ -398,19 +452,80 @@ export function planSystemBootstrap(opts?: {
     // created above, so this must still run. Idempotent: skips when already a
     // member.
     //
-    // ⚠️ THERE IS NO PODMAN EQUIVALENT, and inventing one would be worse than skipping.
-    // Docker's group grants access to a root-owned daemon socket; rootful Podman has no
-    // long-lived daemon and no `podman` group with those semantics. Adding the account to
-    // a group that confers nothing would read, in the output, exactly like access was
-    // granted. Say plainly that the step does not apply instead — the rootful access model
-    // is the socket unit enabled in step 2.
+    // ⭐ PODMAN TAKES A DIFFERENT ROUTE TO THE SAME GRANT — S34, owner decision 2026-09-01.
+    //
+    // This used to be a no-op labelled "no group step for rootful Podman". That was a correct
+    // observation (podman ships no group with docker's semantics) and a wrong conclusion: the
+    // group has to be CREATED ON THE SOCKET, not found. The result was that `init-system`
+    // enabled the rootful socket in step 2 and then left the account unable to reach it, so
+    // `appbay server start` failed on every podman service install (probe-87).
+    //
+    // 🚨 THREE ACTIONS, AND THE OBVIOUS ONE IS INERT ALONE. Measured in probe-89, one variable
+    // at a time. Granting the socket's group and stopping there produces an `ls -l` that looks
+    // finished — `srw-rw---- root appbay` — while podman, run by a non-root user, still goes
+    // ROOTLESS and fails on absent subuid ranges exactly as before. Only `podman info`
+    // returning a version distinguishes the two states.
     if (runtimeIsPodman) {
+      // (a) The socket's group. A drop-in, not `setfacl`: systemd recreates the socket on every
+      // start of podman.socket, which discards an ACL set on the old inode.
       actions.push({
-        id: "docker-group",
-        label: `No group step for rootful Podman (no daemon socket group; see ${runtimeUnit})`,
-        wouldChange: false,
-        command: [],
+        id: "podman-socket-group",
+        label: `Grant ${serviceUser} the rootful Podman socket (SocketGroup on ${runtimeUnit})`,
+        wouldChange: true,
+        command: [
+          "sh", "-c",
+          `mkdir -p ${PODMAN_SOCKET_DROPIN_DIR} && tee ${PODMAN_SOCKET_DROPIN} >/dev/null ` +
+            `&& systemctl daemon-reload && systemctl restart ${runtimeUnit}`,
+        ],
+        // Without the restart the drop-in is on disk and the LIVE socket is still root:root.
+        stdin: renderPodmanSocketDropin(serviceUser),
       });
+
+      // (b) Traversal into the socket's directory.
+      //
+      // ⚠️ `DirectoryMode=` in the drop-in above does NOT do this. It applies only when systemd
+      // creates the parent, and podman's own tmpfiles got there first:
+      //   /usr/lib/tmpfiles.d/podman.conf:15   D! /run/podman 0700 root root
+      // So the socket can be group-granted and still unreachable — `connect: permission denied`
+      // on a socket whose own mode is correct.
+      //
+      // ⚠️ The basename must NOT be `podman.conf`. A file of that name under /etc SHADOWS the
+      // one in /usr/lib entirely, silently dropping its other lines (the /tmp/podman-run-* and
+      // /var/tmp/container_images* cleanup). `zz-` sorts after it and only adds.
+      //
+      // Verified to survive a reboot: the directory came back drwxr-x--- root appbay, so this
+      // line wins over the `D!` line at boot (probe-89).
+      actions.push({
+        id: "podman-runtime-dir",
+        label: `Let ${serviceUser} traverse ${PODMAN_ROOTFUL_SOCKET_DIR} (tmpfiles override)`,
+        wouldChange: true,
+        command: [
+          "sh", "-c",
+          `mkdir -p /etc/tmpfiles.d && tee ${PODMAN_TMPFILES_OVERRIDE} >/dev/null ` +
+            `&& systemd-tmpfiles --create ${PODMAN_TMPFILES_OVERRIDE}`,
+        ],
+        stdin: renderPodmanTmpfilesOverride(serviceUser),
+      });
+
+      // (c) $HOME, for accounts created before S34 added --home-dir above. Grants nothing; it
+      // is machine state. podman resolves $HOME before anything else and refuses when the path
+      // does not exist, so this blocks the rootful path too, not just rootless (probe-88).
+      const currentHome = passwdHome(serviceUser);
+      if (currentHome !== null && currentHome !== home) {
+        actions.push({
+          id: "service-home",
+          label: `Repoint ${serviceUser}'s home from ${currentHome} to ${home} (it does not exist)`,
+          wouldChange: true,
+          command: ["usermod", "-d", home, serviceUser],
+        });
+      } else {
+        actions.push({
+          id: "service-home",
+          label: `${serviceUser}'s home already points at ${home}`,
+          wouldChange: false,
+          command: [],
+        });
+      }
     } else if (svcWillExist && dockerWillExist && !userInGroup(serviceUser, "docker")) {
       actions.push({
         id: "docker-group",
@@ -428,9 +543,54 @@ export function planSystemBootstrap(opts?: {
     }
   }
 
+  // 4b. Create APPBAY_HOME, so steps 5 and 6 have something to own.
+  //
+  // 🚨 THE DOCUMENTED BOOTSTRAP DID NOT REACH A WORKING INSTALL. Steps 5 and 6 were both
+  // `if (existsSync(home))`, and on a fresh host the home does not exist yet — so both printed
+  // "run appbay init first" and did nothing. The operator then ran `appbay init` (with sudo,
+  // because `init-system` needed it), which created the whole tree ROOT-OWNED 0755, and nothing
+  // ever came back to fix it. The service account could not write to the tree it supposedly
+  // owns: `podman` as that account died on `stat /var/lib/appbay/.config: no such file or
+  // directory`. Measured on appbay-rhel via the exact documented order, probe-90.
+  //
+  // ⭐ CREATING IT HERE IS WHAT MAKES ONE PASS ENOUGH, and the mechanism is the DEFAULT ACLs in
+  // step 6. Once this directory exists with `d:u:<svc>:rwx`, every file `appbay init` creates
+  // inside it is readable and writable by the service account NO MATTER WHO RUNS init — which
+  // is the only way a root-run `init` can produce a tree a no-login account can use. Telling
+  // the operator to run `init-system` twice would work and is a worse answer: a two-pass
+  // bootstrap where the second pass looks optional is a trap.
+  const homeWillExist = existsSync(home);
+  if (!homeWillExist) {
+    actions.push({
+      id: "create-home",
+      label: `Create ${home}`,
+      wouldChange: true,
+      command: ["mkdir", "-p", home],
+    });
+  }
+
   // 5. Ownership on APPBAY_HOME. In service mode: owned by the service account,
   // setgid group-writable (D-6). In operator mode: owned by the operator.
-  if (existsSync(home)) {
+  if (!homeWillExist) {
+    // Just created above, so it is root-owned and has no setgid — both need setting, and
+    // neither `dirOwnedBy` nor `dirSetgid` can be consulted because the directory is not
+    // there yet at plan time.
+    actions.push({
+      id: "own-home",
+      label: `Set ownership on ${home} to ${ownerUser}:${ownerUser}` +
+        (owner === "service" ? " (setgid 2770)" : ""),
+      wouldChange: true,
+      command: ["chown", "-R", `${ownerUser}:${ownerUser}`, home],
+    });
+    if (owner === "service") {
+      actions.push({
+        id: "setgid-home",
+        label: `Set setgid on ${home}`,
+        wouldChange: true,
+        command: ["chmod", "g+s", home],
+      });
+    }
+  } else if (existsSync(home)) {
     const needsOwner = !dirOwnedBy(home, ownerUser);
     const needsGroup = !dirGroupOwnedBy(home, ownerUser);
     const needsSetgid = owner === "service" && !dirSetgid(home);
@@ -471,7 +631,12 @@ export function planSystemBootstrap(opts?: {
   // 6. ACLs on APPBAY_HOME. Service mode: service account rwx + default,
   // other::--- both normal and default (closes the mode-0644 read leak).
   // Operator mode: only when --group is given, grant that group rwx + default.
-  if (existsSync(home) && commandExists("setfacl") && needsAcls) {
+  //
+  // ⭐ THE `d:` ENTRIES ARE WHY ONE PASS IS ENOUGH. They are inherited by everything created
+  // inside afterwards, so `appbay init` run as root still leaves a tree the service account can
+  // read and write. Without step 4b creating the directory, this whole block was skipped on
+  // every fresh host and the inheritance never existed.
+  if (commandExists("setfacl") && needsAcls) {
     const aclArgs: string[] = ["setfacl", "-R"];
     if (owner === "service") {
       aclArgs.push(
@@ -498,7 +663,7 @@ export function planSystemBootstrap(opts?: {
       wouldChange: true,
       command: aclArgs,
     });
-  } else if (existsSync(home) && needsAcls && !commandExists("setfacl")) {
+  } else if (needsAcls && !commandExists("setfacl")) {
     // setfacl absent even after the install step — ownership was set in step 5,
     // ACLs are skipped. Degraded but functional.
     actions.push({
@@ -508,9 +673,10 @@ export function planSystemBootstrap(opts?: {
       command: [],
     });
   } else {
+    // Operator mode with no --group: the invoking user owns the tree outright and needs no ACL.
     actions.push({
       id: "acl-home",
-      label: `APPBAY_HOME (${home}) does not exist yet — run "appbay init" first`,
+      label: `No ACLs needed (${ownerUser} owns ${home} outright)`,
       wouldChange: false,
       command: [],
     });

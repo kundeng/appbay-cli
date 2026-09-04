@@ -1,0 +1,144 @@
+record: probe-90-the-documented-bootstrap-now-reaches-a-serving-control-plane
+type: probe
+title: the-documented-bootstrap-now-reaches-a-serving-control-plane
+timestamp: "2026-09-01T01:50:00-04:00"
+claim: "granting the rootful socket is enough to make S34 requirement 1.1 true"
+verdict: 'refines'
+key_evidence: 'Running the documented order on a genuinely fresh host found THREE further
+  blockers past the socket grant, none of which any unit test could see, and all of which
+  reported confidently in the wrong direction. (1) `init-system` skipped its ownership AND acl
+  steps with "run appbay init first" because the home did not exist yet, so the operator ran
+  `appbay init` under sudo, got a ROOT-OWNED 0755 tree, and nothing ever came back — the D-6
+  install never reached a working state on any runtime. (2) `checkServiceAccountRuntimeAccess`
+  probed with `{{.ServerVersion}}`, a DOCKER field; podman errors on it (exit 125), so doctor
+  reported "cannot reach podman" on a host where the account demonstrably could — the exact
+  inversion the shared-environment machinery was built to prevent, shipped anyway because
+  unifying the ENV left the ARGV docker-shaped. (3) `runtimeSocketFor` chose the mounted socket
+  by `uid === 0`, which answers "am I root" rather than "which socket does this install use";
+  the uid-950 account got `/run/user/950/podman/podman.sock` and the control plane died with
+  `statfs: no such file or directory`. After all three: `systemctl enable --now
+  appbay-server.service` → container Up (healthy) → HTTP 200, AND it survives a reboot with the
+  socket group and directory traversal both restored automatically.'
+exit_code: 0
+duration_s: 900
+command: >-
+  appbay init-system; appbay init --container-runtime podman --yes;
+  systemctl enable --now appbay-server.service; curl -s -o /dev/null -w '%{http_code}'
+  http://localhost:3000/api/trpc/health.get; systemctl reboot; <re-check everything>
+output_kind: text
+output:
+  text: |
+    host: appbay-rhel (multipass), Fedora Linux 43, podman 5.6.2, no docker
+    reset to a genuinely fresh state first: no appbay account, no /var/lib/appbay, no drop-in,
+    no tmpfiles override, /run/podman back to drwx------ root root.
+
+    == blocker 1: the documented order never produced a usable tree ==
+      $ sudo appbay init-system        (BEFORE the fix)
+        • APPBAY_HOME (/var/lib/appbay) does not exist yet — run "appbay init" first    <- own-home
+        • APPBAY_HOME (/var/lib/appbay) does not exist yet — run "appbay init" first    <- acl-home
+      $ sudo appbay init
+      $ ls -ld /var/lib/appbay
+        drwxr-xr-x. 1 root root                                  <- ROOT-owned, 0755
+      $ sudo -n -u appbay env HOME=... CONTAINER_HOST=... podman info
+        stat /var/lib/appbay/.config: no such file or directory
+
+      ⇒ Steps 5 and 6 were both `if (existsSync(home))`, and the home is created by the NEXT
+        command in the documented sequence. Nothing ever came back to set ownership. Not
+        podman-specific — the same hole on a docker service install.
+
+      FIX: `init-system` creates the home itself (step 4b), so steps 5 and 6 have something to
+      own. The mechanism that makes ONE pass enough is the DEFAULT ACLs, which are inherited by
+      everything `appbay init` creates inside afterwards no matter who runs it:
+
+      $ sudo appbay init-system        (AFTER)
+        • Create /var/lib/appbay ... ok
+        • Set ownership on /var/lib/appbay to appbay:appbay (setgid 2770) ... ok
+        • Set setgid on /var/lib/appbay ... ok
+        • Set default ACLs on /var/lib/appbay (appbay:rwx, other::---) ... ok
+      $ sudo appbay init ; ls -ld /var/lib/appbay ; getfacl /var/lib/appbay/etc/system.yaml
+        drwxrws---+ 1 appbay appbay
+        # owner: root                              <- created by root...
+        user:appbay:rwx  #effective:rw-            <- ...and still usable by the account
+      $ sudo -n -u appbay env HOME=... CONTAINER_HOST=... podman info --format '{{.Version.Version}}'
+        5.6.2
+
+    == blocker 2: doctor asked podman for a docker field ==
+      $ appbay doctor
+        ✗ Service account runtime access (optional)
+          appbay owns /var/lib/appbay but cannot reach podman
+
+      ...on the host that had just printed 5.6.2. Running doctor's OWN reproduce line:
+      $ sudo -n -u appbay env HOME=... CONTAINER_HOST=... podman info --format '{{.ServerVersion}}'
+        Error: template: info:1:2: executing "info" at <.ServerVersion>:
+               can't evaluate field ServerVersion in type system.infoReport
+        exit=125
+      $ ... --format '{{.Version.Version}}'
+        5.6.2
+        exit=0
+
+      🚨 `.ServerVersion` is a DOCKER field. `tryExec` returns null on the template error, so
+        the check read `denied` on EVERY podman host regardless of access. S34's design section
+        predicted this exact inversion and built `podmanRootfulEnv` to prevent it — and it
+        shipped anyway, because unifying the ENVIRONMENT left the ARGV docker-shaped. The unit
+        tests assert the env, not the field name. Only running doctor against known ground
+        truth caught it.
+
+      AFTER: ✓ Service account runtime access (optional) — appbay can reach podman
+
+    == blocker 3: the mounted socket was chosen by uid ==
+      $ systemctl restart appbay-server.service
+        Error: statfs /run/user/950/podman/podman.sock: no such file or directory
+
+      runtimeSocketFor(runtime, uid, ...) was:
+        uid === 0 ? "/run/podman/podman.sock" : `/run/user/${uid}/podman/podman.sock`
+
+      🚨 `uid === 0` answers "AM I ROOT". The question is "WHICH SOCKET DOES THIS INSTALL USE",
+        and S34 is precisely the change that made those different questions — a uid-950 account
+        on the ROOTFUL socket. CONTAINER_HOST is the direct statement of the answer; the uid was
+        only ever a proxy for it. Now consulted first (unix:// only — tcp:// and ssh:// mean the
+        socket is not on this host at all).
+
+    == not a product bug, recorded so the next person does not chase it ==
+      A stale podman VOLUME survived from a test 10 days earlier, still bound to
+      /home/ubuntu/.appbay (it still contained the pre-RFC-001 `project.yaml`). podman does not
+      rebind an existing volume when driver_opts change, so the server got somebody else's tree
+      and died with SQLITE_READONLY. `podman volume rm appbay-server_appbay-home` fixed it.
+      ⚠️ Worth its own issue: a changed APPBAY_HOME_PATH silently keeps the old binding.
+
+      Also: `appbay init --container-runtime podman` is how the runtime is recorded.
+      APPBAY_CONTAINER_RUNTIME is a ONE-INVOCATION override and does not persist — my first
+      run used it and the unit then looked for `docker`. Product was right; procedure was wrong.
+
+    == the end state, which is requirement 1.1 ==
+      $ sudo appbay init-system
+      $ sudo appbay init --container-runtime podman --yes
+      $ sudo systemctl enable --now appbay-server.service
+        Appbay server running at http://localhost:3000
+      $ curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/trpc/health.get
+        200
+      $ ps -o user=,cmd= -p $(podman inspect appbay.server --format '{{.State.Pid}}')
+        appbay   next-server (v16.2.4)          <- running AS THE SERVICE ACCOUNT
+
+    == and it survives a reboot, which is the unit's whole purpose ==
+      $ systemctl reboot ... $ uptime -p
+        up 0 minutes
+      $ systemctl is-enabled appbay-server.service; systemctl is-active appbay-server.service
+        enabled
+        active
+      $ ls -ld /run/podman; ls -l /run/podman/podman.sock
+        drwxr-x---. 2 root appbay          <- tmpfiles `z` line re-applied at boot
+        srw-rw----. 1 root appbay          <- SocketGroup= re-applied at boot
+      $ podman ps --format '{{.Names}}\t{{.Status}}'
+        appbay.server   Up 26 seconds (healthy)
+      $ curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/trpc/health.get
+        200
+
+    == what was NOT verified ==
+      A docker SERVICE install end to end. `init-system` is RHEL-family only, and the docker VM
+      is Ubuntu 24.04, so it refuses there by design; the RHEL VM has no docker. The changed
+      code (create-home, ownership, ACLs, socket resolution) is runtime-INDEPENDENT and is
+      verified end to end above; the docker-specific branch (`usermod -aG docker`) is untouched
+      and was checked at plan level only:
+      $ APPBAY_CONTAINER_RUNTIME=docker appbay init-system --dry-run
+        • Add appbay to docker group / sudo usermod -aG docker appbay
+        (and none of the three podman actions)

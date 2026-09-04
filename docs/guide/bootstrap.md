@@ -220,8 +220,9 @@ fleet, Ansible arranges access.
 ## 2. `appbay init-system` — host bootstrap (RHEL-family)
 
 `init-system` is a **standalone-host convenience** for a single binary on a
-fresh box. It installs Docker, creates the `appbay` user/group, adds `appbay`
-to the docker group, and sets ACLs on `$APPBAY_HOME`.
+fresh box. It installs the container runtime, creates the `appbay` user/group,
+**grants that account access to the runtime**, creates `$APPBAY_HOME` and sets
+ownership + default ACLs on it, and installs the control-plane systemd unit.
 
 > **Boundary:** For the DGX fleet, **ansible is authoritative**. `init-system`
 > is tested to work, but the fleet path is ansible substrate, not this command.
@@ -237,29 +238,68 @@ appbay init-system --dry-run
 ```
 Appbay init-system
 
-  Distro: Rocky Linux 9.4 (rhel)
+  Distro: Fedora Linux 43 (Cloud Edition) (rhel)
+  Owner model: service account (D-6)
+  APPBAY_HOME: /var/lib/appbay
 
   Dry run — would make these changes:
 
-  • Install Docker Engine (dnf)
-    sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  • Enable + start docker.service
-    sudo systemctl enable --now docker
-  • Create appbay user + group
-    sudo useradd --create-home --user-group --shell /bin/bash appbay
-  • Add appbay to docker group
-    sudo usermod -aG docker appbay
-  • Set ACLs on /home/appbay/.appbay for appbay
-    sudo setfacl -R -m u:appbay:rwX /home/appbay/.appbay
+  • Create system group appbay
+    sudo groupadd --system appbay
+  • Create no-login system service account appbay (uid 950)
+    sudo useradd --system --no-create-home --home-dir /var/lib/appbay --shell /usr/sbin/nologin --uid 950 --gid appbay appbay
+  • Grant appbay the rootful Podman socket (SocketGroup on podman.socket)
+  • Let appbay traverse /run/podman (tmpfiles override)
+  • Create /var/lib/appbay
+  • Set ownership on /var/lib/appbay to appbay:appbay (setgid 2770)
+  • Set default ACLs on /var/lib/appbay (appbay:rwx, other::---)
+  • Record the appbay home in /etc/appbay/config
+  • Install /etc/systemd/system/appbay-server.service (not enabled — see the summary)
 
   No changes made.
 ```
+
+On a Docker host the two Podman lines are replaced by a single
+`sudo usermod -aG docker appbay`.
 
 Apply it (requires sudo):
 
 ```bash
 appbay init-system
 ```
+
+### What it grants the service account, in both cases
+
+**The `appbay` account gets root-equivalent control of this host's containers.**
+That is true on Docker and on Podman, by the same reasoning: anything that can
+drive the container runtime can start a privileged container that mounts the
+host filesystem. It is inherent to running a control plane as a non-root
+account, not something either mechanism adds.
+
+| | how | what it is |
+|---|---|---|
+| Docker | `usermod -aG docker appbay` | the `docker` group on a `root:docker 0660` daemon socket |
+| Podman | `SocketGroup=appbay` on `podman.socket`, plus a tmpfiles override so the account can traverse `/run/podman` | the same grant, expressed on the socket rather than found on it — Podman ships no group with those semantics |
+
+::: {.callout-important}
+**Podman here means the ROOTFUL socket, deliberately.** Rootless is not a
+supported control-plane model: the edge binds `:80` and `:443`, which a rootless
+container cannot do without setting `net.ipv4.ip_unprivileged_port_start`
+host-wide — a larger privilege change than granting one account one socket.
+The unit therefore sets `CONTAINER_HOST=unix:///run/podman/podman.sock`; without
+it `podman` run by a non-root user silently falls back to rootless and the grant
+does nothing. Rootless Podman for **deployed apps** is a separate question and is
+unaffected.
+:::
+
+The two Podman files are declarations systemd re-applies itself, so the grant
+survives a socket restart and a reboot:
+
+- `/etc/systemd/system/podman.socket.d/10-appbay.conf`
+- `/etc/tmpfiles.d/zz-appbay-podman.conf`
+
+A one-off `setfacl` on the socket would not: systemd recreates it on every start
+of `podman.socket`, and the ACL was on the old inode.
 
 The command is **idempotent**: re-running it after a successful bootstrap
 reports `Host is already bootstrapped. Nothing to do.` Each step detects the
@@ -272,6 +312,15 @@ current state and only changes what differs.
 - **`sudo: setfacl: command not found`** — the `acl` package is absent on a
   minimal image. `init-system` falls back to `chown -R appbay:appbay` on the
   home directory automatically.
+- **`Executable not found in $PATH: "docker"` on a Podman host** — the runtime
+  is recorded by `appbay init --container-runtime podman`, not by `init-system`.
+  `APPBAY_CONTAINER_RUNTIME` is a one-invocation override and does not persist.
+- **`statfs /run/user/<uid>/podman/podman.sock: no such file or directory`** —
+  the install predates the rootful grant. Re-run `appbay init-system`, which
+  writes the `CONTAINER_HOST` the unit needs.
+- **`appbay doctor` says the service account cannot reach the runtime** — run
+  `appbay init-system`. Doctor prints the exact command it used; run that to see
+  the underlying error.
 
 ## 3. `appbay init` — scaffold APPBAY_HOME
 

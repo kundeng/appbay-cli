@@ -48,15 +48,32 @@ const HEALTH_MAX_RETRIES = 30;
 /** Delay between health check retries in milliseconds. */
 const HEALTH_RETRY_DELAY_MS = 1000;
 
-/** Pure runtime-socket policy, exported so both rootful and rootless paths stay tested. */
+/**
+ * Pure runtime-socket policy, exported so both rootful and rootless paths stay tested.
+ *
+ * 🚨 `uid === 0` ANSWERS "AM I ROOT", AND THE QUESTION IS "WHICH SOCKET DOES THIS INSTALL USE".
+ * Those were the same question until S34, which put the D-6 service account — uid 950 — on the
+ * ROOTFUL socket via `CONTAINER_HOST`. The uid test then computed
+ * `/run/user/950/podman/podman.sock`, a rootless socket that does not exist, and the control
+ * plane died with `statfs /run/user/950/podman/podman.sock: no such file or directory` on a
+ * host where every access grant was correct. `CONTAINER_HOST` is consulted first because it is
+ * the direct statement of which socket this process talks to; the uid is a proxy for it.
+ */
 export function runtimeSocketFor(
   runtime: string,
   uid: number,
   xdgRuntimeDir?: string,
   override?: string,
+  containerHost?: string,
 ): string {
   if (override) return override;
   if (runtime !== "podman") return "/var/run/docker.sock";
+  // Only `unix://` says anything about a local path. A tcp:// or ssh:// CONTAINER_HOST means
+  // the socket is not on this host at all, and mounting a guessed local path would be worse
+  // than falling through.
+  if (containerHost?.startsWith("unix://")) {
+    return containerHost.slice("unix://".length);
+  }
   return uid === 0
     ? "/run/podman/podman.sock"
     : `${xdgRuntimeDir ?? `/run/user/${uid}`}/podman/podman.sock`;
@@ -69,6 +86,7 @@ export function resolveRuntimeSocket(): string {
     process.getuid?.() ?? 0,
     process.env.XDG_RUNTIME_DIR,
     process.env.APPBAY_RUNTIME_SOCKET,
+    process.env.CONTAINER_HOST,
   );
 }
 
