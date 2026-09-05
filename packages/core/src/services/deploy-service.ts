@@ -28,7 +28,7 @@ import {
 import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
-import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { containerBin, findContainerByLabel, type Inspection } from "../runtime/container-runtime.js";
 import { APP_LABEL } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 
@@ -102,13 +102,16 @@ function composePs(
   runDockerCompose: DockerComposeRunner,
   composePath: string,
   env: Record<string, string>,
-): ComposePsRow[] | null {
+): Inspection<ComposePsRow[]> {
   let ps = runDockerCompose(["ps", "-a", "--format", "json"], composePath, env);
   if (ps.exitCode !== 0) {
     // podman-compose: no `-a`, and none needed.
     ps = runDockerCompose(["ps", "--format", "json"], composePath, env);
   }
-  if (ps.exitCode !== 0) return null; // Cannot inspect — do not invent a verdict.
+  if (ps.exitCode !== 0) {
+    // Cannot inspect. That is its own answer, carried with the runtime's reason.
+    return { kind: "unknown", reason: ps.output.trim() || `compose ps exited with code ${String(ps.exitCode)}` };
+  }
 
   const rows: ComposePsRow[] = [];
   for (const row of parseComposePsJson(ps.output)) {
@@ -128,7 +131,7 @@ function composePs(
       exitCode: typeof r.ExitCode === "number" ? r.ExitCode : 0,
     });
   }
-  return rows;
+  return { kind: "ok", value: rows };
 }
 
 /**
@@ -177,32 +180,28 @@ function parseComposePsJson(output: string): unknown[] {
 }
 
 /**
- * Which services exited non-zero after a converge, or null when compose could not be asked.
+ * Which services exited non-zero after a converge. Exported so the CLI and the web deploy
+ * worker share one implementation of "did the deploy work": `up -d` exiting 0 means started,
+ * not still running.
  *
- * ⭐ EXPORTED SO THERE IS ONE IMPLEMENTATION. `apps/web`'s deploy worker resolved on
- * `compose up -d` exiting 0 and reported "Successfully deployed" plus a running badge — for a
- * container that had started and immediately died. That is the same defect this function was
- * written to fix in the CLI path, still live in the web path, because the two had separate
- * implementations of "did the deploy work".
- *
- * ⚠️ null means COULD NOT INSPECT, not "nothing crashed". A caller that treats it as the
- * latter reintroduces the bug in a new place.
+ * `ok([])` is "nothing crashed"; `unknown` is "compose could not be asked". The type keeps a
+ * caller from reading the second as the first.
  */
 export function findCrashedServices(
   runDockerCompose: DockerComposeRunner,
   composePath: string,
   env: Record<string, string>,
-): string | null {
+): Inspection<string[]> {
   const rows = composePs(runDockerCompose, composePath, env);
-  if (rows === null) return null; // Cannot inspect — do not invent a failure.
+  if (rows.kind === "unknown") return rows;
 
   const dead: string[] = [];
-  for (const r of rows) {
+  for (const r of rows.value) {
     if (r.state === "exited" && r.exitCode !== 0) {
       dead.push(`${r.service} exited ${String(r.exitCode)}`);
     }
   }
-  return dead.length > 0 ? dead.join(", ") : null;
+  return { kind: "ok", value: dead };
 }
 
 /** One container's identity and run state, as compose reports it. */
@@ -213,25 +212,21 @@ interface ContainerState {
 
 /**
  * Snapshot the containers compose knows about for one project, keyed by container name.
- *
- * @returns the snapshot, or null when compose could not be asked — the caller must treat
- *          null as "unknown", never as "nothing running".
+ * Stopped containers are included: a container about to be started is a stopped one.
  */
 function snapshotContainers(
   runDockerCompose: DockerComposeRunner,
   composePath: string,
   env: Record<string, string>,
-): Map<string, ContainerState> | null {
-  // Stopped containers MUST be in this list: a container about to be STARTED is exactly a
-  // stopped one, and missing it would make every start look like "already running".
+): Inspection<Map<string, ContainerState>> {
   const rows = composePs(runDockerCompose, composePath, env);
-  if (rows === null) return null;
+  if (rows.kind === "unknown") return rows;
 
   const snapshot = new Map<string, ContainerState>();
-  for (const r of rows) {
+  for (const r of rows.value) {
     snapshot.set(r.name, { id: r.id, running: r.state === "running" });
   }
-  return snapshot;
+  return { kind: "ok", value: snapshot };
 }
 
 /**
@@ -248,21 +243,21 @@ function snapshotContainers(
  * id) or STARTED (same id, was not running). "Already running, nothing to do" is the only
  * case that is genuinely unchanged.
  *
- * @returns true/false when both snapshots are known, and null when either could not be
- *          taken — an unknown must not be reported as either verdict.
+ * Unknown when either snapshot could not be taken; an unknown is not a verdict either way.
  */
 function didConverge(
-  before: Map<string, ContainerState> | null,
-  after: Map<string, ContainerState> | null,
-): boolean | null {
-  if (!before || !after) return null;
-  for (const [name, now] of after) {
-    const was = before.get(name);
-    if (!was) return true;                        // created
-    if (was.id !== now.id) return true;           // recreated under the same name
-    if (!was.running && now.running) return true; // started
+  before: Inspection<Map<string, ContainerState>>,
+  after: Inspection<Map<string, ContainerState>>,
+): Inspection<boolean> {
+  if (before.kind === "unknown") return before;
+  if (after.kind === "unknown") return after;
+  for (const [name, now] of after.value) {
+    const was = before.value.get(name);
+    if (!was) return { kind: "ok", value: true };                        // created
+    if (was.id !== now.id) return { kind: "ok", value: true };           // recreated under the same name
+    if (!was.running && now.running) return { kind: "ok", value: true }; // started
   }
-  return false;
+  return { kind: "ok", value: false };
 }
 
 /** Callback for discovering currently running apps. */
@@ -290,6 +285,8 @@ export interface AppDeployResult {
    * asked — in which case the honest answer is that we do not know.
    */
   convergeAction?: "started" | "already-running" | "unknown";
+  /** Why the runtime could not be read, when `convergeAction` is "unknown". */
+  unknownReason?: string;
   /**
    * The app's container is up but its edge routes did not land — it is running and
    * unreachable. A partial converge, not a total failure (appbay-cli#5).
@@ -813,20 +810,27 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
       // Docker compose up
       const dcResult = runDockerCompose(["up", "-d"], composePath, secretEnv);
-      // `up -d` succeeding means "started", not "still running" — see findCrashedServices.
-      const crashed = dcResult.exitCode === 0
-        ? findCrashedServices(runDockerCompose, composePath, secretEnv)
-        : null;
-      if (crashed) {
+      if (dcResult.exitCode !== 0) {
         appResult.status = "failed";
-        appResult.error = `container(s) exited immediately after start: ${crashed}`;
+        appResult.error = dcResult.output;
         result.apps.push(appResult);
         result.failed++;
         continue;
       }
-      if (dcResult.exitCode !== 0) {
+      // `up -d` succeeding means "started", not "still running" — see findCrashedServices.
+      const crashed = findCrashedServices(runDockerCompose, composePath, secretEnv);
+      if (crashed.kind === "unknown") {
+        // Compose could not be asked what it did. Not a deployment, not a failure: say so.
+        appResult.status = "unchanged";
+        appResult.convergeAction = "unknown";
+        appResult.unknownReason = crashed.reason;
+        result.apps.push(appResult);
+        result.unchanged++;
+        continue;
+      }
+      if (crashed.value.length > 0) {
         appResult.status = "failed";
-        appResult.error = dcResult.output;
+        appResult.error = `container(s) exited immediately after start: ${crashed.value.join(", ")}`;
         result.apps.push(appResult);
         result.failed++;
         continue;
@@ -931,25 +935,32 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         // the container it describes still exists (appbay-cli#4).
         const before = snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv);
         const dcResult = runDockerCompose(["up", "-d"], existingComposePath, unchangedSecretEnv);
-        const after = dcResult.exitCode === 0
-          ? snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv)
-          : null;
-        const converged = didConverge(before, after);
-        appResult.convergeAction =
-          converged === null ? "unknown" : converged ? "started" : "already-running";
-        const crashedUnchanged = dcResult.exitCode === 0
-          ? findCrashedServices(runDockerCompose, existingComposePath, unchangedSecretEnv)
-          : null;
-        if (crashedUnchanged) {
+        if (dcResult.exitCode !== 0) {
           appResult.status = "failed";
-          appResult.error = `container(s) exited immediately after start: ${crashedUnchanged}`;
+          appResult.error = dcResult.output;
           result.apps.push(appResult);
           result.failed++;
           continue;
         }
-        if (dcResult.exitCode !== 0) {
+        const after = snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv);
+        const converged = didConverge(before, after);
+        if (converged.kind === "unknown") {
+          appResult.convergeAction = "unknown";
+          appResult.unknownReason = converged.reason;
+        } else {
+          appResult.convergeAction = converged.value ? "started" : "already-running";
+        }
+        const crashedUnchanged = findCrashedServices(runDockerCompose, existingComposePath, unchangedSecretEnv);
+        if (crashedUnchanged.kind === "unknown") {
+          appResult.convergeAction = "unknown";
+          appResult.unknownReason ??= crashedUnchanged.reason;
+          result.apps.push(appResult);
+          result.unchanged++;
+          continue;
+        }
+        if (crashedUnchanged.value.length > 0) {
           appResult.status = "failed";
-          appResult.error = dcResult.output;
+          appResult.error = `container(s) exited immediately after start: ${crashedUnchanged.value.join(", ")}`;
           result.apps.push(appResult);
           result.failed++;
           continue;

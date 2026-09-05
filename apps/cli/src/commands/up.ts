@@ -106,7 +106,7 @@ export const upCommand = new Command("up")
         // `unknown` means compose could not be asked what it did — say so rather than
         // let silence read as "already running".
         const note = app.convergeAction === "unknown"
-          ? "  (could not read container state)"
+          ? `  (could not read container state: ${app.unknownReason ?? "compose did not answer"})`
           : "";
         console.log(`  - ${pad(app.appName, 14)} [plan: ${statusLabel}]${note}`);
       }

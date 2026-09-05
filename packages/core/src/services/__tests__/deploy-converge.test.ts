@@ -200,6 +200,29 @@ describe("when compose cannot be asked, the unknown is recorded, not guessed", (
     });
     expect(result.failed).toBe(0);
   });
+
+  it("carries the runtime's own words as the reason", async () => {
+    await seedRender();
+    const result = await deploy({
+      appbayHome: home,
+      dockerCompose: runnerWith([{ exitCode: 1, output: "Cannot connect to the Docker daemon" }]),
+    });
+    expect(result.apps[0]?.unknownReason).toContain("Cannot connect");
+  });
+
+  it("on a FIRST deploy, an unreadable crash check is unknown too — not deployed", async () => {
+    // The new/changed path used to run the crash check and read its null as "fine".
+    const result = await deploy({
+      appbayHome: home,
+      dockerCompose: runnerWith([{ exitCode: 1, output: "ps unavailable" }]),
+    });
+    expect(result.apps[0]?.planStatus).toBe("new");
+    expect(result.apps[0]?.convergeAction).toBe("unknown");
+    expect(result.apps[0]?.unknownReason).toContain("ps unavailable");
+    expect(result.deployed).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(result.unchanged).toBe(1);
+  });
 });
 
 describe("findCrashedServices — the contract apps/web now depends on", () => {
@@ -221,24 +244,29 @@ describe("findCrashedServices — the contract apps/web now depends on", () => {
       "/tmp/compose.yml",
       {},
     );
-    expect(out).toContain(APP);
-    expect(out).toContain("137");
+    expect(out.kind).toBe("ok");
+    if (out.kind === "ok") {
+      expect(out.value).toHaveLength(1);
+      expect(out.value[0]).toContain(APP);
+      expect(out.value[0]).toContain("137");
+    }
   });
 
-  it("returns null when everything is running", () => {
-    expect(findCrashedServices(psRunner(0, row("running")), "/tmp/compose.yml", {})).toBeNull();
+  it("returns an empty list when everything is running", () => {
+    expect(findCrashedServices(psRunner(0, row("running")), "/tmp/compose.yml", {}))
+      .toEqual({ kind: "ok", value: [] });
   });
 
   it("treats exit 0 as a completed one-shot, not a crash", () => {
-    expect(
-      findCrashedServices(psRunner(0, row("exited", "id-1", 0)), "/tmp/compose.yml", {}),
-    ).toBeNull();
+    expect(findCrashedServices(psRunner(0, row("exited", "id-1", 0)), "/tmp/compose.yml", {}))
+      .toEqual({ kind: "ok", value: [] });
   });
 
-  it("🚨 returns null when compose could not be ASKED — which is not 'nothing crashed'", () => {
-    // The distinction the export comment insists on. A caller that fails the deploy on any
-    // null would abort every deploy on a host where `ps` is unavailable; one that treats null
-    // as success reintroduces the original bug. Both callers must read it as "unknown".
-    expect(findCrashedServices(psRunner(1, ""), "/tmp/compose.yml", {})).toBeNull();
+  it("returns unknown, with the reason, when compose could not be ASKED", () => {
+    // "Could not ask" and "nothing crashed" used to be the same null, and both callers read
+    // it as success. The type now keeps them apart: a caller has to write the unknown arm.
+    const out = findCrashedServices(psRunner(1, "Cannot connect to the Docker daemon"), "/tmp/compose.yml", {});
+    expect(out.kind).toBe("unknown");
+    if (out.kind === "unknown") expect(out.reason).toContain("Cannot connect");
   });
 });

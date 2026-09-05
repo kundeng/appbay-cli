@@ -263,7 +263,7 @@ identity module, and the lookup keeps working if the namespace changes again.
   - [x] 1.2 Compile-then-target test (fails against the literal)
     - **Depends**: 1.1 · **Requirements**: 8.1 · **Properties**: 2 · **Pillar**: Verified
 - [ ] 2. Core
-  - [ ] 2.1 `deploy-service.ts`: the four functions return `Inspection`; callers handle `unknown`; `unknownReason` on the result; tally prints it
+  - [x] 2.1 `deploy-service.ts`: the four functions return `Inspection`; callers handle `unknown`; `unknownReason` on the result; tally prints it
     - **Depends**: 1.1 · **Requirements**: 2.1, 2.2 · **Properties**: 1
   - [x] 2.2 `runCaddyCommand` and `edge-identity-service.ts` and `setup.ts` resolve the edge by label; literals deleted
     - **Depends**: 1.1, 1.2 · **Requirements**: 1.1, 1.2, 1.3
