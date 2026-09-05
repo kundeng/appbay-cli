@@ -11,7 +11,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@appbay/core": "workspace:*",
     "better-sqlite3": "^11.9.0",
     "drizzle-orm": "^0.44.0",
     "yaml": "^2.8.4"

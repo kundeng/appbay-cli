@@ -43,7 +43,7 @@ export function askSecret(question: string): Promise<string> {
 }
 
 /** Ask a yes/no question. Returns true for yes. */
-export async function confirm(question: string, defaultYes = true): Promise<boolean> {
+async function confirm(question: string, defaultYes = true): Promise<boolean> {
   const hint = defaultYes ? "Y/n" : "y/N";
   const answer = await ask(`${question} (${hint})`, defaultYes ? "y" : "n");
   return answer.toLowerCase().startsWith("y");

@@ -59,7 +59,7 @@ export const DEFAULT_SERVICE_USER = "appbay";
 /** Default system uid for the service account (D-6: <1000, never a human's). */
 export const DEFAULT_SERVICE_UID = 950;
 /** Default system home for service mode (NOT under the operator's home). */
-export const DEFAULT_SERVICE_HOME = "/var/lib/appbay";
+const DEFAULT_SERVICE_HOME = "/var/lib/appbay";
 
 /** Commander option collector for repeatable flags (e.g. --group a --group b). */
 function collect(value: string, previous: string[]): string[] {
@@ -97,7 +97,7 @@ export interface DistroInfo {
  * command can report a clear boundary rather than guessing, but only RHEL
  * family is actually bootstrapped.
  */
-export function detectDistro(): DistroInfo {
+function detectDistro(): DistroInfo {
   let id = "";
   let idLike = "";
   let prettyName = "unknown";

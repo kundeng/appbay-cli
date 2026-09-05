@@ -15,88 +15,35 @@ import { resolveAppbayHome } from "./appbay-home.js";
 import * as core from "@appbay/core";
 
 // Alias the shared type back to the CLI's historical name so its callers are untouched.
-export type { HealthCheckResult as CheckResult, ComposeProvider, JsonCheck } from "@appbay/core";
+export type { HealthCheckResult as CheckResult } from "@appbay/core";
 export {
   buildDoctorJson,
-  compareSemver,
   formatCheck,
   formatRemediation,
   requiredChecksFailed,
-  tryExec,
   parseComposeProvider,
   COMPOSE_PROVIDER_MINIMUMS,
-  MIN_COMPOSE_VERSION,
-  SERVER_CONTAINER,
-  SHARED_NETWORK,
 } from "@appbay/core";
 
-export async function checkAppbayHome(): Promise<core.HealthCheckResult> {
-  return await core.checkAppbayHome(resolveAppbayHome());
-}
 
-export function checkCaddySecurityConfig(): core.HealthCheckResult {
-  return core.checkCaddySecurityConfig(resolveAppbayHome());
-}
 
-export function checkComposeInstalled(): core.HealthCheckResult {
-  return core.checkComposeInstalled(resolveAppbayHome());
-}
 
-export function checkComposeVersion(): core.HealthCheckResult {
-  return core.checkComposeVersion(resolveAppbayHome());
-}
 
-export function checkDocker(): core.HealthCheckResult {
-  return core.checkDocker(resolveAppbayHome());
-}
 
-export function checkDockerAccessible(): core.HealthCheckResult {
-  return core.checkDockerAccessible(resolveAppbayHome());
-}
 
-export function checkGpu(): core.HealthCheckResult {
-  return core.checkGpu(resolveAppbayHome());
-}
 
 export function checkHealthcheckStartPeriod(): core.HealthCheckResult {
   return core.checkHealthcheckStartPeriod(resolveAppbayHome());
 }
 
-export function checkKeePassCli(): core.HealthCheckResult {
-  return core.checkKeePassCli(resolveAppbayHome());
-}
 
-export function checkKeePassDb(): core.HealthCheckResult {
-  return core.checkKeePassDb(resolveAppbayHome());
-}
 
-export function checkNetwork(): core.HealthCheckResult {
-  return core.checkNetwork(resolveAppbayHome());
-}
 
-export function checkPlatform(): core.HealthCheckResult {
-  return core.checkPlatform(resolveAppbayHome());
-}
 
-export function checkServer(): core.HealthCheckResult {
-  return core.checkServer(resolveAppbayHome());
-}
 
-export function checkSharedNetworkDns(): core.HealthCheckResult {
-  return core.checkSharedNetworkDns(resolveAppbayHome());
-}
 
-export function checkSops(): core.HealthCheckResult {
-  return core.checkSops(resolveAppbayHome());
-}
 
-export function checkTraefikConfig(): core.HealthCheckResult {
-  return core.checkTraefikConfig(resolveAppbayHome());
-}
 
-export function checkVault(): core.HealthCheckResult {
-  return core.checkVault(resolveAppbayHome());
-}
 
 export async function runChecks(): Promise<core.HealthCheckResult[]> {
   return await core.runChecks(resolveAppbayHome());

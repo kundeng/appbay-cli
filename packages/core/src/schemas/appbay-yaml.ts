@@ -75,7 +75,7 @@ export type Scope = z.infer<typeof ScopeSchema>;
  *   - alias map: { web: "dify-web" } (expose with custom alias)
  *   - full object: { service: "api", networks: ["appbay_shared"] }
  */
-export const ExposeEntryFullSchema = z.object({
+const ExposeEntryFullSchema = z.object({
   service: z.string(),
   networks: z.array(z.string()).optional(),
 });
@@ -209,13 +209,13 @@ export const AuthTraitSchema = z.object({
 
 export type AuthTrait = z.infer<typeof AuthTraitSchema>;
 
-export const NamespaceShareSchema = z.object({
+const NamespaceShareSchema = z.object({
   network: z.boolean().optional().default(false),
   pid: z.boolean().optional().default(false),
   ipc: z.boolean().optional().default(false),
 }).optional();
 
-export type NamespaceShare = z.infer<typeof NamespaceShareSchema>;
+type NamespaceShare = z.infer<typeof NamespaceShareSchema>;
 
 export const HooksTraitSchema = z.object({
   type: z.literal("hooks"),
@@ -359,7 +359,7 @@ export const VarDefinitionSchema = z.object({
   auto_generate: z.boolean().optional(),
 });
 
-export type VarDefinition = z.infer<typeof VarDefinitionSchema>;
+type VarDefinition = z.infer<typeof VarDefinitionSchema>;
 
 // ---------------------------------------------------------------------------
 // Full appbay.yaml Schema
@@ -379,7 +379,7 @@ export type VarDefinition = z.infer<typeof VarDefinitionSchema>;
  *
  * Values are compared as strings against `$APPBAY_HOME/project.yaml`. All keys must match.
  */
-export const BuildWhenSchema = z.object({
+const BuildWhenSchema = z.object({
   instance: z.record(z.string()),
 });
 
@@ -394,12 +394,12 @@ export const BuildWhenSchema = z.object({
  * Expressed as DATA, not code: a command and a substring its output must contain. That
  * keeps appbay from growing a per-image special case for every provider.
  */
-export const BuildVerifySchema = z.object({
+const BuildVerifySchema = z.object({
   command: z.array(z.string()).min(1),
   contains: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
 });
 
-export const BuildSpecSchema = z.object({
+const BuildSpecSchema = z.object({
   /**
    * The image tag the build produces AND the service runs.
    *

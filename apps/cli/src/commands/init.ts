@@ -679,7 +679,7 @@ export async function upsertIngressProvider(
  * recording "unknown" would be worse than recording nothing, because the check
  * treats absent as "never asked" and would treat a literal "unknown" as a path.
  */
-export async function upsertContainerStore(
+async function upsertContainerStore(
   appbayHome: string,
   store: string,
 ): Promise<"created" | "updated" | "unchanged"> {
@@ -687,7 +687,7 @@ export async function upsertContainerStore(
 }
 
 /** Same, for the ACME DNS-01 provider. */
-export async function upsertAcmeDnsProvider(
+async function upsertAcmeDnsProvider(
   appbayHome: string,
   provider: AcmeDnsProvider,
 ): Promise<"created" | "updated" | "unchanged"> {
