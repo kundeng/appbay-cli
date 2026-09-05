@@ -33,15 +33,8 @@ import { tmpdir } from "node:os";
 import { SYSTEM_CONFIG_FILE } from "../utils/system-config.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  resolveAppbayHome,
-  explainAppbayHome,
-  saveAppbayHome,
-  clearSavedAppbayHome,
-  tiersShadowingSaved,
-  CONFIG_FILE,
-  type HomeTier,
-} from "../utils/appbay-home.js";
+import { resolveAppbayHome, explainAppbayHome, saveAppbayHome, clearSavedAppbayHome, tiersShadowingSaved, CONFIG_FILE } from "../utils/appbay-home.js";
+import type { HomeTier } from "@appbay/core";
 import { checkHomeAssertion, loadInstanceConfig, type HomeMismatch } from "@appbay/core";
 
 /** Label shown per tier in `--explain`, in resolution order. */
