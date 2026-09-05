@@ -167,3 +167,4 @@ export {
   type EdgeIdentityConfig,
 } from "./edge-identity-providers.js";
 export { CollectionsFileSchema, loadCollections, COLLECTIONS_FILE_REL, type CollectionsFile } from "./collections.js";
+export { loadNamespaceValues, NAMESPACES_DIR_REL } from "./namespace-values.js";

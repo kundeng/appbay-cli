@@ -88,6 +88,15 @@ export function auxFileStem(
 }
 
 /**
+ * The hostname an app is routed at when its manifest names none: `<stem>.<domain>`, where the
+ * stem is the app, or `<ns>.<app>` when namespaced. Two instances of one app therefore get
+ * two hosts without either manifest saying so (RFC-001 §4's goal; ledger row 10).
+ */
+export function defaultHost(namespace: string | undefined, appName: string, domain: string): string {
+  return `${auxFileStem(namespace, appName)}.${domain}`;
+}
+
+/**
  * Docker label carrying the app name, so consumers do not have to parse container names.
  *
  * 🚨 THIS EXISTS BECAUSE NAME-PARSING BREAKS UNDER NAMESPACES. `apps/web`'s running-app

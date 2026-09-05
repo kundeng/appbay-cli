@@ -163,15 +163,16 @@ what replaced it and exits non-zero.
 
 | Concept | Controls | Cardinality |
 |---------|----------|-------------|
-| **Namespace** | Deployment identity — container, network and DNS-alias names | Single per app |
-| **Collection** | Which apps deploy together | Multi per app |
+| **Namespace** | Deployment identity — container, network, DNS-alias and default-host names — and the deployment's values file | Single per app |
+| **Collection** | Which apps form a stack: what `when:` can see, and the start order in `etc/collections.yaml` | Multi per app |
 
 `namespace` replaced `project` + `environment` in `v0.0.1-alpha.12`; a non-default value for
-either is now a parse error naming the migration. Collections are selectors, not scope levels.
+either is now a parse error naming the migration.
 
-⚠️ Of the `${{scope.KEY}}` vocabulary, only `${{project.DOMAIN}}` resolves today — it reads
-the `domain:` line from `$APPBAY_HOME/etc/system.yaml`. `${{environment.KEY}}` and
-`${{service.KEY}}` parse but resolve against empty maps. See
+Scopes: `${{project.KEY}}` reads the per-host values in `etc/system.yaml`; `${{namespace.KEY}}`
+reads `etc/namespaces/<namespace>.yaml`, the values of one deployment; `${{app.KEY}}` is what the
+compiler knows about the app (`NAME`, `NAMESPACE`, `STEM`, `HOST`). An ingress trait that omits
+`host:` is routed at `${{app.HOST}}`, so two instances of one app get two hosts. See
 [the scope model reference](docs/reference/scope-model.qmd).
 
 ## Project Structure

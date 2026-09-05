@@ -45,6 +45,8 @@ export interface CompilerContext {
    * app on a host is routed by the same proxy — see IngressProviderSchema.
    */
   ingressProvider?: IngressProvider;
+  /** The install's base domain, when it has one; the default ingress host is built from it. */
+  domain?: string;
 }
 
 // ---------------------------------------------------------------------------

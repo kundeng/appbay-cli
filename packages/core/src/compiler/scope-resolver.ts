@@ -17,8 +17,12 @@
 
 /** Scope values at each level of the hierarchy. */
 export interface ScopeValues {
+  /** Per-host values from `etc/system.yaml` (the allow-listed keys). */
   project: Record<string, string>;
-  environment: Record<string, string>;
+  /** Per-deployment values from `etc/namespaces/<ns>.yaml`. */
+  namespace: Record<string, string>;
+  /** What the compiler knows about this app: NAME, NAMESPACE, STEM, and HOST when a domain exists. */
+  app: Record<string, string>;
   service: Record<string, string>;
 }
 
@@ -47,7 +51,7 @@ export interface ResolveResult {
 // ---------------------------------------------------------------------------
 
 /** Valid scope names in resolution priority order (highest first). */
-const VALID_SCOPES = ["service", "environment", "project"] as const;
+const VALID_SCOPES = ["service", "app", "namespace", "project"] as const;
 
 type ScopeName = (typeof VALID_SCOPES)[number];
 

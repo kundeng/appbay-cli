@@ -143,7 +143,7 @@ services:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `type` | `"ingress"` | (required) | Trait discriminator |
-| `host` | `string` | (required) | Hostname for the route (supports `${{scope.KEY}}` variables) |
+| `host` | `string` | `<app>.<domain>`, or `<ns>.<app>.<domain>` when namespaced | Hostname for the route; omit it and the default derives from identity, so two instances get two hosts. Supports `${{scope.KEY}}`; two apps resolving one host is a compile error naming both |
 | `port` | `number` | (required) | Container port to route to |
 | `exposure` | `"internal" \| "external" \| "both"` | `"both"` | Internal (LAN), external (WAN), or both |
 | `tls.staging` | `boolean` | `false` | Use Let's Encrypt staging certificates |

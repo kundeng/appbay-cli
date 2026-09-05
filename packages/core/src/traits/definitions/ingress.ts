@@ -22,7 +22,7 @@ import type {
   TraitTransformInput,
   TraitTransformOutput,
 } from "../types.js";
-import { sharedNetworkAlias, auxFileStem, SHARED_NETWORK } from "../../compiler/identity.js";
+import { sharedNetworkAlias, auxFileStem, SHARED_NETWORK, defaultHost } from "../../compiler/identity.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,7 +64,7 @@ export function certResolverName(tls?: IngressTrait["tls"]): string {
 export function buildTraefikConfig(
   appName: string,
   serviceName: string,
-  props: IngressTrait,
+  props: IngressTrait & { host: string },
   namespace?: string,
 ): Record<string, unknown> {
   const { host, port, exposure, tls } = props;
@@ -191,7 +191,7 @@ export function caddyAuxPath(appName: string, namespace?: string): string {
 export function buildCaddySnippet(
   appName: string,
   serviceName: string,
-  props: IngressTrait,
+  props: IngressTrait & { host: string },
   namespace?: string,
   upstreamAlias?: string,
 ): string {
@@ -337,16 +337,24 @@ export const ingressTraitDefinition: TraitDefinition<"ingress"> = {
     const provider = input.context.ingressProvider ?? "traefik";
     const namespace = input.context.namespace;
 
+    // No host: the default is the identity stem under the install's domain, so two instances
+    // of one app get two hosts without either manifest saying so.
+    const host = props.host?.trim() || (input.context.domain ? defaultHost(namespace, appName, input.context.domain) : undefined);
+    if (!host) {
+      return { compose, errors: [`ingress on ${appName}: no host: given and the install has no domain to build one from — set domain: in etc/system.yaml or host: in the trait`] };
+    }
+    const routed: IngressTrait & { host: string } = { ...props, host };
+
     const { path, content } =
       provider === "caddy"
         ? {
             path: caddyAuxPath(appName, namespace),
-            content: buildCaddySnippet(appName, serviceName, props, namespace),
+            content: buildCaddySnippet(appName, serviceName, routed, namespace),
           }
         : {
             path: traefikAuxPath(appName, namespace),
             content: yamlStringify(
-              buildTraefikConfig(appName, serviceName, props, namespace),
+              buildTraefikConfig(appName, serviceName, routed, namespace),
               { sortMapEntries: true },
             ),
           };
@@ -354,6 +362,7 @@ export const ingressTraitDefinition: TraitDefinition<"ingress"> = {
     return {
       compose,
       auxiliaryFiles: [{ path, content }],
+      metadata: { [`ingressHost:${serviceName}`]: host },
       // The trait declares the route; the deploy service owns activation. It installs all
       // route/policy fragments, validates the complete imported Caddyfile, then reloads Caddy
       // without a restart. That keeps manifest compilation separate from consumer lifecycle.

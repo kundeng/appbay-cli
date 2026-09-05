@@ -140,7 +140,8 @@ export type Overlay = z.infer<typeof OverlaySchema>;
 
 export const IngressTraitSchema = z.object({
   type: z.literal("ingress"),
-  host: z.string(),
+  /** Omit to be routed at `<app>.<domain>` (or `<ns>.<app>.<domain>` when namespaced). */
+  host: z.string().optional(),
   port: z.number(),
   exposure: z.enum(["internal", "external", "both"]).default("both"),
   tls: z

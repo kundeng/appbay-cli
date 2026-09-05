@@ -42,38 +42,27 @@ top-level scope field is gone.
 :::
 
 ::: {.callout-warning}
-## Only `${{project.DOMAIN}}` actually resolves today
+## The four scopes
 
-The `${{scope.KEY}}` reference vocabulary is **unchanged** by the rename — it is still
-`project`, `environment` and `service`. That asymmetry is deliberate and **permanent**, not a
-migration still owed: `namespace:` and `${{project.KEY}}` are different things that shared a
-word.
+| scope | store | who writes it |
+|---|---|---|
+| `${{project.KEY}}` | `etc/system.yaml`, allow-listed keys (`DOMAIN`) | `appbay init` |
+| `${{namespace.KEY}}` | `etc/namespaces/<namespace>.yaml`, flat `KEY: value` | the operator, one file per deployment |
+| `${{app.KEY}}` | computed: `NAME`, `NAMESPACE`, `STEM`, `HOST` | the compiler |
+| `${{service.KEY}}` | reserved, empty | — |
 
-- **`namespace:`** is a per-app *label*. It disambiguates container names, network aliases
-  and state keys. It has no variable store and never had one.
-- **`${{project.KEY}}`** reads the *installation* config — one file per host, shared by every
-  app on it, whatever their namespaces.
+`namespace` is both identity and a value store: it enters every generated name, and it names
+the values file this deployment resolves against. An un-namespaced app is in `default` and
+reads `etc/namespaces/default.yaml` if one exists. `${{app.HOST}}` is the same string the
+ingress trait uses when a manifest omits `host:`.
 
-Renaming the prefix to `${{namespace.KEY}}` would point every reference at a scope that holds
-nothing. The two are independent, so the §4 field rename does not oblige a reference rename.
-
-What the docs below describe as three variable stores is currently one, and it holds one key.
-`loadProjectVars` reads a single `domain:` line out of `$APPBAY_HOME/etc/system.yaml` and returns
-`{ DOMAIN }`. The exposed keys are an **allow-list**, not everything in the file: `home:`,
-`project:` and `container_runtime:` live there too and are deliberately *not* variables —
-`home:` in particular is an absolute path, which is machine state and not something a manifest
-should be able to interpolate. Nothing reads `projects/<name>/project.yaml` or
-`environments/<env>.yaml`, so
-`${{environment.KEY}}` and `${{service.KEY}}` resolve against empty maps and always fail.
-
-A reference to an unknown key survives the render as a literal and the deploy then refuses
-the app, so this fails safe — but no error names the missing store directly.
-:::
+A reference to an unknown key or scope is a compile error naming the app and the reference,
+and the app is not deployed.
 
 ## Namespace
 
-A namespace is a deployment identity. It distinguishes two instances of the same app in one
-installation, and it scopes the variables an app resolves against.
+A namespace is a deployment identity and a value store. It distinguishes two instances of the
+same app in one installation, and it names the file their `${{namespace.KEY}}` values come from.
 
 ```yaml
 # appbay.yaml
@@ -89,6 +78,8 @@ is what lets a value supplied at compile time take effect — a schema default w
 - The app's private network: `<namespace>_<app>_internal`
 - The shared-network alias other apps dial: `<namespace>_<app>_<service>`
 - The generated edge fragment: `<namespace>.<app>.caddy` / `.yml`
+- The default ingress host: `<namespace>.<app>.<domain>` when the manifest omits `host:`
+- The values file: `etc/namespaces/<namespace>.yaml`
 
 ⚠️ **Dots become hyphens wherever the namespace reaches a hostname.** A dot separates labels
 in DNS, so `uom.sim_litellm_web` would parse as host `uom` in domain `sim_litellm_web` and

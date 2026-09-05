@@ -103,7 +103,7 @@ const COMPOSE_WITH_SCOPED_VARS = `services:
     image: nginx:latest
     environment:
       - DOMAIN=\${{project.DOMAIN}}
-      - ENV=\${{environment.ENV_NAME}}
+      - ENV=\${{namespace.ENV_NAME}}
 `;
 
 // ---------------------------------------------------------------------------
@@ -360,13 +360,13 @@ services:
   // 8. Scoped variable resolution -- most specific scope wins
   // -------------------------------------------------------------------------
 
-  it("scoped variable resolution: environment overrides project scope", async () => {
+  it("scoped variable resolution: a namespace value is its own scope beside project", async () => {
     await writeApp(tempDir, "myapp", COMPOSE_WITH_SCOPED_VARS, APPBAY_WITH_SCOPED_VARS);
 
     const result = await compile(
       makeOptions({
         projectVars: { DOMAIN: "project.example.com", ENV_NAME: "project-env" },
-        environmentVars: { ENV_NAME: "staging" },
+        namespaceValues: { homelab: { ENV_NAME: "staging" } },
       }),
     );
 
@@ -376,7 +376,7 @@ services:
     // project.DOMAIN should resolve from projectVars (no environment override).
     expect(rendered).toContain("project.example.com");
 
-    // environment.ENV_NAME should resolve from environmentVars (most specific).
+    // namespace.ENV_NAME resolves from the app's namespace values (`homelab`, from its manifest).
     expect(rendered).toContain("staging");
     expect(rendered).not.toContain("project-env");
   });

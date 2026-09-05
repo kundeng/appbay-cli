@@ -315,15 +315,16 @@ describe("compile()", () => {
     expect(backupMeta.volumes).toEqual(["myapp_data", "myapp_db"]);
   });
 
-  it("traitMetadata is empty for apps with no traits that emit metadata", async () => {
-    // App with only ingress trait (no backup) — traitMetadata should be empty.
+  it("an ingress trait records the host it routes, and nothing else, in traitMetadata", async () => {
+    // The compiler's duplicate-host check reads these keys (S40).
     await writeApp(tempDir, "myapp", SIMPLE_COMPOSE, APPBAY_WITH_INGRESS);
 
     const result = await compile(makeOptions());
 
     expect(result.errors).toHaveLength(0);
-    const app = result.apps[0]!;
-    expect(app.traitMetadata).toEqual({});
+    const keys = Object.keys(result.apps[0]!.traitMetadata);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^ingressHost:/);
   });
 
   it("traitMetadata is empty for apps without appbay.yaml", async () => {

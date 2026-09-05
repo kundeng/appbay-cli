@@ -12,7 +12,8 @@ function makeValues(
 ): ScopeValues {
   return {
     project: {},
-    environment: {},
+    namespace: {},
+    app: {},
     service: {},
     ...overrides,
   };
@@ -58,21 +59,22 @@ describe("ScopeResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 3. Full chain: service > environment > project
+  // 3. Full chain: service > namespace > project
   // -------------------------------------------------------------------------
 
-  it("respects full scope chain: service > environment > project", () => {
+  it("respects full scope chain: service > namespace > project", () => {
     const resolver = new ScopeResolver(
       makeValues({
         project: { VAR: "from-project" },
-        environment: { VAR: "from-environment" },
+        namespace: { VAR: "from-namespace" },
+        app: {},
         service: { VAR: "from-service" },
       }),
     );
 
     // Each scope reference returns its own value when explicitly named.
     expect(resolver.resolve("${{project.VAR}}").resolved).toBe("from-project");
-    expect(resolver.resolve("${{environment.VAR}}").resolved).toBe("from-environment");
+    expect(resolver.resolve("${{namespace.VAR}}").resolved).toBe("from-namespace");
     expect(resolver.resolve("${{service.VAR}}").resolved).toBe("from-service");
   });
 

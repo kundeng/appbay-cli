@@ -24,7 +24,8 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { APP_LABEL, SHARED_NETWORK } from "./identity.js";
+import { APP_LABEL, SHARED_NETWORK, auxFileStem, defaultHost } from "./identity.js";
+import { loadNamespaceValues } from "../schemas/namespace-values.js";
 
 /** The collection an app is in when it declares none: a home with no collections is one stack. */
 export const DEFAULT_COLLECTION = "default";
@@ -53,36 +54,20 @@ import { loadInstanceConfig, } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
 
-/**
- * What an operator can actually do about an unresolved `${{scope.KEY}}` reference.
- *
- * 🚨 THE OLD TEXT NAMED FOUR THINGS AND THREE DID NOT EXIST: "Define the variable in
- * project.yaml or environment.yaml, or use --project-vars / --env-vars flags." Measured —
- * `--project-vars` and `--env-vars` are not commander options anywhere in the CLI, and
- * nothing reads `environment.yaml`. The one message a stuck operator gets sent them to two
- * flags the binary rejects and a file it never opens. RFC-001 §4.8.
- *
- * What is real: `loadProjectVars` reads a single `domain:` line from
- * `$APPBAY_HOME/project.yaml` and exposes it as `${{project.DOMAIN}}`. The `environment` and
- * `service` maps are threaded through the compiler but nothing populates them, so a
- * reference to either can never resolve — and saying that is more use than naming a file to
- * go and edit.
- */
+/** What an operator can do about an unresolved `${{scope.KEY}}` reference: name the store. */
 function scopeErrorSuggestion(scope: string): string {
-  if (scope === "project") {
-    return (
-      "Only ${{project.DOMAIN}} is available today, from the `domain:` line in " +
-      "$APPBAY_HOME/project.yaml. No other project-level variables are loaded."
-    );
+  switch (scope) {
+    case "project":
+      return "Only ${{project.DOMAIN}} is available today, from the `domain:` line in $APPBAY_HOME/project.yaml (etc/system.yaml). No other project-level variables are loaded.";
+    case "namespace":
+      return "Namespace values come from $APPBAY_HOME/etc/namespaces/<namespace>.yaml (flat KEY: value); an un-namespaced app reads default.yaml.";
+    case "app":
+      return "The app scope has NAME, NAMESPACE, STEM and, when the install has a domain, HOST.";
+    case "service":
+      return "The `service` scope is declared but nothing populates it, so no ${{service.KEY}} reference can resolve. Use a plain Compose ${VAR} read from the app's .env.";
+    default:
+      return "Valid scopes are: project, namespace, app, service.";
   }
-  if (scope === "environment" || scope === "service") {
-    return (
-      `The \`${scope}\` scope is declared but nothing populates it, so no ` +
-      `\${{${scope}.KEY}} reference can resolve. Use \${{project.DOMAIN}}, or a plain ` +
-      "Compose ${VAR} read from the app's .env."
-    );
-  }
-  return "Valid scopes are: project, environment, service.";
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +99,10 @@ export interface CompileOptions {
   /** Project-level variables for scope resolution. */
   projectVars?: Record<string, string>;
   /** Environment-level variables for scope resolution. */
-  environmentVars?: Record<string, string>;
+  /** Per-namespace values, keyed by namespace, when the caller has them (tests). Otherwise read from `namespacesDir`. */
+  namespaceValues?: Record<string, Record<string, string>>;
+  /** Where `<namespace>.yaml` files live; `$APPBAY_HOME/etc/namespaces`. */
+  namespacesDir?: string;
 }
 
 /** A single logical change entry (trait attached, overlay activated, etc.). */
@@ -218,7 +206,8 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     runtimeFacts = DEFAULT_RUNTIME_FACTS,
     namespace,
     projectVars = {},
-    environmentVars = {},
+    namespaceValues,
+    namespacesDir,
   } = options;
 
   const results: AppCompileResult[] = [];
@@ -308,7 +297,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
         generatedValueStore,
         namespace,
         projectVars,
-        environmentVars,
+        namespaceValuesFor: (ns: string) => namespaceValues?.[ns] ?? (namespacesDir ? loadNamespaceValues(namespacesDir, ns) : {}),
       });
 
       results.push(appResult.result);
@@ -386,6 +375,21 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     );
   }
 
+  // Two apps routed at one host would fight at the edge; say so at compile time, naming both.
+  const hostOwners = new Map<string, string[]>();
+  for (const a of results) {
+    for (const [k, val] of Object.entries(a.traitMetadata)) {
+      if (k.startsWith("ingressHost:") && typeof val === "string") hostOwners.set(val, [...(hostOwners.get(val) ?? []), a.appName]);
+    }
+  }
+  for (const [host, owners] of hostOwners) {
+    const distinct = [...new Set(owners)];
+    if (distinct.length < 2) continue;
+    for (const owner of distinct) {
+      errors.push({ appName: owner, stage: "ingress", message: `host ${host} is routed by more than one app: ${distinct.join(", ")}. Give each its own host: (or a namespace, which makes the default host differ).` });
+    }
+  }
+
   return { apps: results, errors, warnings };
 }
 
@@ -406,7 +410,7 @@ interface CompileAppInput {
   /** Namespace from the invocation. Undefined means "the manifest decides". */
   namespace: string | undefined;
   projectVars: Record<string, string>;
-  environmentVars: Record<string, string>;
+  namespaceValuesFor: (namespace: string) => Record<string, string>;
 }
 
 interface CompileAppOutput {
@@ -430,7 +434,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     generatedValueStore,
     namespace: invocationNamespace,
     projectVars,
-    environmentVars,
+    namespaceValuesFor,
   } = input;
 
   const errors: CompileError[] = [];
@@ -480,9 +484,18 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   // Stage 2b: Resolve scoped variables (${{scope.KEY}})
   // -----------------------------------------------------------------------
 
+  // Scopes, per app: the host's values, this namespace's values, and what the compiler
+  // knows about the app itself. `HOST` is the default ingress host (identity.defaultHost).
+  const appScope: Record<string, string> = {
+    NAME: app.name,
+    NAMESPACE: appNamespace,
+    STEM: auxFileStem(appNamespace, app.name),
+    ...(projectVars.DOMAIN ? { HOST: defaultHost(appNamespace, app.name, projectVars.DOMAIN) } : {}),
+  };
   const scopeResolver = new ScopeResolver({
     project: projectVars,
-    environment: environmentVars,
+    namespace: namespaceValuesFor(appNamespace),
+    app: appScope,
     service: {},
   });
 
@@ -622,6 +635,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         // Resolved per app rather than threaded through every call site; the resolver
         // caches per home path, so this is one file read for the whole compile.
         ingressProvider: resolveIngressProvider(join(appsDir, "..", "..")),
+        domain: projectVars.DOMAIN,
       },
     });
 

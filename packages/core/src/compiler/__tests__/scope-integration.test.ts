@@ -1,7 +1,7 @@
 /**
  * Integration tests for scoped variable resolution through the compile pipeline.
  *
- * Tests that project.yaml and environment.yaml variables resolve correctly
+ * Tests that project and namespace values resolve correctly
  * in compose environment, overlays, and trait properties.
  */
 
@@ -46,7 +46,7 @@ describe("Scope resolution integration", () => {
     expect(result.apps[0].rendered).toContain("TZ=America/New_York");
   });
 
-  it("environment variables override project variables", async () => {
+  it("namespace values resolve beside project values", async () => {
     const appsDir = join(testDir, "apps-env-override");
     const appDir = join(appsDir, "myapp");
     await mkdir(appDir, { recursive: true });
@@ -57,7 +57,7 @@ describe("Scope resolution integration", () => {
   web:
     image: nginx
     environment:
-      - DOMAIN=\${{environment.DOMAIN}}
+      - DOMAIN=\${{namespace.DOMAIN}}
 `,
     );
 
@@ -66,7 +66,7 @@ describe("Scope resolution integration", () => {
       rendersDir: join(testDir, "r-env"),
       stateDir: join(testDir, "s-env"),
       projectVars: { DOMAIN: "project.lan" },
-      environmentVars: { DOMAIN: "prod.example.com" },
+      namespaceValues: { default: { DOMAIN: "prod.example.com" } },
     });
 
     expect(result.apps[0].rendered).toContain("DOMAIN=prod.example.com");
@@ -232,7 +232,7 @@ describe("suggestions for an unresolved ${{scope.KEY}}", () => {
     const all = [
       ...(await suggestionsFor(
         "services:\n  web:\n    image: nginx\n    environment:\n" +
-          "      - A=${{project.NOPE}}\n      - B=${{environment.X}}\n      - C=${{bogus.Y}}\n",
+          "      - A=${{project.NOPE}}\n      - B=${{service.X}}\n      - C=${{bogus.Y}}\n",
       )).values(),
     ].join("\n");
 
@@ -244,7 +244,7 @@ describe("suggestions for an unresolved ${{scope.KEY}}", () => {
   it("tells the truth per scope", async () => {
     const s = await suggestionsFor(
       "services:\n  web:\n    image: nginx\n    environment:\n" +
-        "      - A=${{project.NOPE}}\n      - B=${{environment.X}}\n      - C=${{bogus.Y}}\n",
+        "      - A=${{project.NOPE}}\n      - B=${{service.X}}\n      - C=${{bogus.Y}}\n",
     );
     const find = (needle: string) =>
       [...s.entries()].find(([msg]) => msg.includes(needle))?.[1] ?? "";
@@ -253,10 +253,10 @@ describe("suggestions for an unresolved ${{scope.KEY}}", () => {
     expect(find('scope "project"')).toContain("${{project.DOMAIN}}");
     expect(find('scope "project"')).toContain("$APPBAY_HOME/project.yaml");
 
-    // environment: the store is not populated, so say that rather than name a file to edit.
-    expect(find('scope "environment"')).toContain("nothing populates it");
+    // service: the store is not populated, so say that rather than name a file to edit.
+    expect(find('scope "service"')).toContain("nothing populates it");
 
     // an unknown scope is a typo — list the valid ones.
-    expect(find('Unknown scope "bogus"')).toContain("project, environment, service");
+    expect(find('Unknown scope "bogus"')).toContain("project, namespace, app, service");
   });
 });

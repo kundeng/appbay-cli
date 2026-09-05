@@ -277,9 +277,10 @@ Variables are resolved by scope prefix. Each `${{scope.KEY}}` reference targets 
 
 | Syntax | Resolves from |
 |--------|---------------|
-| `${{project.KEY}}` | `projects/<name>/project.yaml` only |
-| `${{environment.KEY}}` | `projects/<name>/environments/<env>.yaml` only |
-| `${{service.KEY}}` | Service-level vars in `appbay.yaml` or `.env` only |
+| `${{project.KEY}}` | the per-host values in `etc/system.yaml` (allow-listed: `DOMAIN`) |
+| `${{namespace.KEY}}` | `etc/namespaces/<namespace>.yaml`, the values of this deployment; `default.yaml` for an un-namespaced app |
+| `${{app.KEY}}` | what the compiler knows about this app: `NAME`, `NAMESPACE`, `STEM` (`app` or `ns.app`), `HOST` (the default ingress host, when the host has a domain) |
+| `${{service.KEY}}` | reserved; resolves against an empty map today |
 
 There is no cascading fallthrough between stores. An undefined reference produces an explicit
 error naming the scope and key; Appbay never silently substitutes an empty string.

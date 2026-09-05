@@ -1,3 +1,4 @@
+import { defaultHost } from "../../compiler/identity.js";
 /**
  * Supported authentication trait: Caddy Security portal plus authorization policy.
  *
@@ -19,7 +20,8 @@ function safePolicyName(appName: string): string {
 
 function ingressHost(input: TraitTransformInput): string | null {
   const ingress = input.siblingTraits.find((trait) => trait.type === "ingress");
-  const host = typeof ingress?.host === "string" ? ingress.host.trim() : "";
+  const declared = typeof ingress?.host === "string" ? ingress.host.trim() : "";
+  const host = declared || (ingress && input.context.domain ? defaultHost(input.context.namespace, input.app, input.context.domain) : "");
   return host || null;
 }
 

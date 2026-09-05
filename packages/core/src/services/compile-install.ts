@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { compile, type CompileResult } from "../compiler/compile.js";
 import { detectRuntimeFacts } from "../runtime/facts.js";
 import { loadProjectVars } from "./instance-vars.js";
+import { NAMESPACES_DIR_REL } from "../schemas/namespace-values.js";
 
 export interface CompileInstallOptions {
   /** Apps to compile; undefined means every installed app. */
@@ -26,6 +27,7 @@ export async function compileInstall(
     rendersDir: join(appbayHome, "var", "lib", "renders"),
     stateDir,
     apps: options.apps,
+    namespacesDir: join(appbayHome, NAMESPACES_DIR_REL),
     projectVars: options.projectVars ?? (await loadProjectVars(appbayHome)),
     runtimeFacts: detectRuntimeFacts({ stateDir }),
   });

@@ -187,7 +187,7 @@ describe("validation errors", () => {
     }
   });
 
-  it("rejects ingress trait missing required host", () => {
+  it("accepts an ingress trait without host — the default derives from identity (S40)", () => {
     const result = safeParse({
       services: {
         app: {
@@ -195,7 +195,7 @@ describe("validation errors", () => {
         },
       },
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("rejects gpu trait with invalid variant", () => {
