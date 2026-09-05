@@ -1,48 +1,44 @@
 # Product
 
-## What appbay-cli is
+## What appbay is
 
-A control plane for Docker Compose applications on one host, running on Docker or
-Podman. An app is an upstream `docker-compose.yml` plus an `appbay.yaml` beside it.
-The manifest declares traits (ingress, GPU, auth, hooks, backup, secrets, scoped
-env), a namespace, and conditional overlays. The compiler turns the pair into the
-compose file that runs, and the deploy path converges it and installs its edge
-route. The CLI is one binary built with Bun.
+An open-source control plane for Docker Compose applications on a self-hosted machine,
+running on Docker or Podman. An operator installs one binary, initialises a home
+directory, and installs apps from a catalog of 150-plus entries. Each app is its upstream
+`docker-compose.yml` plus an `appbay.yaml` beside it. The manifest declares traits
+(ingress, GPU, auth, hooks, backup, secrets, scoped env), a namespace, and conditional
+overlays; the compiler turns the pair into the compose file that runs, and the deploy path
+converges it and installs its edge route. A web control plane, in a separate repository,
+drives the same core.
 
-Kun runs it on his own hosts. There are no other operators.
+Published at `github.com/kundeng/appbay-cli`, installed with one `curl | sh`, MIT-licensed.
+The audience is anyone running a home lab or a small server who wants Compose apps with
+routing, secrets and identity handled for them, on either container runtime, without
+Kubernetes.
 
-## What it is now, in addition
+## Who it is for
 
-The Go rewrite, stackbay, reimplements this command surface from the behaviour this
-repo defines and from the defects its history records. That gives this repo a second
-job: it is the specimen the rewrite learns from. Every defect found here is written
-down with the seam it lives on, so the rewrite carries the lesson and not the bug.
-
-The third job is teaching. Kun reads this codebase to become a strong code reviewer.
-The code is read by seam, across files, and each finding names the file and line it
-came from.
-
-## The three goals, in priority order
-
-1. **Correct.** A command that reports an outcome looked at the thing it reports on.
-   The CLI on Kun's hosts deploys, routes, and reports truthfully on both runtimes.
-2. **Legible.** One fact has one owner. A reader new to the codebase can find where a
-   question is answered without finding it answered twice. Comments state the
-   invariant; the history of how it was learned lives in `docs/history/`.
-3. **Harvested.** Every seam defect found here has a lesson in the rewrite's design
-   record before the rewrite reaches that seam.
-
-## Who reads what
-
-| reader | reads |
+| user | wants |
 |---|---|
-| Kun operating a host | `README.md`, `docs/guide/`, `appbay doctor` |
-| Kun reviewing the code | the seam and ledger records in `docs/history/`, then the file under review |
-| the rewrite | `docs/history/`, the fix history in git, the journeys under `scripts/journeys/` |
+| a self-hosting operator | `appbay install <app>` then `appbay up <app>` and a working `https://<app>.<domain>`, on Docker or Podman, with secrets never on disk in the clear |
+| a catalog author | to package an upstream Compose app with a short `appbay.yaml` and have traits do the rest |
+| a contributor | a codebase where one question is answered in one place, and a test that runs what it names |
+
+## The promises the product makes
+
+1. **Runtime choice is configuration, not a code path.** Docker and Podman are both first
+   class; there is no `if runtime == "podman"` in shared logic.
+2. **What the CLI reports is what it observed.** `deployed` means running and routed on an
+   edge that exists; a check that could not run says unknown, never ok.
+3. **Compose stays Compose.** The upstream file is untouched; appbay compiles beside it and
+   the rendered file is readable by anyone who knows Compose.
+4. **Secrets never reach a render, an argv, or a log.**
+5. **Two instances of one app can share a host.** The namespace enters every generated
+   name.
 
 ## Decided definitions
 
-These are Kun's, and a spec or a doc that contradicts one is wrong.
+These are the maintainer's, and a spec or a doc that contradicts one is wrong.
 
 - **`when:` is about where, not when.** An overlay clause `when: [ollama]` asks whether
   `ollama` is declared in the same collection as this app. It is a statement about the
@@ -58,10 +54,17 @@ These are Kun's, and a spec or a doc that contradicts one is wrong.
 
 ## Boundaries
 
-- The web control plane (`apps/web`) is a separate private repository. This tree holds
-  `packages/core` and `apps/cli` only. Comments and tests here that name a web caller
-  describe something this tree cannot see.
+- The web control plane (`apps/web`) is a separate repository. This tree holds
+  `packages/core` and `apps/cli`. A comment or test here that names a web caller describes
+  something this tree cannot see.
 - The catalog of installable apps is a sibling repository, `appbay-catalog`. This repo
   ships ten system apps in `packages/core/src/system-apps.ts`.
-- Two runtimes are supported, Docker and Podman, and a change is not done until it
-  has run on both.
+- Two runtimes are supported, and a change is not done until it has run on both.
+
+## Related work
+
+A Go reimplementation, stackbay, is being built from this repo's behaviour and from the
+defects its history records. That is a fact about the maintainer's roadmap, not about this
+product: appbay-cli is released, supported, and fixed on its own terms. The review track
+that studies this codebase is described in `CLAUDE.md`, and its records live in
+`docs/history/`.
