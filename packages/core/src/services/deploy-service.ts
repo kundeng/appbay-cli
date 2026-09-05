@@ -25,10 +25,11 @@ import {
   resolveWrapperFileSecrets,
   extractSecretRefs,
 } from "../secrets/resolve-for-deploy.js";
-import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
+import { deployOrder, dependentsOf, isSystemApp } from "../boot-order.js";
+import { loadCollections } from "../schemas/collections.js";
 import { spawnSync } from "node:child_process";
 import { containerBin, findContainerByLabel, resolveIngressProvider } from "../runtime/container-runtime.js";
-import { composePs, findCrashedServices, snapshotContainers, didConverge, type DockerComposeRunner } from "../runtime/observe.js";
+import { composePs, findCrashedServices, snapshotContainers, didConverge, isReady, type DockerComposeRunner } from "../runtime/observe.js";
 import { APP_LABEL, shepherdTarget } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 import { compileInstall } from "./compile-install.js";
@@ -102,6 +103,10 @@ export interface DeployOptions {
   /** Running apps discoverer (injected by caller). */
   /** Project-level variables (e.g., { DOMAIN: "example.com" }). */
   projectVars?: Record<string, string>;
+  /** Overrides `collections.yaml`'s readiness timeout; tests use it. */
+  readinessTimeoutMs?: number;
+  /** Test seam for the readiness poll's pause. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -509,8 +514,23 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     return result;
   }
 
-  // Phase 2-5: Deploy each app (system apps first, in boot order)
-  const orderedApps = sortByDeployOrder(compileResult.apps);
+  // Phase 2-5: Deploy each app in the declared order: system apps first, then the edges
+  // etc/collections.yaml declares, expanded to apps. A cycle or an unknown name refuses the
+  // whole run before anything starts (S39 R1.2); there is no weaker order to fall back to.
+  const collectionsFile = loadCollections(appbayHome);
+  if (collectionsFile.error) {
+    result.compileErrors.push({ stage: "collections", message: collectionsFile.error });
+    return result;
+  }
+  const graph = deployOrder(compileResult.apps, collectionsFile.config.collections);
+  if (graph.errors.length > 0) {
+    for (const message of graph.errors) result.compileErrors.push({ stage: "collections", message });
+    return result;
+  }
+  const orderedApps = graph.order;
+  const readinessTimeoutMs = options.readinessTimeoutMs ?? collectionsFile.config.readiness.timeout_seconds * 1000;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const notReady = new Set<string>();
 
   // 🚨 AN APP WHOSE CONFIGURATION DID NOT COMPILE IS NOT DEPLOYED.
   //
@@ -533,6 +553,18 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   for (const app of orderedApps) {
     const planStatus = app.plan.status as "new" | "changed" | "unchanged";
     const isSystem = isSystemApp(app.appName);
+
+    // A dependency that failed or never became ready: skip with the reason, do not start.
+    const blockedBy = [...(graph.dependsOn.get(app.appName) ?? [])].filter((d) => notReady.has(d));
+    if (blockedBy.length > 0) {
+      result.apps.push({
+        appName: app.appName, status: "failed", isSystem, planStatus,
+        error: `skipped: depends on ${blockedBy.join(", ")}, which did not become ready`,
+      });
+      result.failed++;
+      notReady.add(app.appName);
+      continue;
+    }
     const appResult: AppDeployResult = {
       appName: app.appName,
       status: "unchanged",
@@ -560,6 +592,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         appResult.error = `Failed to write rendered output: ${err instanceof Error ? err.message : String(err)}`;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
 
@@ -580,6 +613,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         appResult.error = resolved.error;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
       const secretEnv = resolved.env;
@@ -622,6 +656,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         appResult.error = dcResult.output;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
       // `up -d` succeeding means "started", not "still running" — see findCrashedServices.
@@ -640,6 +675,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         appResult.error = `container(s) exited immediately after start: ${crashed.value.join(", ")}`;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
 
@@ -654,6 +690,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         result.startedButUnrouted++;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
 
@@ -688,6 +725,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         appResult.error = resolvedUnchanged.error;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
       const unchangedSecretEnv = resolvedUnchanged.env;
@@ -755,6 +793,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         result.startedButUnrouted++;
         result.apps.push(appResult);
         result.failed++;
+        notReady.add(app.appName);
         continue;
       }
 
@@ -769,6 +808,30 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         result.deployed++;
       } else {
         result.unchanged++;
+      }
+    }
+
+    // Something starts after this app: wait until it is ready, bounded, and observed.
+    if (dependentsOf(app.appName, graph.dependsOn).size > 0) {
+      const composePath = join(rendersDir, app.appName, "docker-compose.rendered.yml");
+      const env = (await resolveDeployEnv(app, appsDir)).env;
+      const deadline = Date.now() + readinessTimeoutMs;
+      let last = "";
+      let ready = false;
+      for (;;) {
+        const probe = isReady(runDockerCompose, composePath, env);
+        if (probe.kind === "unknown") { last = `could not ask compose (${probe.reason})`; break; }
+        if (probe.value.ready) { ready = true; break; }
+        last = probe.value.detail;
+        if (Date.now() >= deadline) break;
+        await sleep(2000);
+      }
+      if (!ready) {
+        if (appResult.status === "deployed") result.deployed--; else result.unchanged--;
+        appResult.status = "failed";
+        appResult.error = `not ready within ${String(Math.round(readinessTimeoutMs / 1000))}s: ${last}`;
+        result.failed++;
+        notReady.add(app.appName);
       }
     }
 

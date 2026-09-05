@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { discoverApps, partitionByBootOrder } from "@appbay/core";
+import { discoverApps, deployOrder, loadCollections } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -77,9 +77,16 @@ export const downCommand = new Command("down")
     // BOOT order — the exact opposite of what the comment claimed. Latent only because one
     // ingress provider is installed at a time, so the list had one element. Derive the order
     // from SYSTEM_APP_BOOT_ORDER instead of assuming the caller supplied it.
-    const { system, user } = partitionByBootOrder(targetApps.map((a) => a.name));
-    const byName = new Map(targetApps.map((a) => [a.name, a]));
-    const orderedApps = [...user, ...system.reverse()].map((n) => byName.get(n)!);
+    // The reverse of the start order, from the same graph `up` uses: dependents stop first,
+    // the edge everything routes through goes last. An order that cannot be honoured refuses.
+    const collections = loadCollections(appbayHome);
+    if (collections.error) { console.error(collections.error); process.exit(1); }
+    const graph = deployOrder(
+      targetApps.map((a) => ({ appName: a.name, collections: a.appbayConfig?.collection?.length ? a.appbayConfig.collection : ["default"], app: a })),
+      collections.config.collections,
+    );
+    if (graph.errors.length > 0) { for (const e of graph.errors) console.error(`  ${e}`); process.exit(1); }
+    const orderedApps = graph.order.map((o) => o.app).reverse();
 
     console.log("Stopping apps...\n");
 

@@ -218,26 +218,26 @@ To be written at activation, once §1.4 is decided. The shape is constrained alr
 
 - [ ] 1. Decide the granularity
   - [x] 1.1 C. Collections expand to app-level edges; cycles and unknown names fail before anything starts. Kun's frame: a collection is a stack, and `when:` is membership in a shared one (implemented first: overlay peers = installed apps sharing a collection; no collection = `default`).
-  - [ ] 2.1 Define what "ready" means, including for an app that declares nothing
+  - [x] 2.1 Ready = every container running and every healthcheck healthy; a service with no healthcheck is ready when it runs, and the docs say so (`isReady` in runtime/observe.ts)
     - **Requirements**: 2.1, 2.2 · **Pillar**: Design
-  - [ ] 2.2 Implement the bounded wait in the deploy loop; timeout fails the app and skips
+  - [x] 2.2 Bounded wait in the deploy loop, only for apps something depends on; timeout fails the app and skips
         dependents with a named reason
     - **Depends**: 2.1 · **Requirements**: 2.1, 2.3 · **Pillar**: MVP, Test
-  - [ ] 2.3 Correct `boot-order.ts:11` and `:20`
+  - [x] 2.3 Corrected `boot-order.ts` comments
     - **Depends**: 2.2 · **Requirements**: 4.1 · **Pillar**: Docs
 - [ ] 3. The graph
-  - [ ] 3.1 `etc/collections.yaml` schema + reader; absent file is a byte-for-byte no-op
+  - [x] 3.1 `schemas/collections.ts`; absent file is a no-op
     - **Depends**: 1.1 · **Requirements**: 1.1 · **Pillar**: MVP
-  - [ ] 3.2 Toposort behind `sortByDeployOrder`, seeded by `SYSTEM_APP_BOOT_ORDER`; cycles and
+  - [x] 3.2 `deployOrder` (Kahn, system apps first); cycles and
         unknown names fail before anything starts
     - **Depends**: 3.1 · **Requirements**: 1.1, 1.2, 1.3 · **Pillar**: MVP, Test
-  - [ ] 3.3 `down` reverses the same graph rather than a second list
+  - [x] 3.3 `down` reverses the same graph
     - **Depends**: 3.2 · **Requirements**: 3.1 · **Pillar**: MVP, Test
 - [ ] 4. Prove it on a host where the order matters
   - [ ] 4.1 A dependency with a slow start (initdb, or an image that loads on boot), verifying
         the dependent does not start until the dependency SERVES — the case `up -d` ordering
         gets wrong and the whole sprint exists to fix
     - **Depends**: 2.2, 3.2 · **Requirements**: 1.1, 2.1 · **Pillar**: Test
-  - [ ] 4.2 Document the file where collections are described (`docs/guide/concepts.qmd:243`
+  - [x] 4.2 Documented in `docs/guide/concepts.qmd` (collections, `collections.yaml`, readiness); `overlays.qmd` carries the `when:` definition
         currently says collections are "purely a selection mechanism" — this changes that)
     - **Depends**: 3.2 · **Requirements**: 2.2 · **Pillar**: Docs

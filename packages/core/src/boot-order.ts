@@ -3,7 +3,7 @@
  *
  * Defines the fixed deployment sequence for system apps. When `appbay up --all`
  * or `appbay init` deploys everything, system apps are deployed first in this
- * order, with user apps following after all system apps are healthy.
+ * order, with user apps following after all system apps are ready (running, and healthy where a healthcheck exists — see `isReady`).
  *
  * The ordering exists because system apps have implicit dependencies:
  *   - traefik: supported ingress-only edge
@@ -17,7 +17,7 @@
  * Fixed boot order for system apps. Apps not in this list are treated as
  * user apps and deployed after all system apps.
  *
- * The order matters: each app may depend on the ones above it being healthy.
+ * The order matters: each app may depend on the ones above it being ready (running, and healthy where a healthcheck exists — see `isReady`).
  */
 export const SYSTEM_APP_BOOT_ORDER = [
   // 🚨 BOTH INGRESS PROVIDERS BELONG HERE, AND caddy WAS MISSING. On a
@@ -101,4 +101,84 @@ export function sortByDeployOrder<T extends { appName: string }>(
   }
 
   return result;
+}
+
+/** What `deployOrder` needs to know about an app. */
+export interface OrderableApp {
+  appName: string;
+  collections: string[];
+}
+
+/** Collection order as `etc/collections.yaml` declares it: `after[c]` are the collections c waits for. */
+export type CollectionOrder = Record<string, { after: string[] }>;
+
+export interface DeployOrder<T extends OrderableApp> {
+  order: T[];
+  /** Direct dependencies: app → the apps that must be ready before it starts. */
+  dependsOn: Map<string, Set<string>>;
+  /** Why the order cannot be honoured. Non-empty means nothing may start. */
+  errors: string[];
+}
+
+/**
+ * The order apps start in: system apps first in boot order, then every edge that
+ * `collections.yaml` declares, expanded to app level (option C of S39 §1.4). A cycle or an
+ * unknown collection is an error naming the apps involved, returned before anything runs;
+ * there is no weaker order to fall back to.
+ */
+export function deployOrder<T extends OrderableApp>(apps: T[], collections: CollectionOrder = {}): DeployOrder<T> {
+  const errors: string[] = [];
+  const byCollection = new Map<string, T[]>();
+  for (const app of apps) for (const c of app.collections) byCollection.set(c, [...(byCollection.get(c) ?? []), app]);
+
+  const dependsOn = new Map<string, Set<string>>(apps.map((a) => [a.appName, new Set<string>()]));
+  const systemNames = apps.filter((a) => isSystemApp(a.appName)).map((a) => a.appName);
+  for (const app of apps) {
+    if (isSystemApp(app.appName)) continue;
+    for (const s of systemNames) dependsOn.get(app.appName)!.add(s);
+  }
+  for (const [name, spec] of Object.entries(collections)) {
+    for (const before of spec.after) {
+      if (!(before in collections) && !byCollection.has(before)) {
+        errors.push(`collection "${name}" is declared after "${before}", which no app declares and collections.yaml does not define`);
+        continue;
+      }
+      for (const dependent of byCollection.get(name) ?? []) {
+        for (const dep of byCollection.get(before) ?? []) {
+          if (dep.appName !== dependent.appName) dependsOn.get(dependent.appName)!.add(dep.appName);
+        }
+      }
+    }
+  }
+
+  // Kahn's algorithm; ties keep the input order after system apps in boot order.
+  const rank = new Map<string, number>();
+  SYSTEM_APP_BOOT_ORDER.forEach((n, i) => rank.set(n, i));
+  apps.forEach((a, i) => { if (!rank.has(a.appName)) rank.set(a.appName, SYSTEM_APP_BOOT_ORDER.length + i); });
+  const remaining = new Map(apps.map((a) => [a.appName, a]));
+  const indegree = new Map(apps.map((a) => [a.appName, dependsOn.get(a.appName)!.size]));
+  const order: T[] = [];
+  while (remaining.size > 0) {
+    const ready = [...remaining.keys()].filter((n) => indegree.get(n) === 0).sort((x, y) => rank.get(x)! - rank.get(y)!);
+    if (ready.length === 0) {
+      errors.push(`start order has a cycle among: ${[...remaining.keys()].join(", ")}`);
+      break;
+    }
+    const next = ready[0]!;
+    order.push(remaining.get(next)!);
+    remaining.delete(next);
+    for (const [n, deps] of dependsOn) if (deps.has(next) && remaining.has(n)) indegree.set(n, indegree.get(n)! - 1);
+  }
+  return { order, dependsOn, errors };
+}
+
+/** Everything that transitively depends on `appName`. */
+export function dependentsOf(appName: string, dependsOn: Map<string, Set<string>>): Set<string> {
+  const out = new Set<string>();
+  const queue = [appName];
+  while (queue.length > 0) {
+    const cur = queue.pop()!;
+    for (const [n, deps] of dependsOn) if (deps.has(cur) && !out.has(n)) { out.add(n); queue.push(n); }
+  }
+  return out;
 }

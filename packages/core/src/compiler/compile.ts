@@ -154,6 +154,8 @@ export interface AppCompileResult {
   shepherdActions: import("../traits/types.js").ShepherdAction[];
   /** Structured logical changes: which traits/overlays were applied. */
   logicalChanges: LogicalGroup[];
+  /** The collections this app declares, or `["default"]`. The deploy orders by them. */
+  collections: string[];
 }
 
 /** An error encountered during compilation. */
@@ -777,6 +779,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       traitMetadata,
       shepherdActions,
       logicalChanges,
+      collections: config?.collection?.length ? config.collection : [DEFAULT_COLLECTION],
     },
     errors,
     warnings,

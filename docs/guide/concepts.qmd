@@ -251,6 +251,26 @@ Usage: `appbay up --collection ai-stack` deploys all apps tagged with that colle
 
 Collections decide what an overlay's `when:` can see: a peer counts only if it shares a collection with the app. They do not participate in variable resolution; that is the namespace's job.
 
+#### Start order: `etc/collections.yaml`
+
+```yaml
+collections:
+  data-layer:
+    description: databases and caches
+  ai-stack:
+    after: [data-layer]      # no app of ai-stack starts until every app of data-layer is READY
+readiness:
+  timeout_seconds: 90        # per app; a timeout fails that app and skips its dependents
+```
+
+The deploy expands collection order to edges between apps and starts them in that order,
+system apps (the edge) first. An app is **ready** when every one of its containers is running
+and every container with a healthcheck reports healthy; a service with no healthcheck is
+ready when it runs, so declare one for anything a dependent waits on. A cycle, or an `after:`
+naming a collection nothing declares, refuses the whole deploy before anything starts. An app
+that is in two ordered collections takes every edge from both; `appbay down` stops in the
+reverse of the same order.
+
 ## Variable resolution
 
 Variables are resolved by scope prefix. Each `${{scope.KEY}}` reference targets a specific variable store:

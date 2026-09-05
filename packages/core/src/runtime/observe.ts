@@ -32,6 +32,8 @@ export interface ComposePsRow {
   status: string;
   /** Published ports, rendered `host->container/proto`, comma-joined. */
   ports: string;
+  /** `healthy`, `unhealthy`, `starting`, or "" when the service declares no healthcheck. */
+  health: string;
   exitCode: number;
 }
 
@@ -61,7 +63,7 @@ export function composePs(
     const r = row as {
       ID?: string; Id?: string;
       Name?: string; Names?: string[];
-      Service?: string; State?: string; Status?: string; ExitCode?: number;
+      Service?: string; State?: string; Status?: string; ExitCode?: number; Health?: string;
       Ports?: unknown; Publishers?: unknown;
       Labels?: Record<string, string>;
     };
@@ -74,6 +76,7 @@ export function composePs(
       state: (r.State ?? "").toLowerCase(),
       status: r.Status ?? "",
       ports: formatPorts(r.Publishers ?? r.Ports),
+      health: (r.Health ?? "").toLowerCase(),
       exitCode: typeof r.ExitCode === "number" ? r.ExitCode : 0,
     });
   }
@@ -186,6 +189,25 @@ export function didConverge(
     if (!was.running && now.running) return { kind: "ok", value: true };
   }
   return { kind: "ok", value: false };
+}
+
+/**
+ * Is a project ready: every container running, and every one with a healthcheck healthy.
+ * A service with no healthcheck is ready when it runs; that is what "ready" means for it,
+ * and the operator docs say so. `detail` names what is still in the way.
+ */
+export function isReady(
+  run: DockerComposeRunner,
+  composePath: string,
+  env: Record<string, string>,
+): Inspection<{ ready: boolean; detail: string }> {
+  const rows = composePs(run, composePath, env);
+  if (rows.kind === "unknown") return rows;
+  const waiting = rows.value
+    .filter((r) => r.state !== "running" || (r.health !== "" && r.health !== "healthy"))
+    .map((r) => `${r.service} is ${r.state}${r.health ? ` (${r.health})` : ""}`);
+  if (rows.value.length === 0) return { kind: "ok", value: { ready: false, detail: "no containers yet" } };
+  return { kind: "ok", value: { ready: waiting.length === 0, detail: waiting.join(", ") } };
 }
 
 // ---------------------------------------------------------------------------

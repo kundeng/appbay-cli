@@ -166,3 +166,4 @@ export {
   type EdgeIdentityProvider,
   type EdgeIdentityConfig,
 } from "./edge-identity-providers.js";
+export { CollectionsFileSchema, loadCollections, COLLECTIONS_FILE_REL, type CollectionsFile } from "./collections.js";
