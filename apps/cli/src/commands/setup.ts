@@ -23,7 +23,7 @@ import {
   type AcmeDnsProvider,
 } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
-import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL } from "@appbay/core";
+import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -296,7 +296,7 @@ function showSetupStatus(): void {
 
   const checks = [
     { name: "APPBAY_HOME", ok: existsSync(appbayHome), detail: appbayHome },
-    { name: "Docker network", ok: (() => { const r = spawnSync(cliContainerBin(), ["network", "inspect", "appbay_shared"], { stdio: "pipe" }); return r.status === 0; })(), detail: "appbay_shared" },
+    { name: "Docker network", ok: (() => { const r = networkExists("appbay_shared", appbayHome); return r.kind === "ok" && r.value; })(), detail: "appbay_shared" },
     { name: "Selected edge seeded", ok: existsSync(edgeApp), detail: ingressProvider },
     { name: "Selected edge running", ok: edgeIsRunning(ingressProvider), detail: ingressProvider },
     ...(ingressProvider === "caddy" ? [{

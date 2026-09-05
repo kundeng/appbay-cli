@@ -62,7 +62,7 @@ const RULES: Rule[] = [
   },
   {
     name: "Go-template parsing of runtime output lives in runtime/",
-    pattern: /\{\{\.(State\.Running|Names|Name|Id|ID|Ports|Labels|Image)\b/,
+    pattern: /\{\{\.(State|Config|NetworkSettings|Names|Name|Id|ID|Ports|Labels|Image)\b/,
     owners: ["packages/core/src/runtime/"],
     exempt: {},
     allowed: {
@@ -70,7 +70,6 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/setup.ts": "2.4",
       "apps/cli/src/commands/size.ts": "2.4",
       "apps/cli/src/commands/stats.ts": "2.4",
-      "apps/cli/src/commands/tunnel.ts": "2.4",
       "packages/core/src/compiler/builds.ts": "2.4",
       "packages/core/src/compiler/compile.ts": "2.4",
       "packages/core/src/health/checks.ts": "2.4/2.5",

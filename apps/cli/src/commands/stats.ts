@@ -1,4 +1,6 @@
 import { Command } from "commander";
+import { runningContainerNames } from "@appbay/core";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { spawnSync } from "node:child_process";
 import { cliContainerBin } from "../utils/docker.js";
 
@@ -13,11 +15,12 @@ export const statsCommand = new Command("stats")
     }
 
     // Filter to appbay-managed containers
-    const ps = spawnSync(cliContainerBin(), ["ps", "--format", "{{.Names}}", "--filter", "name=appbay."], {
-      encoding: "utf-8",
-    });
-
-    const containers = (ps.stdout ?? "").trim().split("\n").filter(Boolean);
+    const named = runningContainerNames("appbay.", resolveAppbayHome());
+    if (named.kind === "unknown") {
+      console.error(`Could not list containers: ${named.reason}`);
+      process.exit(1);
+    }
+    const containers = named.value;
     if (containers.length === 0) {
       console.log("No running Appbay containers.");
       return;

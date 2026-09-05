@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { runningContainerNames } from "@appbay/core";
 import { spawnSync, spawn } from "node:child_process";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
@@ -147,13 +148,12 @@ export const tunnelCommand = new Command("tunnel")
 export const tunnelDownCommand = new Command("tunnel-down")
   .description("Stop all running Cloudflare tunnels")
   .action(() => {
-    const ps = spawnSync(
-      cliContainerBin(),
-      ["ps", "--format", "{{.Names}}", "--filter", "name=appbay.tunnel."],
-      { encoding: "utf-8", timeout: 10_000 },
-    );
-
-    const tunnels = (ps.stdout as string).trim().split("\n").filter(Boolean);
+    const named = runningContainerNames("appbay.tunnel.", resolveAppbayHome());
+    if (named.kind === "unknown") {
+      console.error(`Could not list tunnels: ${named.reason}`);
+      process.exit(1);
+    }
+    const tunnels = named.value;
 
     if (tunnels.length === 0) {
       console.log("No running tunnels.");

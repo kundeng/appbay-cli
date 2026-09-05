@@ -47,6 +47,8 @@ import {
   persistMasterPassword,
   hasMasterPassword,
   MASTER_PASSWORD_REL,
+  networkExists,
+  containerExec,
 } from "@appbay/core";
 import {
   resolveAppbayHome,
@@ -317,19 +319,14 @@ async function fileExists(path: string): Promise<boolean> {
  * @returns true if the network was created, false if it already existed.
  */
 function ensureDockerNetwork(): boolean {
-  // Check if network already exists.
-  const inspect = spawnSync(cliContainerBin(), ["network", "inspect", SHARED_NETWORK], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  if (inspect.status === 0) return false;
+  const exists = networkExists(SHARED_NETWORK);
+  if (exists.kind === "ok" && exists.value) return false;
 
-  // Network does not exist; create it.
-  const create = spawnSync(cliContainerBin(), ["network", "create", SHARED_NETWORK], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  if (create.status === 0) return true;
+  // Absent, or could not tell: try to create it and let the runtime say.
+  const create = containerExec(["network", "create", SHARED_NETWORK], { label: "network create" });
+  if (create.exitCode === 0) return true;
 
-  const errMsg = create.stderr ? String(create.stderr).trim() : "unknown error";
+  const errMsg = create.output.trim() || "unknown error";
   console.error(`  Warning: could not create ${cliRuntimeProfile().displayName} network: ${errMsg}`);
   return false;
 }

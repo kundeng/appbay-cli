@@ -186,7 +186,7 @@ touched; a separate sweep re-reads everything twice.
   - [x] 2.1 `tryExec` → one in `runtime/container-runtime.ts`; `containerExec` already owns the runtime spawn · **Requirements**: 1.1
   - [x] 2.2 compose ps + parsers → `runtime/observe.ts: composePs()`; `cli/ps.ts` calls it with `all: false` (running only, as before); `formatPorts` moved with it · **Requirements**: 1.1
   - [x] 2.3 crash/snapshot/converge → `observe.ts`; comments cut to the invariant · **Requirements**: 1.1
-  - [ ] 2.4 `findContainer`, `isRunning`, `networkExists` · **Requirements**: 1.2
+  - [x] 2.4 `isRunning`, `networkExists`, `runningContainerNames` in `observe.ts`; callers in checks, server, init, setup, stats, tunnel redirected; `findContainerByLabel` already owned the label lookup · **Requirements**: 1.2
   - [ ] 2.5 versions and podman templates → profile · **Requirements**: 1.3
   - [ ] 2.6 `loadInstanceConfig`; regex readers deleted · **Requirements**: 2.1
   - [ ] 2.7 `.env` parse and `appbay.yaml` parse · **Requirements**: 2.2, 2.3

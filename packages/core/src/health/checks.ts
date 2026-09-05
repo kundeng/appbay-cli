@@ -26,6 +26,7 @@ import {
   resolveIngressProvider,  tryExec,
 } from "../runtime/container-runtime.js";
 import { podmanRootfulEnv } from "../runtime/podman-rootful.js";
+import { isRunning, networkExists } from "../runtime/observe.js";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
 
@@ -542,8 +543,11 @@ export function probeArgv(bin: string, appbayHome: string): string[] {
  * Check if the appbay_shared Docker network exists.
  */
 export function checkNetwork(appbayHome: string): HealthCheckResult {
-  const result = tryExec(containerBin(appbayHome), ["network", "inspect", SHARED_NETWORK]);
-  if (result !== null) {
+  const net = networkExists(SHARED_NETWORK, appbayHome);
+  if (net.kind === "unknown") {
+    return { name: "appbay_shared network", status: "unknown", detail: `could not ask the runtime (${net.reason})`, required: true };
+  }
+  if (net.value) {
     return { name: "appbay_shared network", status: "ok", detail: "exists", required: true };
   }
   return {
@@ -559,11 +563,11 @@ export function checkNetwork(appbayHome: string): HealthCheckResult {
  * Check if the Appbay server container is running.
  */
 export function checkServer(appbayHome: string): HealthCheckResult {
-  const state = tryExec(containerBin(appbayHome), [
-    "inspect", "--format", "{{.State.Running}}", SERVER_CONTAINER,
-  ]);
-
-  if (state === "true") {
+  const state = isRunning(SERVER_CONTAINER, appbayHome);
+  if (state.kind === "unknown") {
+    return { name: "Appbay server", status: "unknown", detail: `could not ask the runtime (${state.reason})`, required: false };
+  }
+  if (state.value) {
     return {
       name: "Appbay server",
       status: "ok",
@@ -878,8 +882,11 @@ export function checkSharedNetworkDns(appbayHome: string): HealthCheckResult {
   const bin = containerBin(appbayHome);
 
   // The network must exist before we can attach a probe to it.
-  const netExists = tryExec(bin, ["network", "inspect", SHARED_NETWORK]);
-  if (netExists === null) {
+  const netExists = networkExists(SHARED_NETWORK, appbayHome);
+  if (netExists.kind === "unknown") {
+    return { name: "Shared network DNS", status: "unknown", detail: `could not ask the runtime (${netExists.reason})`, required: true };
+  }
+  if (!netExists.value) {
     return {
       name: "Shared network DNS",
       status: "failed",

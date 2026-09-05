@@ -6,7 +6,7 @@
  * the answer; that is the caller's job. This is the one place `compose ps` output is parsed.
  */
 
-import type { Inspection } from "./container-runtime.js";
+import { containerExec, type Inspection } from "./container-runtime.js";
 
 /** Result of one compose invocation. */
 export interface DockerComposeResult {
@@ -186,4 +186,32 @@ export function didConverge(
     if (!was.running && now.running) return { kind: "ok", value: true };
   }
   return { kind: "ok", value: false };
+}
+
+// ---------------------------------------------------------------------------
+// Probes against the runtime binary itself (not compose)
+// ---------------------------------------------------------------------------
+
+/** Whether a container exists and is running. `unknown` when the runtime could not be asked. */
+export function isRunning(container: string, appbayHome?: string): Inspection<boolean> {
+  const r = containerExec(["inspect", "--format", "{{.State.Running}}", container], { appbayHome, label: "inspect" });
+  if (r.exitCode === 0) return { kind: "ok", value: r.output.trim() === "true" };
+  // Both runtimes say "no such object" for an absent container; anything else is a failed ask.
+  if (/no such (object|container)/i.test(r.output)) return { kind: "ok", value: false };
+  return { kind: "unknown", reason: r.output.trim() || `inspect exited with code ${String(r.exitCode)}` };
+}
+
+/** Whether a network exists. `unknown` when the runtime could not be asked. */
+export function networkExists(network: string, appbayHome?: string): Inspection<boolean> {
+  const r = containerExec(["network", "inspect", network], { appbayHome, label: "network inspect" });
+  if (r.exitCode === 0) return { kind: "ok", value: true };
+  if (/no such network|not found/i.test(r.output)) return { kind: "ok", value: false };
+  return { kind: "unknown", reason: r.output.trim() || `network inspect exited with code ${String(r.exitCode)}` };
+}
+
+/** Names of running containers whose name contains `namePart`. Stopped ones are excluded. */
+export function runningContainerNames(namePart: string, appbayHome?: string): Inspection<string[]> {
+  const r = containerExec(["ps", "--format", "{{.Names}}", "--filter", `name=${namePart}`], { appbayHome, label: "ps" });
+  if (r.exitCode !== 0) return { kind: "unknown", reason: r.output.trim() || `ps exited with code ${String(r.exitCode)}` };
+  return { kind: "ok", value: r.output.split("\n").map((l) => l.trim()).filter(Boolean) };
 }

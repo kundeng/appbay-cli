@@ -19,7 +19,7 @@ import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { tryExec } from "@appbay/core";
+import { tryExec, isRunning, networkExists, containerExec } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -94,10 +94,8 @@ export function resolveRuntimeSocket(): string {
  * Check whether the server container is currently running.
  */
 function isServerRunning(): boolean {
-  const state = tryExec(cliContainerBin(), [
-    "inspect", "--format", "{{.State.Running}}", SERVER_CONTAINER,
-  ]);
-  return state === "true";
+  const state = isRunning(SERVER_CONTAINER, resolveAppbayHome());
+  return state.kind === "ok" && state.value;
 }
 
 /**
@@ -131,9 +129,10 @@ function getServerInfo(): {
  * Ensure the appbay_shared Docker network exists. Creates it if missing.
  */
 function ensureNetwork(): void {
-  const exists = tryExec(cliContainerBin(), ["network", "inspect", SHARED_NETWORK]);
-  if (exists === null) {
-    tryExec(cliContainerBin(), ["network", "create", SHARED_NETWORK]);
+  const exists = networkExists(SHARED_NETWORK, resolveAppbayHome());
+  if (exists.kind === "ok" && !exists.value) {
+    const created = containerExec(["network", "create", SHARED_NETWORK], { appbayHome: resolveAppbayHome(), label: "network create" });
+    if (created.exitCode !== 0) console.error(`Could not create ${SHARED_NETWORK}: ${created.output.trim()}`);
   }
 }
 
