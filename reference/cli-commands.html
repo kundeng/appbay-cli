@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Every CLI command with flags, examples, and exit codes">
+
+<title>CLI Command Reference – Appbay</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-0765f023667b6bcdf5ed016d57afa70e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-e15ee575b0a198078dde24d3f280917c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.js"></script>
+<link href="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-dark"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = true;
+    const darkModeDefault = authorPrefersDark;
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Appbay</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../guide/index.html"> 
+<span class="menu-text">Guide</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../deploy/index.html"> 
+<span class="menu-text">Deploy</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="../reference/index.html" aria-current="page"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/kundeng/appbay-cli"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/cli-commands.html">CLI Command Reference</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/appbay-yaml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">appbay.yaml Schema Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cli-commands.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">CLI Command Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/api-endpoints.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API Endpoint Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/scope-model.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Scope Model Reference</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#global-flags" id="toc-global-flags" class="nav-link" data-scroll-target="#global-flags">Global flags</a></li>
+  <li><a href="#commands" id="toc-commands" class="nav-link" data-scroll-target="#commands">Commands</a>
+  <ul class="collapse">
+  <li><a href="#appbay-setup" id="toc-appbay-setup" class="nav-link" data-scroll-target="#appbay-setup"><code>appbay setup</code></a></li>
+  <li><a href="#appbay-install" id="toc-appbay-install" class="nav-link" data-scroll-target="#appbay-install"><code>appbay install</code></a></li>
+  <li><a href="#appbay-catalog" id="toc-appbay-catalog" class="nav-link" data-scroll-target="#appbay-catalog"><code>appbay catalog</code></a></li>
+  <li><a href="#appbay-shell-appbay-exec-appbay-run" id="toc-appbay-shell-appbay-exec-appbay-run" class="nav-link" data-scroll-target="#appbay-shell-appbay-exec-appbay-run"><code>appbay shell</code> · <code>appbay exec</code> · <code>appbay run</code></a></li>
+  <li><a href="#appbay-init-system" id="toc-appbay-init-system" class="nav-link" data-scroll-target="#appbay-init-system"><code>appbay init-system</code></a></li>
+  <li><a href="#appbay-init" id="toc-appbay-init" class="nav-link" data-scroll-target="#appbay-init"><code>appbay init</code></a></li>
+  <li><a href="#appbay-server-start" id="toc-appbay-server-start" class="nav-link" data-scroll-target="#appbay-server-start"><code>appbay server start</code></a></li>
+  <li><a href="#appbay-server-stop" id="toc-appbay-server-stop" class="nav-link" data-scroll-target="#appbay-server-stop"><code>appbay server stop</code></a></li>
+  <li><a href="#appbay-server-status" id="toc-appbay-server-status" class="nav-link" data-scroll-target="#appbay-server-status"><code>appbay server status</code></a></li>
+  <li><a href="#appbay-up" id="toc-appbay-up" class="nav-link" data-scroll-target="#appbay-up"><code>appbay up</code></a></li>
+  <li><a href="#appbay-apply" id="toc-appbay-apply" class="nav-link" data-scroll-target="#appbay-apply"><code>appbay apply</code></a></li>
+  <li><a href="#appbay-down" id="toc-appbay-down" class="nav-link" data-scroll-target="#appbay-down"><code>appbay down</code></a></li>
+  <li><a href="#appbay-delete" id="toc-appbay-delete" class="nav-link" data-scroll-target="#appbay-delete"><code>appbay delete</code></a></li>
+  <li><a href="#appbay-restart" id="toc-appbay-restart" class="nav-link" data-scroll-target="#appbay-restart"><code>appbay restart</code></a></li>
+  <li><a href="#appbay-pull" id="toc-appbay-pull" class="nav-link" data-scroll-target="#appbay-pull"><code>appbay pull</code></a></li>
+  <li><a href="#appbay-compile" id="toc-appbay-compile" class="nav-link" data-scroll-target="#appbay-compile"><code>appbay compile</code></a></li>
+  <li><a href="#appbay-validate" id="toc-appbay-validate" class="nav-link" data-scroll-target="#appbay-validate"><code>appbay validate</code></a></li>
+  <li><a href="#appbay-eject" id="toc-appbay-eject" class="nav-link" data-scroll-target="#appbay-eject"><code>appbay eject</code></a></li>
+  <li><a href="#appbay-status" id="toc-appbay-status" class="nav-link" data-scroll-target="#appbay-status"><code>appbay status</code></a></li>
+  <li><a href="#appbay-logs" id="toc-appbay-logs" class="nav-link" data-scroll-target="#appbay-logs"><code>appbay logs</code></a></li>
+  <li><a href="#appbay-doctor" id="toc-appbay-doctor" class="nav-link" data-scroll-target="#appbay-doctor"><code>appbay doctor</code></a></li>
+  <li><a href="#appbay-secrets-init" id="toc-appbay-secrets-init" class="nav-link" data-scroll-target="#appbay-secrets-init"><code>appbay secrets init</code></a></li>
+  <li><a href="#appbay-secrets-set" id="toc-appbay-secrets-set" class="nav-link" data-scroll-target="#appbay-secrets-set"><code>appbay secrets set</code></a></li>
+  <li><a href="#appbay-secrets-get" id="toc-appbay-secrets-get" class="nav-link" data-scroll-target="#appbay-secrets-get"><code>appbay secrets get</code></a></li>
+  <li><a href="#appbay-secrets-delete" id="toc-appbay-secrets-delete" class="nav-link" data-scroll-target="#appbay-secrets-delete"><code>appbay secrets delete</code></a></li>
+  <li><a href="#appbay-secrets-vault" id="toc-appbay-secrets-vault" class="nav-link" data-scroll-target="#appbay-secrets-vault"><code>appbay secrets vault</code></a></li>
+  <li><a href="#appbay-secrets-scan" id="toc-appbay-secrets-scan" class="nav-link" data-scroll-target="#appbay-secrets-scan"><code>appbay secrets scan</code></a></li>
+  <li><a href="#appbay-secrets-import" id="toc-appbay-secrets-import" class="nav-link" data-scroll-target="#appbay-secrets-import"><code>appbay secrets import</code></a></li>
+  <li><a href="#appbay-secrets-export" id="toc-appbay-secrets-export" class="nav-link" data-scroll-target="#appbay-secrets-export"><code>appbay secrets export</code></a></li>
+  <li><a href="#appbay-secrets-import-kdbx" id="toc-appbay-secrets-import-kdbx" class="nav-link" data-scroll-target="#appbay-secrets-import-kdbx"><code>appbay secrets import-kdbx</code></a></li>
+  <li><a href="#appbay-secrets-check" id="toc-appbay-secrets-check" class="nav-link" data-scroll-target="#appbay-secrets-check"><code>appbay secrets check</code></a></li>
+  <li><a href="#appbay-secrets-list" id="toc-appbay-secrets-list" class="nav-link" data-scroll-target="#appbay-secrets-list"><code>appbay secrets list</code></a></li>
+  <li><a href="#appbay-edge-users-list" id="toc-appbay-edge-users-list" class="nav-link" data-scroll-target="#appbay-edge-users-list"><code>appbay edge users list</code></a></li>
+  <li><a href="#appbay-edge-users-create" id="toc-appbay-edge-users-create" class="nav-link" data-scroll-target="#appbay-edge-users-create"><code>appbay edge users create</code></a></li>
+  <li><a href="#appbay-edge-users-reset-password" id="toc-appbay-edge-users-reset-password" class="nav-link" data-scroll-target="#appbay-edge-users-reset-password"><code>appbay edge users reset-password</code></a></li>
+  <li><a href="#appbay-admin-retired" id="toc-appbay-admin-retired" class="nav-link" data-scroll-target="#appbay-admin-retired"><code>appbay admin</code> — retired</a></li>
+  <li><a href="#appbay-rebuild-cache" id="toc-appbay-rebuild-cache" class="nav-link" data-scroll-target="#appbay-rebuild-cache"><code>appbay rebuild-cache</code></a></li>
+  <li><a href="#appbay-update" id="toc-appbay-update" class="nav-link" data-scroll-target="#appbay-update"><code>appbay update</code></a></li>
+  <li><a href="#appbay-list" id="toc-appbay-list" class="nav-link" data-scroll-target="#appbay-list"><code>appbay list</code></a></li>
+  <li><a href="#appbay-ps" id="toc-appbay-ps" class="nav-link" data-scroll-target="#appbay-ps"><code>appbay ps</code></a></li>
+  <li><a href="#appbay-config" id="toc-appbay-config" class="nav-link" data-scroll-target="#appbay-config"><code>appbay config</code></a></li>
+  <li><a href="#appbay-env" id="toc-appbay-env" class="nav-link" data-scroll-target="#appbay-env"><code>appbay env</code></a></li>
+  <li><a href="#appbay-presets" id="toc-appbay-presets" class="nav-link" data-scroll-target="#appbay-presets"><code>appbay presets</code></a></li>
+  <li><a href="#appbay-open" id="toc-appbay-open" class="nav-link" data-scroll-target="#appbay-open"><code>appbay open</code></a></li>
+  <li><a href="#appbay-url" id="toc-appbay-url" class="nav-link" data-scroll-target="#appbay-url"><code>appbay url</code></a></li>
+  <li><a href="#appbay-version" id="toc-appbay-version" class="nav-link" data-scroll-target="#appbay-version"><code>appbay version</code></a></li>
+  <li><a href="#appbay-home" id="toc-appbay-home" class="nav-link" data-scroll-target="#appbay-home"><code>appbay home</code></a></li>
+  <li><a href="#appbay-info" id="toc-appbay-info" class="nav-link" data-scroll-target="#appbay-info"><code>appbay info</code></a></li>
+  <li><a href="#appbay-size" id="toc-appbay-size" class="nav-link" data-scroll-target="#appbay-size"><code>appbay size</code></a></li>
+  <li><a href="#appbay-fixfs" id="toc-appbay-fixfs" class="nav-link" data-scroll-target="#appbay-fixfs"><code>appbay fixfs</code></a></li>
+  </ul></li>
+  <li><a href="#inspection-and-diagnostics" id="toc-inspection-and-diagnostics" class="nav-link" data-scroll-target="#inspection-and-diagnostics">Inspection and diagnostics</a>
+  <ul class="collapse">
+  <li><a href="#appbay-stats" id="toc-appbay-stats" class="nav-link" data-scroll-target="#appbay-stats"><code>appbay stats</code></a></li>
+  <li><a href="#appbay-dive" id="toc-appbay-dive" class="nav-link" data-scroll-target="#appbay-dive"><code>appbay dive</code></a></li>
+  <li><a href="#appbay-smi" id="toc-appbay-smi" class="nav-link" data-scroll-target="#appbay-smi"><code>appbay smi</code></a></li>
+  </ul></li>
+  <li><a href="#ai-models" id="toc-ai-models" class="nav-link" data-scroll-target="#ai-models">AI models</a>
+  <ul class="collapse">
+  <li><a href="#appbay-models" id="toc-appbay-models" class="nav-link" data-scroll-target="#appbay-models"><code>appbay models</code></a></li>
+  <li><a href="#appbay-ollama" id="toc-appbay-ollama" class="nav-link" data-scroll-target="#appbay-ollama"><code>appbay ollama</code></a></li>
+  </ul></li>
+  <li><a href="#configuration-profiles" id="toc-configuration-profiles" class="nav-link" data-scroll-target="#configuration-profiles">Configuration profiles</a>
+  <ul class="collapse">
+  <li><a href="#appbay-profile" id="toc-appbay-profile" class="nav-link" data-scroll-target="#appbay-profile"><code>appbay profile</code></a></li>
+  </ul></li>
+  <li><a href="#public-tunnels" id="toc-public-tunnels" class="nav-link" data-scroll-target="#public-tunnels">Public tunnels</a>
+  <ul class="collapse">
+  <li><a href="#appbay-tunnel" id="toc-appbay-tunnel" class="nav-link" data-scroll-target="#appbay-tunnel"><code>appbay tunnel</code></a></li>
+  <li><a href="#appbay-tunnel-down" id="toc-appbay-tunnel-down" class="nav-link" data-scroll-target="#appbay-tunnel-down"><code>appbay tunnel-down</code></a></li>
+  </ul></li>
+  <li><a href="#mcp" id="toc-mcp" class="nav-link" data-scroll-target="#mcp">MCP</a>
+  <ul class="collapse">
+  <li><a href="#appbay-mcp-inspector" id="toc-appbay-mcp-inspector" class="nav-link" data-scroll-target="#appbay-mcp-inspector"><code>appbay mcp inspector</code></a></li>
+  </ul></li>
+  <li><a href="#retired-commands" id="toc-retired-commands" class="nav-link" data-scroll-target="#retired-commands">Retired commands</a></li>
+  <li><a href="#shell-integration" id="toc-shell-integration" class="nav-link" data-scroll-target="#shell-integration">Shell integration</a>
+  <ul class="collapse">
+  <li><a href="#appbay-completion" id="toc-appbay-completion" class="nav-link" data-scroll-target="#appbay-completion"><code>appbay completion</code></a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">CLI Command Reference</h1>
+</div>
+
+<div>
+  <div class="description">
+    Every CLI command with flags, examples, and exit codes
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>The Appbay CLI is a single compiled binary built with Bun. It directly imports <code>@appbay/core</code> and operates entirely offline — it does not use a tRPC client or require the Appbay server to be running. Commands that deploy containers invoke <code>docker compose</code> directly.</p>
+</section>
+<section id="global-flags" class="level2">
+<h2 class="anchored" data-anchor-id="global-flags">Global flags</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--help</code></td>
+<td>Show help for any command</td>
+</tr>
+<tr class="even">
+<td><code>--version</code></td>
+<td>Print CLI version</td>
+</tr>
+<tr class="odd">
+<td><code>--server &lt;url&gt;</code></td>
+<td>Override server URL (default: <code>http://localhost:3000</code>)</td>
+</tr>
+<tr class="even">
+<td><code>--token &lt;token&gt;</code></td>
+<td>Override auth token (alternative to <code>APPBAY_TOKEN</code> env var)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="commands" class="level2">
+<h2 class="anchored" data-anchor-id="commands">Commands</h2>
+<section id="appbay-setup" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-setup"><code>appbay setup</code></h3>
+<p>The guided path, and the one most people should start with: it runs <code>init</code>, creates the secret vault, and brings up the edge, in order, asking only for what it cannot infer.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup <span class="at">--domain</span> home.lan</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup <span class="at">--domain</span> example.com <span class="at">--email</span> you@example.com <span class="at">--ingress-provider</span> caddy <span class="at">--yes</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup <span class="at">--status</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--domain &lt;domain&gt;</code></td>
+<td>(prompted)</td>
+<td>Base domain for ingress routing</td>
+</tr>
+<tr class="even">
+<td><code>--project &lt;name&gt;</code></td>
+<td>(prompted)</td>
+<td>Project name</td>
+</tr>
+<tr class="odd">
+<td><code>--email &lt;email&gt;</code></td>
+<td>(prompted)</td>
+<td>ACME email, for Let’s Encrypt certificates</td>
+</tr>
+<tr class="even">
+<td><code>--ingress-provider &lt;p&gt;</code></td>
+<td><code>traefik</code></td>
+<td>Edge to install: <code>traefik</code> or <code>caddy</code></td>
+</tr>
+<tr class="odd">
+<td><code>--yes</code></td>
+<td><code>false</code></td>
+<td>Non-interactive: accept all defaults</td>
+</tr>
+<tr class="even">
+<td><code>--status</code></td>
+<td>—</td>
+<td>Report what is already set up, and change nothing</td>
+</tr>
+<tr class="odd">
+<td><code>--reset</code></td>
+<td>—</td>
+<td>Tear down system apps and remove generated configs</td>
+</tr>
+</tbody>
+</table>
+<p>⚠️ The administrator <code>setup</code> creates is the <strong>edge</strong> administrator, which guards apps behind the reverse proxy — and since RFC-001 §1 that is the SAME account that signs in to the web control plane, which no longer has one of its own. It needs the <code>authp/admin</code> role to reach the control plane. See <a href="../guide/credentials.html">Credentials</a> — the two are deliberately separate and are never synchronised.</p>
+<p><strong>Exit codes:</strong> 0 = success, 1 = a step failed.</p>
+</section>
+<section id="appbay-install" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-install"><code>appbay install</code></h3>
+<p>Install an app from the catalog into <code>$APPBAY_HOME/etc/apps/&lt;name&gt;/</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> install jellyfin</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> install nextcloud <span class="at">--set</span> ADMIN_USER=me <span class="at">--set</span> TZ=Europe/Berlin</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> install adminer <span class="at">--as</span> adminer-staging      <span class="co"># a second copy</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--set &lt;pairs...&gt;</code></td>
+<td>—</td>
+<td>Input values as <code>KEY=VALUE</code>, repeatable</td>
+</tr>
+<tr class="even">
+<td><code>--as &lt;name&gt;</code></td>
+<td>the catalog name</td>
+<td>Install under a different app name</td>
+</tr>
+<tr class="odd">
+<td><code>--force</code></td>
+<td><code>false</code></td>
+<td>Overwrite an app of the same name</td>
+</tr>
+<tr class="even">
+<td><code>--no-validate</code></td>
+<td><code>false</code></td>
+<td>Skip post-install validation</td>
+</tr>
+</tbody>
+</table>
+<p><code>--as</code> splits the catalog lookup from the install location, which is what makes a second copy possible: without it both were the same value, so installing an entry twice overwrote it.</p>
+<p>⚠️ Not the same axis as <code>namespace:</code>. A namespace disambiguates two <em>deployments</em> of one installed app; <code>--as</code> gives you two <em>installations</em>, each with its own directory, manifest and config. Use <code>--as</code> when the copies should differ in what they are, <code>namespace:</code> when they differ only in where they run.</p>
+<p>Installing copies the upstream files unmodified and writes an <code>appbay.yaml</code> beside them. Nothing is deployed until you run <a href="#appbay-up"><code>appbay up</code></a>.</p>
+</section>
+<section id="appbay-catalog" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-catalog"><code>appbay catalog</code></h3>
+<p>Browse and manage catalog sources.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> catalog list</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> catalog search media</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> catalog info jellyfin</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> catalog add-source https://github.com/you/your-catalog</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> catalog update</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-shell-appbay-exec-appbay-run" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-shell-appbay-exec-appbay-run"><code>appbay shell</code> · <code>appbay exec</code> · <code>appbay run</code></h3>
+<p>Reach into a running app.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> shell jellyfin                      <span class="co"># interactive shell in the service container</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> exec jellyfin <span class="at">--</span> ls /config          <span class="co"># run a command in the running container</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> run jellyfin <span class="at">--</span> /bin/backup.sh       <span class="co"># one-off command in a fresh container</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>shell</code> and <code>exec</code> require the app to be running; <code>run</code> starts a container for the command and removes it afterwards.</p>
+</section>
+<section id="appbay-init-system" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-init-system"><code>appbay init-system</code></h3>
+<p>Bootstrap a <strong>fresh host</strong> to run Appbay: installs the container runtime and sets up ownership and access for the Appbay tree. Written for RHEL-family hosts, where the defaults differ enough to matter.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> appbay init-system                     <span class="co"># --owner service (default)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> appbay init-system <span class="at">--owner</span> operator</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>--owner service</code> creates a no-login system service account, which is the right choice for a homelab or worklab box. <code>--owner operator</code> uses your own account instead.</p>
+</section>
+<section id="appbay-init" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-init"><code>appbay init</code></h3>
+<p>Scaffold the <code>$APPBAY_HOME</code> directory structure and seed system app definitions.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init <span class="at">--dir</span> /opt/appbay</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init <span class="at">--project</span> homelab <span class="at">--domain</span> homelab.example.com <span class="at">--yes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--dir &lt;path&gt;</code></td>
+<td><code>~/.appbay</code></td>
+<td>Override <code>$APPBAY_HOME</code> location — <strong>persisted</strong>, see below</td>
+</tr>
+<tr class="even">
+<td><code>--project &lt;name&gt;</code></td>
+<td>(prompted)</td>
+<td>Name of the default project</td>
+</tr>
+<tr class="odd">
+<td><code>--domain &lt;name&gt;</code></td>
+<td>(prompted)</td>
+<td>Base domain for ingress routing</td>
+</tr>
+<tr class="even">
+<td><code>--yes</code></td>
+<td><code>false</code></td>
+<td>Non-interactive: accept all defaults</td>
+</tr>
+</tbody>
+</table>
+<p>Creates: <code>etc/apps/</code>, <code>etc/projects/</code>, <code>etc/presets/</code>, <code>var/lib/renders/</code>, <code>var/lib/state/</code>, <code>var/log/</code>. Seeds system app definitions if absent.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span><code>--dir</code> changes where <em>every</em> later command looks
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>--dir</code> is not scoped to this one run: it writes the path to <code>~/.config/appbay/home</code>, so every subsequent <code>appbay</code> invocation on this account resolves there until you change it. Undo it with <a href="#appbay-home"><code>appbay home clear</code></a>, or repoint with <code>appbay home set &lt;path&gt;</code>.</p>
+<p>To initialise a throwaway install <strong>without</strong> touching that default — what a test or a journey script wants — set the environment variable instead, which <code>init</code> honours as a runtime override and deliberately does not persist:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="va">APPBAY_HOME</span><span class="op">=</span>/tmp/scratch/home <span class="ex">appbay</span> init <span class="at">--project</span> t <span class="at">--domain</span> t.local <span class="at">--yes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+<p><strong>Exit codes:</strong> 0 = success, 1 = filesystem error.</p>
+</section>
+<section id="appbay-server-start" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-server-start"><code>appbay server start</code></h3>
+<p>Start the Appbay server as a Docker Compose stack.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> server start</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> server start <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--open</code></td>
+<td><code>false</code></td>
+<td>Open the web UI in a browser after start</td>
+</tr>
+</tbody>
+</table>
+<p>Creates <code>appbay_shared</code> network, starts the appbay-server container, waits for health check, prints the server URL.</p>
+<p><strong>Exit codes:</strong> 0 = server healthy, 1 = start failed, 2 = health check timeout.</p>
+</section>
+<section id="appbay-server-stop" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-server-stop"><code>appbay server stop</code></h3>
+<p>Stop the server container.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> server stop</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = stopped, 1 = error.</p>
+</section>
+<section id="appbay-server-status" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-server-status"><code>appbay server status</code></h3>
+<p>Check whether the Appbay server is running. Prints the server URL and start time if running, or a “not running” message if it is not.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> server status</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = always (status is informational).</p>
+</section>
+<section id="appbay-up" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-up"><code>appbay up</code></h3>
+<p>Deploy one or more apps.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up jellyfin</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up ollama webui tts</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up <span class="at">--collection</span> ai-stack</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up <span class="at">--all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--collection &lt;name&gt;</code></td>
+<td>(none)</td>
+<td>Deploy all apps in a collection</td>
+</tr>
+<tr class="even">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Deploy all discovered apps</td>
+</tr>
+</tbody>
+</table>
+<p>Runs the full pipeline: compile, apply overlays, write renders, and bring up via <code>docker compose up -d</code>.</p>
+<p><strong>Exit codes:</strong> 0 = deployed, 1 = compile or deploy error.</p>
+</section>
+<section id="appbay-apply" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-apply"><code>appbay apply</code></h3>
+<p>Compile and review a plan, then deploy with explicit confirmation. Separates compile and deploy for review workflows.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> apply jellyfin</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> apply ollama webui <span class="at">--dry-run</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> apply jellyfin <span class="at">--yes</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> apply <span class="at">--all</span> <span class="at">--yes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--dry-run</code></td>
+<td><code>false</code></td>
+<td>Show the plan without applying</td>
+</tr>
+<tr class="even">
+<td><code>--yes</code></td>
+<td><code>false</code></td>
+<td>Skip confirmation prompt and deploy immediately</td>
+</tr>
+<tr class="odd">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Apply all discovered apps</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = applied (or dry run complete), 1 = compile or deploy error.</p>
+</section>
+<section id="appbay-down" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-down"><code>appbay down</code></h3>
+<p>Stop one or more running apps.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> down jellyfin</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> down webui tts</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> down <span class="at">--all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Stop all discovered apps</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = stopped, 1 = error.</p>
+</section>
+<section id="appbay-delete" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-delete"><code>appbay delete</code></h3>
+<p>Remove an app definition and stop its containers.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> delete myapp <span class="at">--keep-volumes</span> <span class="at">--force</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--keep-volumes</code></td>
+<td><code>false</code></td>
+<td>Keep Docker volumes after deletion</td>
+</tr>
+<tr class="even">
+<td><code>--force</code></td>
+<td><code>false</code></td>
+<td>Skip confirmation prompt (required to proceed)</td>
+</tr>
+</tbody>
+</table>
+<p>Without <code>--force</code>, the command exits with an error and instructions. Runs <code>docker compose down</code> (with <code>-v</code> unless <code>--keep-volumes</code>) before removing the app definition directory.</p>
+<p><strong>Exit codes:</strong> 0 = deleted, 1 = not found or confirmation required.</p>
+</section>
+<section id="appbay-restart" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-restart"><code>appbay restart</code></h3>
+<p>Restart one or more apps.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> restart jellyfin</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> restart webui tts</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> restart <span class="at">--all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Restart all discovered apps</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = restarted, 1 = error.</p>
+</section>
+<section id="appbay-pull" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-pull"><code>appbay pull</code></h3>
+<p>Pull the latest Docker images for one or more apps.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> pull jellyfin</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> pull ollama webui</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> pull <span class="at">--all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Pull images for all discovered apps</td>
+</tr>
+</tbody>
+</table>
+<p>Uses the rendered compose file if available, otherwise falls back to the source compose.</p>
+<p><strong>Exit codes:</strong> 0 = all pulls succeeded, 1 = one or more failed.</p>
+</section>
+<section id="appbay-compile" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-compile"><code>appbay compile</code></h3>
+<p>Run the compiler pipeline without deploying.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> compile jellyfin</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> compile jellyfin webui</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> compile              <span class="co"># compiles all discovered apps</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--output &lt;dir&gt;</code></td>
+<td><code>var/lib/renders/</code></td>
+<td>Write rendered output to a custom directory</td>
+</tr>
+</tbody>
+</table>
+<p>Runs the full compile pipeline and writes rendered compose and auxiliary files. Available offline (no server needed).</p>
+<p><strong>Exit codes:</strong> 0 = compiled, 1 = error.</p>
+</section>
+<section id="appbay-validate" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-validate"><code>appbay validate</code></h3>
+<p>Validate app definitions against Zod schemas.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> validate jellyfin</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> validate <span class="at">--all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reports errors with file paths, field names, and expected types. Available offline.</p>
+<p><strong>Exit codes:</strong> 0 = valid, 1 = validation errors found.</p>
+</section>
+<section id="appbay-eject" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-eject"><code>appbay eject</code></h3>
+<p>Export a fully standalone Compose project.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> eject jellyfin</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> eject jellyfin <span class="at">--output</span> ./exported/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--output &lt;path&gt;</code></td>
+<td><code>./appbay-eject/&lt;app&gt;/</code></td>
+<td>Output directory</td>
+</tr>
+</tbody>
+</table>
+<p>Produces a directory with <code>docker-compose.yml</code> and <code>.env</code> that can be run with <code>docker compose up</code> without Appbay. Available offline.</p>
+<p><strong>Exit codes:</strong> 0 = ejected, 1 = error.</p>
+</section>
+<section id="appbay-status" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-status"><code>appbay status</code></h3>
+<p>Show app configuration and metadata. Available offline.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> status</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> status jellyfin</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> status jellyfin <span class="at">--json</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--json</code></td>
+<td>Output as JSON</td>
+</tr>
+</tbody>
+</table>
+<p>Without an app name, shows a summary table of all discovered apps (name, services count, traits count, errors). With an app name, shows full detail: directory, project, environment, services (with service-level traits), app-level traits, overlays, and upstream configuration.</p>
+<p><strong>Exit codes:</strong> 0 = success, 1 = app not found.</p>
+</section>
+<section id="appbay-logs" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-logs"><code>appbay logs</code></h3>
+<p>Show or stream app logs.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> logs jellyfin</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> logs jellyfin redis <span class="at">--follow</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> logs jellyfin <span class="at">--tail</span> 100</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>-f, --follow</code></td>
+<td><code>false</code></td>
+<td>Stream logs in real time</td>
+</tr>
+<tr class="even">
+<td><code>--tail &lt;n&gt;</code></td>
+<td>(Docker default)</td>
+<td>Number of lines to show from the end</td>
+</tr>
+</tbody>
+</table>
+<p>The optional second positional argument filters to a specific service within the app.</p>
+<p><strong>Exit codes:</strong> 0 = success, 1 = error.</p>
+</section>
+<section id="appbay-doctor" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-doctor"><code>appbay doctor</code></h3>
+<p>Run prerequisite and health checks.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> doctor</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Checks: Docker connectivity, Compose version, server health, disk space, system app status.</p>
+<p><strong>Exit codes:</strong> 0 = all checks passed, 1 = one or more checks failed.</p>
+</section>
+<section id="appbay-secrets-init" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-init"><code>appbay secrets init</code></h3>
+<p>Initialize the local secrets vault. Auto-generates a master password if none provided.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets init</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets init <span class="at">--password</span> mypassword</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-set" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-set"><code>appbay secrets set</code></h3>
+<p>Store a secret in the vault. Key format: <code>KEY</code> for default scope, <code>APP/KEY</code> for app-scoped.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets set DB_PASSWORD myvalue</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets set kestra/DB_PASSWORD myvalue</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Warns if the secret already exists, with database-specific guidance.</p>
+</section>
+<section id="appbay-secrets-get" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-get"><code>appbay secrets get</code></h3>
+<p>Retrieve a secret value from the vault.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets get DB_PASSWORD</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets get kestra/DB_PASSWORD</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-delete" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-delete"><code>appbay secrets delete</code></h3>
+<p>Delete a secret from the vault.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets delete DB_PASSWORD</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets delete kestra/DB_PASSWORD</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-vault" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-vault"><code>appbay secrets vault</code></h3>
+<p>List all secrets stored in the vault, grouped by scope. Shows metadata only — never values.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets vault</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets vault <span class="at">--scope</span> kestra</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-scan" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-scan"><code>appbay secrets scan</code></h3>
+<p>Discover secret-like env vars in an app’s compose and .env files. Suggests vault URI mappings for unmanaged secrets.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets scan kestra</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-import" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-import"><code>appbay secrets import</code></h3>
+<p>Scan an app and auto-create vault entries for unmanaged secret-like variables.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets import kestra</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets import kestra <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-export" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-export"><code>appbay secrets export</code></h3>
+<p>Export vault contents to a KeePass .kdbx file.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># `secrets export` was removed with the kdbx work; use `appbay secrets list`</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets list</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-import-kdbx" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-import-kdbx"><code>appbay secrets import-kdbx</code></h3>
+<p>Import secrets from a KeePass .kdbx file into the vault.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb31"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets import-kdbx secrets.kdbx <span class="at">--password</span> mypass</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-check" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-check"><code>appbay secrets check</code></h3>
+<p>Verify that all secret URI references across all apps can be resolved.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb32"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets check</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-secrets-list" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-secrets-list"><code>appbay secrets list</code></h3>
+<p>List secret URI references for an app (or all apps). Prints URIs only — never values.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb33"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets list</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> secrets list jellyfin</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-edge-users-list" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-edge-users-list"><code>appbay edge users list</code></h3>
+<p>List Caddy Security local edge users.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb34"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> edge users list</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-edge-users-create" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-edge-users-create"><code>appbay edge users create</code></h3>
+<p>Create a Caddy Security local edge user.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb35"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> edge users create newuser <span class="at">--email</span> user@example.com <span class="at">--roles</span> user</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> edge users create newuser <span class="at">--email</span> user@example.com <span class="at">--generate</span> <span class="at">--reveal</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-edge-users-reset-password" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-edge-users-reset-password"><code>appbay edge users reset-password</code></h3>
+<p>Reset a Caddy Security local edge user’s password.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb36"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> edge users reset-password username</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-admin-retired" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-admin-retired"><code>appbay admin</code> — retired</h3>
+<p>RFC-001 §1 removed AppBay’s own accounts. The control plane is a stack behind the Caddy Security edge like any other app, so the account that signs in to AppBay is an edge user:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb37"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> edge users reset-password alice <span class="at">--generate</span> <span class="at">--reveal</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Running <code>appbay admin</code> prints this and exits non-zero, so a script that still calls it fails rather than appearing to succeed.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>One store now, and a role instead of a second password
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>There is no longer a separate credential domain for the control plane. What distinguishes it is the <strong>role</strong>: its edge route carries an admin-only policy (<code>authp/admin</code>), narrower than an app’s default, because it is the one stack that can reach the container runtime socket. So “can open Grafana” still does not imply “can reconfigure the installation”.</p>
+</div>
+</div>
+</section>
+<section id="appbay-rebuild-cache" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-rebuild-cache"><code>appbay rebuild-cache</code></h3>
+<p>Regenerate the SQLite metadata cache from filesystem state.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb38"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> rebuild-cache</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Deletes the existing <code>appbay.db</code>, creates a fresh database with Drizzle migrations, and populates all tables from filesystem sources. Available offline.</p>
+<p><strong>Exit codes:</strong> 0 = rebuilt, 1 = error.</p>
+</section>
+<section id="appbay-update" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-update"><code>appbay update</code></h3>
+<p>Check for and apply CLI and system app updates.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb39"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> update</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> update <span class="at">--check</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> update <span class="at">--system-only</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--check</code></td>
+<td><code>false</code></td>
+<td>Check for updates without applying</td>
+</tr>
+<tr class="even">
+<td><code>--system-only</code></td>
+<td><code>false</code></td>
+<td>Only pull system app Docker images</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = updated, 1 = pull failed, 2 = restart failed.</p>
+</section>
+<section id="appbay-list" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-list"><code>appbay list</code></h3>
+<p>List all discovered apps. Available offline.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb40"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> list</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> list <span class="at">--json</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--all</code></td>
+<td>Include apps with discovery errors (default: all apps shown anyway)</td>
+</tr>
+<tr class="even">
+<td><code>--json</code></td>
+<td>Output as JSON array</td>
+</tr>
+</tbody>
+</table>
+<p>Reads from <code>$APPBAY_HOME/etc/apps/</code> and shows each app’s name, project, environment, whether an <code>appbay.yaml</code> exists, and the compose filename. Does not require Docker or the server to be running.</p>
+<p><strong>Exit codes:</strong> 0 = success.</p>
+</section>
+<section id="appbay-ps" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-ps"><code>appbay ps</code></h3>
+<p>Show container runtime status for apps. Runs <code>docker compose ps</code> against rendered compose files.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb41"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ps</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ps jellyfin</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ps jellyfin redis</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ps <span class="at">--json</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--all</code></td>
+<td><code>false</code></td>
+<td>Include apps without rendered compose files</td>
+</tr>
+<tr class="even">
+<td><code>--json</code></td>
+<td><code>false</code></td>
+<td>Output as JSON</td>
+</tr>
+</tbody>
+</table>
+<p>Prefers the rendered compose file in <code>var/lib/renders/</code>; falls back to the source compose.</p>
+<p><strong>Exit codes:</strong> 0 = success, 1 = docker compose failed or no apps found.</p>
+</section>
+<section id="appbay-config" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-config"><code>appbay config</code></h3>
+<p>Get or set configuration values in an app’s <code>appbay.yaml</code>. Uses dot-separated key paths.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb42"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> config jellyfin                          <span class="co"># show all config</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> config jellyfin upstream.source          <span class="co"># read a single key</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> config jellyfin upstream.source my-app  <span class="co"># set a value</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Values are auto-coerced: <code>"true"</code> → boolean, <code>"42"</code> → number, everything else stays string.</p>
+<p><strong>Exit codes:</strong> 0 = success, 1 = app or key not found.</p>
+</section>
+<section id="appbay-env" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-env"><code>appbay env</code></h3>
+<p>Manage environment variables in an app’s <code>.env</code> file (<code>$APPBAY_HOME/etc/apps/&lt;app&gt;/.env</code>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb43"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> env jellyfin               <span class="co"># list all variables</span></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> env jellyfin DB_HOST       <span class="co"># get a variable</span></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> env jellyfin DB_HOST db    <span class="co"># set a variable</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> env jellyfin DB_HOST <span class="at">--delete</span>  <span class="co"># delete a variable</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--list</code></td>
+<td><code>false</code></td>
+<td>List all variables</td>
+</tr>
+<tr class="even">
+<td><code>--delete</code></td>
+<td><code>false</code></td>
+<td>Delete the specified variable</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = success, 1 = app not found or key not found.</p>
+</section>
+<section id="appbay-presets" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-presets"><code>appbay presets</code></h3>
+<p>Manage named app selection presets. Presets save which apps are selected together for quick recall. Stored as YAML in <code>$APPBAY_HOME/etc/presets/</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb44"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> presets save ai-dev <span class="at">--apps</span> <span class="st">"ollama,webui,whisper"</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> presets load ai-dev</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> presets list</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> presets delete ai-dev</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="appbay-presets-save-name" class="level4">
+<h4 class="anchored" data-anchor-id="appbay-presets-save-name"><code>appbay presets save &lt;name&gt;</code></h4>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--apps &lt;list&gt;</code></td>
+<td>Comma-separated app names to include</td>
+</tr>
+<tr class="even">
+<td><code>--description &lt;desc&gt;</code></td>
+<td>Optional description</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="appbay-presets-load-name" class="level4">
+<h4 class="anchored" data-anchor-id="appbay-presets-load-name"><code>appbay presets load &lt;name&gt;</code></h4>
+<p>Prints the app list from the preset. Typically piped to <code>appbay up</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb45"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up <span class="va">$(</span><span class="ex">appbay</span> presets load ai-dev<span class="va">)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-presets-list" class="level4">
+<h4 class="anchored" data-anchor-id="appbay-presets-list"><code>appbay presets list</code></h4>
+<p>List all saved presets with their app lists.</p>
+</section>
+<section id="appbay-presets-delete-name" class="level4">
+<h4 class="anchored" data-anchor-id="appbay-presets-delete-name"><code>appbay presets delete &lt;name&gt;</code></h4>
+<p>Delete a preset by name.</p>
+</section>
+</section>
+<section id="appbay-open" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-open"><code>appbay open</code></h3>
+<p>Open an app’s URL in the default browser.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb46"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> open jellyfin</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolves the app’s ingress URL from the ingress trait configuration and opens it.</p>
+<p><strong>Exit codes:</strong> 0 = opened, 1 = no ingress configured.</p>
+</section>
+<section id="appbay-url" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-url"><code>appbay url</code></h3>
+<p>Print an app’s URL without opening the browser. Resolves the ingress trait or falls back to compose port mappings.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb47"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> url jellyfin</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> url jellyfin <span class="at">--lan</span></span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> url jellyfin <span class="at">--internal</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--lan</code></td>
+<td>Show the LAN address</td>
+</tr>
+<tr class="even">
+<td><code>--internal</code></td>
+<td>Show the internal Docker network address</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = success, 1 = app not found.</p>
+</section>
+<section id="appbay-version" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-version"><code>appbay version</code></h3>
+<p>Print the Appbay CLI version.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb48"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> version</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = always.</p>
+</section>
+<section id="appbay-home" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-home"><code>appbay home</code></h3>
+<p>Print, explain or repoint the resolved <code>$APPBAY_HOME</code> path.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb49"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> home                  <span class="co"># print the resolved path, and nothing else</span></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> home <span class="at">--explain</span>        <span class="co"># show every tier and which one wins</span></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> home set <span class="op">&lt;</span>path<span class="op">&gt;</span>       <span class="co"># persist a new home for future commands</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> home clear            <span class="co"># forget the persisted home</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Bare <code>appbay home</code> prints only the path, so <code>cd $(appbay home)/etc/apps</code> keeps working.</p>
+<p><strong>Resolution order</strong> — the first tier with a value wins:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Tier</th>
+<th>Set by</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><code>$APPBAY_HOME</code></td>
+<td>the environment; a runtime override that always wins</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><code>/etc/appbay/config</code></td>
+<td><code>appbay init-system</code> (a host-level decision) — holds <code>home:</code> and nothing else</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><code>~/.config/appbay/home</code></td>
+<td><code>appbay init --dir</code>, or <code>appbay home set</code></td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><code>~/.appbay</code></td>
+<td>built-in default</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why tier 2 is a file and not a systemd unit
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>RFC-001 proposed replacing it with <code>Environment=APPBAY_HOME=</code> in a unit. Measured on a real host, a unit’s environment reaches the processes systemd starts and nothing else: the service saw the home, an operator’s login shell saw nothing. Tier 2 serves that second case — an operator typing <code>appbay …</code> — which is precisely where a per-operator <code>~/.config/appbay/home</code> would otherwise win. Deleting it made the CLI resolve a personal path over a service install.</p>
+</div>
+</div>
+<p><code>--explain</code> prints all four with the winner marked, and warns when the resolved path does not exist, has no <code>etc/</code> (never initialised), or is a saved pointer under a temp directory that will not survive a reboot.</p>
+<p><code>set</code> writes tier 3 and <strong>refuses</strong> when tier 1 or 2 would shadow it — a saved path that a higher tier overrides is a setting that reports success and changes nothing. It also refuses a path that does not exist. <code>--force</code> overrides both refusals; when forced past a shadowing tier it says so rather than claiming the resolved home changed.</p>
+<p><code>clear</code> removes tier 3 and reports the tier now in force. Use it to undo an <code>appbay init --dir</code> that pointed at a directory you no longer want — including a throwaway one that has since been deleted.</p>
+<p><strong>Exit codes:</strong> 0 = printed, explained, set or cleared; 1 = <code>set</code> refused (shadowed by a higher tier, or the path is missing or not a directory).</p>
+</section>
+<section id="appbay-info" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-info"><code>appbay info</code></h3>
+<p>Print system information relevant to Appbay: OS/arch, Docker version, Docker Compose version, GPU availability, <code>$APPBAY_HOME</code> path, and number of discovered apps.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb50"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> info</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = always.</p>
+</section>
+<section id="appbay-size" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-size"><code>appbay size</code></h3>
+<p>Show disk usage for app definitions and Docker volumes.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb51"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> size</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> size jellyfin</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = always.</p>
+</section>
+<section id="appbay-fixfs" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-fixfs"><code>appbay fixfs</code></h3>
+<p>Fix filesystem permissions for app volume directories. Sets ACLs for common container UIDs (linuxserver.io 911, nginx 101, etc.) so containers can read/write their data directories without running as root.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb52"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> fixfs jellyfin</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> fixfs jellyfin <span class="at">--uid</span> 911</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> fixfs jellyfin <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--uid &lt;n&gt;</code></td>
+<td>Grant access to a specific UID</td>
+</tr>
+<tr class="even">
+<td><code>--gid &lt;n&gt;</code></td>
+<td>Grant access to a specific GID</td>
+</tr>
+<tr class="odd">
+<td><code>--dry-run</code></td>
+<td>Show what would change without applying</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exit codes:</strong> 0 = success.</p>
+</section>
+</section>
+<section id="inspection-and-diagnostics" class="level2">
+<h2 class="anchored" data-anchor-id="inspection-and-diagnostics">Inspection and diagnostics</h2>
+<section id="appbay-stats" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-stats"><code>appbay stats</code></h3>
+<p>Resource usage for running containers. Streams by default.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb53"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> stats</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> stats <span class="at">--no-stream</span>     <span class="co"># one snapshot, then exit</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--no-stream</code></td>
+<td>Print a single snapshot instead of streaming</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="appbay-dive" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-dive"><code>appbay dive</code></h3>
+<p>Inspect an image’s layers and where its disk usage goes.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb54"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> dive ollama              <span class="co"># by app name</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> dive nginx:latest        <span class="co"># by image reference</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="appbay-smi" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-smi"><code>appbay smi</code></h3>
+<p>Show NVIDIA GPU information, as seen by the host.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb55"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> smi</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Useful before adding a <code>gpu</code> trait — see <a href="../guide/traits.html">Traits</a>. A host with no NVIDIA GPU reports that plainly rather than failing obscurely.</p>
+</section>
+</section>
+<section id="ai-models" class="level2">
+<h2 class="anchored" data-anchor-id="ai-models">AI models</h2>
+<section id="appbay-models" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-models"><code>appbay models</code></h3>
+<p>Manage models held by the Ollama system app.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb56"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> models ls</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> models rm llama3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Subcommand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ls</code></td>
+<td>List downloaded models</td>
+</tr>
+<tr class="even">
+<td><code>rm &lt;model&gt;</code></td>
+<td>Remove a model</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="appbay-ollama" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-ollama"><code>appbay ollama</code></h3>
+<p>Run the Ollama CLI <strong>inside</strong> the Ollama container, passing arguments through unchanged.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb57"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ollama list</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ollama run llama3</span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> ollama show llama3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="configuration-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="configuration-profiles">Configuration profiles</h2>
+<section id="appbay-profile" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-profile"><code>appbay profile</code></h3>
+<p>Save and restore named configuration profiles.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb58"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> profile save homelab</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> profile ls</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> profile set homelab</span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> profile rm homelab</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Subcommand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>save &lt;name&gt;</code></td>
+<td>Save the current configuration under a name</td>
+</tr>
+<tr class="even">
+<td><code>set &lt;name&gt;</code></td>
+<td>Restore a saved profile</td>
+</tr>
+<tr class="odd">
+<td><code>ls</code></td>
+<td>List saved profiles</td>
+</tr>
+<tr class="even">
+<td><code>rm &lt;name&gt;</code></td>
+<td>Delete a saved profile</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="public-tunnels" class="level2">
+<h2 class="anchored" data-anchor-id="public-tunnels">Public tunnels</h2>
+<section id="appbay-tunnel" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-tunnel"><code>appbay tunnel</code></h3>
+<p>Create a Cloudflare quick tunnel exposing a local app publicly, without touching your edge or DNS.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb59"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> tunnel jellyfin</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> tunnel jellyfin <span class="at">--port</span> 8096</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--port &lt;port&gt;</code></td>
+<td>Override the port to tunnel</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>A quick tunnel is public and unauthenticated
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>It publishes the app on a Cloudflare-generated hostname that anyone with the URL can reach. It does <strong>not</strong> pass through the Caddy Security edge, so an <code>auth</code> trait on the app does not apply to traffic arriving this way. Use it for a demo or a temporary share, not as a way to publish something permanently.</p>
+</div>
+</div>
+</section>
+<section id="appbay-tunnel-down" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-tunnel-down"><code>appbay tunnel-down</code></h3>
+<p>Stop all running Cloudflare tunnels.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb60"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> tunnel-down</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="mcp" class="level2">
+<h2 class="anchored" data-anchor-id="mcp">MCP</h2>
+<section id="appbay-mcp-inspector" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-mcp-inspector"><code>appbay mcp inspector</code></h3>
+<p>Launch the MCP inspector for debugging Model Context Protocol servers.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb61"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> mcp inspector</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> mcp inspector http://localhost:3001</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="retired-commands" class="level2">
+<h2 class="anchored" data-anchor-id="retired-commands">Retired commands</h2>
+<p><code>appbay auth</code> and <code>appbay authelia</code> still exist as <strong>stubs that exit non-zero</strong>. They print what replaced them and change nothing.</p>
+<p>Authelia was AppBay’s authentication edge until S25 replaced it with the integrated Caddy Security edge. <code>appbay admin</code> joined them when RFC-001 §1 removed AppBay’s own accounts. Authentication now lives entirely in <code>appbay edge</code> — one store for the people who sign in to your deployed apps and to AppBay itself.</p>
+</section>
+<section id="shell-integration" class="level2">
+<h2 class="anchored" data-anchor-id="shell-integration">Shell integration</h2>
+<section id="appbay-completion" class="level3">
+<h3 class="anchored" data-anchor-id="appbay-completion"><code>appbay completion</code></h3>
+<p>Generate shell completion scripts for bash or zsh.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb62"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> completion bash <span class="op">&gt;&gt;</span> ~/.bashrc</span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> completion zsh  <span class="op">&gt;&gt;</span> ~/.zshrc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Exit codes:</strong> 0 = always.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

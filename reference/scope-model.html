@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Namespace and Collection – complete reference">
+
+<title>Scope Model Reference – Appbay</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-0765f023667b6bcdf5ed016d57afa70e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-e15ee575b0a198078dde24d3f280917c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.js"></script>
+<link href="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-dark"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = true;
+    const darkModeDefault = authorPrefersDark;
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Appbay</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../guide/index.html"> 
+<span class="menu-text">Guide</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../deploy/index.html"> 
+<span class="menu-text">Deploy</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="../reference/index.html" aria-current="page"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/kundeng/appbay-cli"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../reference/scope-model.html">Scope Model Reference</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/appbay-yaml.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">appbay.yaml Schema Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/cli-commands.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">CLI Command Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/api-endpoints.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">API Endpoint Reference</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../reference/scope-model.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Scope Model Reference</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#namespace" id="toc-namespace" class="nav-link" data-scroll-target="#namespace">Namespace</a>
+  <ul class="collapse">
+  <li><a href="#what-it-controls" id="toc-what-it-controls" class="nav-link" data-scroll-target="#what-it-controls">What it controls</a></li>
+  <li><a href="#an-un-namespaced-app-is-unchanged" id="toc-an-un-namespaced-app-is-unchanged" class="nav-link" data-scroll-target="#an-un-namespaced-app-is-unchanged">An un-namespaced app is unchanged</a></li>
+  <li><a href="#when-to-use-a-namespace" id="toc-when-to-use-a-namespace" class="nav-link" data-scroll-target="#when-to-use-a-namespace">When to use a namespace</a></li>
+  </ul></li>
+  <li><a href="#collection" id="toc-collection" class="nav-link" data-scroll-target="#collection">Collection</a>
+  <ul class="collapse">
+  <li><a href="#what-it-controls-1" id="toc-what-it-controls-1" class="nav-link" data-scroll-target="#what-it-controls-1">What it controls</a></li>
+  <li><a href="#what-it-does-not-control" id="toc-what-it-does-not-control" class="nav-link" data-scroll-target="#what-it-does-not-control">What it does NOT control</a></li>
+  <li><a href="#multi-valued" id="toc-multi-valued" class="nav-link" data-scroll-target="#multi-valued">Multi-valued</a></li>
+  <li><a href="#cli-usage" id="toc-cli-usage" class="nav-link" data-scroll-target="#cli-usage">CLI usage</a></li>
+  </ul></li>
+  <li><a href="#variable-resolution" id="toc-variable-resolution" class="nav-link" data-scroll-target="#variable-resolution">Variable resolution</a>
+  <ul class="collapse">
+  <li><a href="#variable-reference-syntax" id="toc-variable-reference-syntax" class="nav-link" data-scroll-target="#variable-reference-syntax">Variable reference syntax</a></li>
+  <li><a href="#resolution-example" id="toc-resolution-example" class="nav-link" data-scroll-target="#resolution-example">Resolution example</a></li>
+  <li><a href="#magic-generators" id="toc-magic-generators" class="nav-link" data-scroll-target="#magic-generators">Magic generators</a></li>
+  </ul></li>
+  <li><a href="#compose-runtime-mapping" id="toc-compose-runtime-mapping" class="nav-link" data-scroll-target="#compose-runtime-mapping">Compose runtime mapping</a></li>
+  <li><a href="#filesystem-layout" id="toc-filesystem-layout" class="nav-link" data-scroll-target="#filesystem-layout">Filesystem layout</a></li>
+  <li><a href="#reserved-keys-vs-tags" id="toc-reserved-keys-vs-tags" class="nav-link" data-scroll-target="#reserved-keys-vs-tags">Reserved keys vs tags</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a>
+  <ul class="collapse">
+  <li><a href="#do-not-use-collections-for-variable-scoping" id="toc-do-not-use-collections-for-variable-scoping" class="nav-link" data-scroll-target="#do-not-use-collections-for-variable-scoping">Do not use collections for variable scoping</a></li>
+  <li><a href="#do-not-use-a-namespace-for-operational-grouping" id="toc-do-not-use-a-namespace-for-operational-grouping" class="nav-link" data-scroll-target="#do-not-use-a-namespace-for-operational-grouping">Do not use a namespace for operational grouping</a></li>
+  <li><a href="#do-not-use-a-namespace-to-select-different-app-sets" id="toc-do-not-use-a-namespace-to-select-different-app-sets" class="nav-link" data-scroll-target="#do-not-use-a-namespace-to-select-different-app-sets">Do not use a namespace to select different app sets</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Scope Model Reference</h1>
+</div>
+
+<div>
+  <div class="description">
+    Namespace and Collection – complete reference
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>Appbay has two organizational concepts. Each controls a different aspect of how apps are grouped, configured, and deployed.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Controls</th>
+<th>Compose mapping</th>
+<th>Cardinality</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Namespace</strong></td>
+<td>Deployment identity and variable scope</td>
+<td>Container, network and edge-fragment names</td>
+<td>Single per app</td>
+</tr>
+<tr class="even">
+<td><strong>Collection</strong></td>
+<td>App selection</td>
+<td>Which <code>docker compose up</code> calls are made</td>
+<td>Multi per app</td>
+</tr>
+</tbody>
+</table>
+<p>Collection is NOT part of variable resolution — it is a selector only.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span><code>project:</code> and <code>environment:</code> were replaced by <code>namespace:</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>RFC-001 §4 collapsed the two scope fields into one. As of <code>v0.0.1-alpha.12</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># check-docs-manifests: ignore</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># appbay.yaml -- before</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">project</span><span class="kw">:</span><span class="at"> homelab</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">environment</span><span class="kw">:</span><span class="at"> prod</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># appbay.yaml -- now</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> homelab.prod</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A namespace is <strong>flat and dot-delimited</strong>. Values shared across namespaces live one level up in the installation config, not in a hierarchy of names.</p>
+<p><strong>A non-default <code>project:</code> or <code>environment:</code> is now a parse ERROR</strong>, not a silently ignored key — the manifest fails with a message naming <code>namespace:</code>. The literal value <code>default</code> is still accepted, because it carried no information and every shipped manifest used it.</p>
+<p>⚠️ <code>environment:</code> <em>inside a service</em> is Docker Compose’s own field and is untouched. Only the top-level scope field is gone.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Only <code>${{project.DOMAIN}}</code> actually resolves today
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>${{scope.KEY}}</code> reference vocabulary is <strong>unchanged</strong> by the rename — it is still <code>project</code>, <code>environment</code> and <code>service</code>. That asymmetry is deliberate and <strong>permanent</strong>, not a migration still owed: <code>namespace:</code> and <code>${{project.KEY}}</code> are different things that shared a word.</p>
+<ul>
+<li><strong><code>namespace:</code></strong> is a per-app <em>label</em>. It disambiguates container names, network aliases and state keys. It has no variable store and never had one.</li>
+<li><strong><code>${{project.KEY}}</code></strong> reads the <em>installation</em> config — one file per host, shared by every app on it, whatever their namespaces.</li>
+</ul>
+<p>Renaming the prefix to <code>${{namespace.KEY}}</code> would point every reference at a scope that holds nothing. The two are independent, so the §4 field rename does not oblige a reference rename.</p>
+<p>What the docs below describe as three variable stores is currently one, and it holds one key. <code>loadProjectVars</code> reads a single <code>domain:</code> line out of <code>$APPBAY_HOME/etc/system.yaml</code> and returns <code>{ DOMAIN }</code>. The exposed keys are an <strong>allow-list</strong>, not everything in the file: <code>home:</code>, <code>project:</code> and <code>container_runtime:</code> live there too and are deliberately <em>not</em> variables — <code>home:</code> in particular is an absolute path, which is machine state and not something a manifest should be able to interpolate. Nothing reads <code>projects/&lt;name&gt;/project.yaml</code> or <code>environments/&lt;env&gt;.yaml</code>, so <code>${{environment.KEY}}</code> and <code>${{service.KEY}}</code> resolve against empty maps and always fail.</p>
+<p>A reference to an unknown key survives the render as a literal and the deploy then refuses the app, so this fails safe — but no error names the missing store directly.</p>
+</div>
+</div>
+</section>
+<section id="namespace" class="level2">
+<h2 class="anchored" data-anchor-id="namespace">Namespace</h2>
+<p>A namespace is a deployment identity. It distinguishes two instances of the same app in one installation, and it scopes the variables an app resolves against.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># appbay.yaml</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> uom.sim</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Absence means “decided at deploy time”.</strong> The field is optional and has no default, which is what lets a value supplied at compile time take effect — a schema default would shadow it.</p>
+<section id="what-it-controls" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-controls">What it controls</h3>
+<ul>
+<li>Container names: <code>appbay.&lt;namespace&gt;.&lt;app&gt;.&lt;service&gt;</code></li>
+<li>The app’s private network: <code>&lt;namespace&gt;_&lt;app&gt;_internal</code></li>
+<li>The shared-network alias other apps dial: <code>&lt;namespace&gt;_&lt;app&gt;_&lt;service&gt;</code></li>
+<li>The generated edge fragment: <code>&lt;namespace&gt;.&lt;app&gt;.caddy</code> / <code>.yml</code></li>
+</ul>
+<p>⚠️ <strong>Dots become hyphens wherever the namespace reaches a hostname.</strong> A dot separates labels in DNS, so <code>uom.sim_litellm_web</code> would parse as host <code>uom</code> in domain <code>sim_litellm_web</code> and resolve to nothing. An app in namespace <code>uom.sim</code> publishes <code>uom-sim_litellm_web</code>.</p>
+</section>
+<section id="an-un-namespaced-app-is-unchanged" class="level3">
+<h3 class="anchored" data-anchor-id="an-un-namespaced-app-is-unchanged">An un-namespaced app is unchanged</h3>
+<p>When <code>namespace:</code> is absent — the case for every shipped manifest — the namespace is omitted from all four names entirely:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>no namespace</th>
+<th><code>namespace: uom.sim</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>container</td>
+<td><code>appbay.litellm.web</code></td>
+<td><code>appbay.uom-sim.litellm.web</code></td>
+</tr>
+<tr class="even">
+<td>network</td>
+<td><code>litellm_internal</code></td>
+<td><code>uom-sim_litellm_internal</code></td>
+</tr>
+<tr class="odd">
+<td>alias</td>
+<td><code>litellm_web</code></td>
+<td><code>uom-sim_litellm_web</code></td>
+</tr>
+<tr class="even">
+<td>edge fragment</td>
+<td><code>litellm.caddy</code></td>
+<td><code>uom-sim.litellm.caddy</code></td>
+</tr>
+</tbody>
+</table>
+<p>This is deliberate: including it unconditionally would rename every container on every existing host in order to disambiguate installations that have nothing to disambiguate.</p>
+</section>
+<section id="when-to-use-a-namespace" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-a-namespace">When to use a namespace</h3>
+<ul>
+<li>Two instances of one app in one installation (<code>uom.sim</code> and <code>uom.prod</code>)</li>
+<li>Separate variable values for the same config keys</li>
+</ul>
+</section>
+</section>
+<section id="collection" class="level2">
+<h2 class="anchored" data-anchor-id="collection">Collection</h2>
+<p>A collection is an operational grouping – a named set of apps that are deployed, restarted, or stopped together. Collections are purely a selection mechanism.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># appbay.yaml</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">ai-stack</span><span class="kw">,</span><span class="at"> gpu-apps</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="what-it-controls-1" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-controls-1">What it controls</h3>
+<p>Which apps are included in a batch operation. Nothing else.</p>
+</section>
+<section id="what-it-does-not-control" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-does-not-control">What it does NOT control</h3>
+<ul>
+<li>Variable values (use environment for that)</li>
+<li>Naming prefixes (use project for that)</li>
+<li>Network isolation (use project for that)</li>
+</ul>
+</section>
+<section id="multi-valued" class="level3">
+<h3 class="anchored" data-anchor-id="multi-valued">Multi-valued</h3>
+<p>An app can belong to multiple collections:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ollama</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">ai-stack</span><span class="kw">,</span><span class="at"> gpu-apps</span><span class="kw">]</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># jellyfin</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">media</span><span class="kw">,</span><span class="at"> gpu-apps</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="cli-usage" class="level3">
+<h3 class="anchored" data-anchor-id="cli-usage">CLI usage</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up <span class="at">--collection</span> ai-stack          <span class="co"># Deploy all ai-stack apps</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up ollama webui                   <span class="co"># Deploy specific apps (no collection needed)</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> down ollama webui tts             <span class="co"># Stop apps by name</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> restart ollama jellyfin           <span class="co"># Restart apps by name</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="variable-resolution" class="level2">
+<h2 class="anchored" data-anchor-id="variable-resolution">Variable resolution</h2>
+<p>Variables are resolved by scope prefix — each <code>${{scope.KEY}}</code> reference targets exactly one variable store. There is no cascading fallthrough.</p>
+<p>Collection is NOT part of variable resolution. It is a selector, not a scope level.</p>
+<section id="variable-reference-syntax" class="level3">
+<h3 class="anchored" data-anchor-id="variable-reference-syntax">Variable reference syntax</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Syntax</th>
+<th>Resolves from</th>
+<th>Only from</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>${{project.KEY}}</code></td>
+<td><code>etc/system.yaml</code> (<code>domain:</code> only)</td>
+<td>project store only</td>
+</tr>
+<tr class="even">
+<td><code>${{environment.KEY}}</code></td>
+<td><code>etc/projects/&lt;name&gt;/environments/&lt;env&gt;.yaml</code></td>
+<td>environment store only</td>
+</tr>
+<tr class="odd">
+<td><code>${{service.KEY}}</code></td>
+<td>Service-level vars in <code>appbay.yaml</code> or <code>.env</code></td>
+<td>service store only</td>
+</tr>
+</tbody>
+</table>
+<p>Undefined variable references produce explicit errors with the scope and key name. Appbay never silently substitutes empty strings.</p>
+</section>
+<section id="resolution-example" class="level3">
+<h3 class="anchored" data-anchor-id="resolution-example">Resolution example</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># projects/homelab/project.yaml</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">vars</span><span class="kw">:</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">DOMAIN</span><span class="kw">:</span><span class="at"> home.lan</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">TZ</span><span class="kw">:</span><span class="at"> UTC</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># projects/homelab/environments/prod.yaml</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">vars</span><span class="kw">:</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">DOMAIN</span><span class="kw">:</span><span class="at"> homelab.example.com</span><span class="co">    # separate environment-scope value, does NOT override project-scope</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">TZ</span><span class="kw">:</span><span class="at"> America/New_York</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resolution of <code>${{project.DOMAIN}}</code> in any environment: - Returns <code>home.lan</code> — resolved from <code>project.yaml</code> only</p>
+<p>Resolution of <code>${{environment.DOMAIN}}</code>: - In <code>prod</code>: returns <code>homelab.example.com</code> — resolved from <code>prod.yaml</code> - In <code>dev</code> (if <code>dev.yaml</code> has no <code>DOMAIN</code>): compile error — undefined variable</p>
+</section>
+<section id="magic-generators" class="level3">
+<h3 class="anchored" data-anchor-id="magic-generators">Magic generators</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Generator</th>
+<th>Output</th>
+<th>Persisted?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>${password:N}</code></td>
+<td>Random N-character password</td>
+<td>Yes – stored in <code>generated-values.yaml</code></td>
+</tr>
+<tr class="even">
+<td><code>${uuid}</code></td>
+<td>Random UUID v4</td>
+<td>Yes</td>
+</tr>
+<tr class="odd">
+<td><code>${base64:N}</code></td>
+<td>Random N-byte base64 string</td>
+<td>Yes</td>
+</tr>
+<tr class="even">
+<td><code>${hash}</code></td>
+<td>Deterministic hash of (project + env + service + key)</td>
+<td>No – always reproducible</td>
+</tr>
+<tr class="odd">
+<td><code>${timestamp}</code></td>
+<td>Current ISO timestamp</td>
+<td>No – evaluated at render time</td>
+</tr>
+</tbody>
+</table>
+<p>Generated values are keyed by <code>(project, environment, service, var_name)</code>. Once generated, they are reused on subsequent compiles to ensure deterministic output.</p>
+</section>
+</section>
+<section id="compose-runtime-mapping" class="level2">
+<h2 class="anchored" data-anchor-id="compose-runtime-mapping">Compose runtime mapping</h2>
+<p>When you run <code>appbay up --collection ai-stack</code>:</p>
+<pre><code>1. Select apps tagged with collection: ai-stack
+   -&gt; [ollama, webui, tts]
+
+2. For each app, resolve variables:
+   ${{project.DOMAIN}} from $APPBAY_HOME/etc/system.yaml
+   (${{environment.KEY}} and ${{service.KEY}} resolve against empty maps -- see the
+    warning at the top of this page)
+
+3. Compile each app:
+   upstream transform -&gt; overlays -&gt; traits -&gt; render
+
+4. Execute each app as a separate Compose project:
+   docker compose -f renders/ollama/docker-compose.rendered.yml up -d
+   docker compose -f renders/webui/docker-compose.rendered.yml up -d
+   docker compose -f renders/tts/docker-compose.rendered.yml up -d</code></pre>
+<p>Each app is an independent Compose project. They communicate via shared networks (e.g., <code>appbay_shared</code>), not via Compose’s internal service discovery.</p>
+</section>
+<section id="filesystem-layout" class="level2">
+<h2 class="anchored" data-anchor-id="filesystem-layout">Filesystem layout</h2>
+<p>⚠️ <strong>This is the intended layout, not the built one.</strong> <code>etc/projects/</code> is not read by anything — <code>ProjectConfigSchema</code> and <code>EnvironmentConfigSchema</code> exist and have no non-test consumers, and the string <code>"projects"</code> is never joined into a path. The one file that is read is <code>$APPBAY_HOME/etc/system.yaml</code> at the root.</p>
+<pre><code>$APPBAY_HOME/
+  project.yaml                          # the ONE config that is read; `domain:` -&gt; ${{project.DOMAIN}}
+  etc/
+    projects/                           # ⚠️ specified, not implemented -- nothing reads this
+      homelab/
+        project.yaml
+        environments/
+          prod.yaml
+    apps/
+      ollama/                           # App definition
+        appbay.yaml                     # namespace: uom.sim, collection: [ai-stack]
+        docker-compose.yml
+      jellyfin/
+        appbay.yaml                     # collection: [media]
+        docker-compose.yml</code></pre>
+</section>
+<section id="reserved-keys-vs-tags" class="level2">
+<h2 class="anchored" data-anchor-id="reserved-keys-vs-tags">Reserved keys vs tags</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Keys</th>
+<th>Semantics</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Reserved</strong></td>
+<td><code>namespace</code>, <code>collection</code>, <code>operator</code>, <code>service</code></td>
+<td>Fixed meaning – drives Appbay behavior</td>
+</tr>
+<tr class="even">
+<td><strong>Removed</strong></td>
+<td><code>project</code>, <code>environment</code></td>
+<td>Replaced by <code>namespace</code>; a non-default value is a parse error</td>
+</tr>
+<tr class="odd">
+<td><strong>Tags</strong></td>
+<td>Anything via <code>tags:</code></td>
+<td>No fixed meaning – UI filtering and bulk ops only</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<section id="do-not-use-collections-for-variable-scoping" class="level3">
+<h3 class="anchored" data-anchor-id="do-not-use-collections-for-variable-scoping">Do not use collections for variable scoping</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># WRONG: no collection-level variable resolution exists</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># RIGHT: use a namespace, or app-level overrides</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> prod</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="do-not-use-a-namespace-for-operational-grouping" class="level3">
+<h3 class="anchored" data-anchor-id="do-not-use-a-namespace-for-operational-grouping">Do not use a namespace for operational grouping</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># WRONG -- a namespace is a deployment identity, not a label</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> ai-apps</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> media-apps</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># RIGHT -- group with collections, which are multi-valued</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">ai-stack</span><span class="kw">]</span><span class="co">    # ollama</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">media</span><span class="kw">]</span><span class="co">       # jellyfin</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="do-not-use-a-namespace-to-select-different-app-sets" class="level3">
+<h3 class="anchored" data-anchor-id="do-not-use-a-namespace-to-select-different-app-sets">Do not use a namespace to select different app sets</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># WRONG -- namespace does not choose which apps deploy</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> minimal</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">namespace</span><span class="kw">:</span><span class="at"> full</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co"># RIGHT -- collections select, the namespace identifies</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">core</span><span class="kw">]</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="fu">collection</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">core</span><span class="kw">,</span><span class="at"> extras</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

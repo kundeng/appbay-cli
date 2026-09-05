@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="From a single compiled binary to a working Appbay deployment — doctor, init, init-system, setup, and your first app.">
+
+<title>Bootstrap Guide – Appbay</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-0765f023667b6bcdf5ed016d57afa70e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-e15ee575b0a198078dde24d3f280917c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.js"></script>
+<link href="../site_libs/quarto-contrib/present-mode-1.0.0/present-mode.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-dark"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = true;
+    const darkModeDefault = authorPrefersDark;
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">Appbay</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../guide/index.html"> 
+<span class="menu-text">Guide</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../deploy/index.html"> 
+<span class="menu-text">Deploy</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/kundeng/appbay-cli"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#bootstrap-guide" id="toc-bootstrap-guide" class="nav-link active" data-scroll-target="#bootstrap-guide">Bootstrap Guide</a>
+  <ul class="collapse">
+  <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites">0. Prerequisites</a>
+  <ul class="collapse">
+  <li><a href="#a.-installing-the-runtime-docker" id="toc-a.-installing-the-runtime-docker" class="nav-link" data-scroll-target="#a.-installing-the-runtime-docker">0a. Installing the runtime — Docker</a></li>
+  <li><a href="#b.-installing-the-runtime-rootful-podman" id="toc-b.-installing-the-runtime-rootful-podman" class="nav-link" data-scroll-target="#b.-installing-the-runtime-rootful-podman">0b. Installing the runtime — rootful Podman</a></li>
+  <li><a href="#c.-verify-the-runtime-by-creating-a-container" id="toc-c.-verify-the-runtime-by-creating-a-container" class="nav-link" data-scroll-target="#c.-verify-the-runtime-by-creating-a-container">0c. Verify the runtime by CREATING A CONTAINER</a></li>
+  <li><a href="#d.-ports-dns-and-firewall" id="toc-d.-ports-dns-and-firewall" class="nav-link" data-scroll-target="#d.-ports-dns-and-firewall">0d. Ports, DNS, and firewall</a></li>
+  </ul></li>
+  <li><a href="#appbay-doctor-verify-the-environment" id="toc-appbay-doctor-verify-the-environment" class="nav-link" data-scroll-target="#appbay-doctor-verify-the-environment">1. <code>appbay doctor</code> — verify the environment</a>
+  <ul class="collapse">
+  <li><a href="#machine-readable-output" id="toc-machine-readable-output" class="nav-link" data-scroll-target="#machine-readable-output">Machine-readable output</a></li>
+  <li><a href="#failure-modes" id="toc-failure-modes" class="nav-link" data-scroll-target="#failure-modes">Failure modes</a></li>
+  <li><a href="#the-sudo-question-once" id="toc-the-sudo-question-once" class="nav-link" data-scroll-target="#the-sudo-question-once">The sudo question, once</a></li>
+  </ul></li>
+  <li><a href="#appbay-init-system-host-bootstrap-rhel-family" id="toc-appbay-init-system-host-bootstrap-rhel-family" class="nav-link" data-scroll-target="#appbay-init-system-host-bootstrap-rhel-family">2. <code>appbay init-system</code> — host bootstrap (RHEL-family)</a>
+  <ul class="collapse">
+  <li><a href="#what-it-grants-the-service-account-in-both-cases" id="toc-what-it-grants-the-service-account-in-both-cases" class="nav-link" data-scroll-target="#what-it-grants-the-service-account-in-both-cases">What it grants the service account, in both cases</a></li>
+  <li><a href="#failure-modes-1" id="toc-failure-modes-1" class="nav-link" data-scroll-target="#failure-modes-1">Failure modes</a></li>
+  </ul></li>
+  <li><a href="#appbay-init-scaffold-appbay_home" id="toc-appbay-init-scaffold-appbay_home" class="nav-link" data-scroll-target="#appbay-init-scaffold-appbay_home">3. <code>appbay init</code> — scaffold APPBAY_HOME</a>
+  <ul class="collapse">
+  <li><a href="#options" id="toc-options" class="nav-link" data-scroll-target="#options">Options</a></li>
+  <li><a href="#failure-modes-2" id="toc-failure-modes-2" class="nav-link" data-scroll-target="#failure-modes-2">Failure modes</a></li>
+  </ul></li>
+  <li><a href="#appbay-setup-configure-the-edge-and-deploy-system-apps" id="toc-appbay-setup-configure-the-edge-and-deploy-system-apps" class="nav-link" data-scroll-target="#appbay-setup-configure-the-edge-and-deploy-system-apps">4. <code>appbay setup</code> — configure the edge and deploy system apps</a></li>
+  <li><a href="#deploy-your-first-app" id="toc-deploy-your-first-app" class="nav-link" data-scroll-target="#deploy-your-first-app">5. Deploy your first app</a></li>
+  <li><a href="#full-non-interactive-journey-ai-operator" id="toc-full-non-interactive-journey-ai-operator" class="nav-link" data-scroll-target="#full-non-interactive-journey-ai-operator">Full non-interactive journey (AI operator)</a></li>
+  <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Bootstrap Guide</h1>
+</div>
+
+<div>
+  <div class="description">
+    From a single compiled binary to a working Appbay deployment — doctor, init, init-system, setup, and your first app.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="bootstrap-guide" class="level1">
+<h1>Bootstrap Guide</h1>
+<p>This guide walks a fresh host from “one compiled binary in hand” to a working Appbay deployment. It is written for both human and AI operators: every step has the exact command, the expected output, and the failure modes you are likely to hit.</p>
+<p>The journey is:</p>
+<pre><code>binary in hand
+   │
+   ▼
+appbay doctor        verify the environment can run Appbay
+   │
+   ▼
+appbay init-system   (RHEL-family hosts) install Docker + appbay user
+   │
+   ▼
+appbay init          scaffold $APPBAY_HOME, shared network, system apps
+   │
+   ▼
+appbay setup         configure the edge (ingress + auth), deploy system apps
+   │
+   ▼
+appbay up &lt;app&gt;      deploy your first app</code></pre>
+<section id="prerequisites" class="level2">
+<h2 class="anchored" data-anchor-id="prerequisites">0. Prerequisites</h2>
+<p>Appbay ships as a single compiled binary — no Node.js, Bun, or other runtime is needed on the target machine. You need:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 44%">
+<col style="width: 31%">
+<col style="width: 24%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Requirement</th>
+<th>Minimum</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Linux (x64/arm64) or macOS</td>
+<td>—</td>
+<td><code>uname -m</code></td>
+</tr>
+<tr class="even">
+<td>Docker <strong>or</strong> Podman</td>
+<td>Docker 24.0+ / Podman 4.9+</td>
+<td><code>docker --version</code></td>
+</tr>
+<tr class="odd">
+<td>Compose v2</td>
+<td>v2.23.1+</td>
+<td><code>docker compose version</code></td>
+</tr>
+</tbody>
+</table>
+<p>Compose v2.23.1+ is required because Appbay uses the <code>configs</code> resource with inline <code>content</code>, introduced in that release.</p>
+<section id="a.-installing-the-runtime-docker" class="level3">
+<h3 class="anchored" data-anchor-id="a.-installing-the-runtime-docker">0a. Installing the runtime — Docker</h3>
+<p>⚠️ <strong>AppBay does not install this for you.</strong> It consumes a runtime an administrator (or external automation) has already configured. AppBay never installs packages, invokes <code>sudo</code>, or mutates host services and firewall policy; <code>appbay doctor</code> reports what is missing and names the repair step, and stops there.</p>
+<p>Measured on Ubuntu 24.04 (Docker 29.1.3, Compose v2.40.3):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt-get update</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt-get install <span class="at">-y</span> docker.io docker-compose-v2</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> usermod <span class="at">-aG</span> docker <span class="st">"</span><span class="va">$USER</span><span class="st">"</span>      <span class="co"># log out and back in for this to take effect</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl enable <span class="at">--now</span> docker</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="b.-installing-the-runtime-rootful-podman" class="level3">
+<h3 class="anchored" data-anchor-id="b.-installing-the-runtime-rootful-podman">0b. Installing the runtime — rootful Podman</h3>
+<p>Measured on Ubuntu 24.04 (Podman 4.9.3, podman-compose 1.0.6):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt-get update</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt-get install <span class="at">-y</span> podman podman-compose</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl enable <span class="at">--now</span> podman.socket   <span class="co"># rootful socket at /run/podman/podman.sock</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Then tell AppBay which client to invoke:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init <span class="at">--container-runtime</span> podman</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span><code>container_runtime</code> selects the CLIENT BINARY, not the daemon
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>docker</code> here can perfectly well be talking to a rootful <code>podman.socket</code> via <code>DOCKER_HOST</code> — that is the documented and often preferable arrangement, since podman’s own man page notes <code>docker-compose</code> takes precedence as a compose provider when installed. Choose <code>podman</code> only when you want the <code>podman</code> binary itself invoked.</p>
+</div>
+</div>
+</section>
+<section id="c.-verify-the-runtime-by-creating-a-container" class="level3">
+<h3 class="anchored" data-anchor-id="c.-verify-the-runtime-by-creating-a-container">0c. Verify the runtime by CREATING A CONTAINER</h3>
+<p>🚨 <strong>A version banner is not proof the runtime works.</strong> Measured: podman 6.0.2 with docker-compose v5.1.2 prints its version happily and then fails <code>up</code> with <code>no such image</code> on an image podman is holding. That reproduces with <code>podman compose</code> directly, with AppBay uninvolved.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">--rm</span> hello-world          <span class="co"># or: sudo podman run --rm quay.io/podman/hello</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If that does not print a success message, stop here. Nothing below will work, and the failure will surface later as something that looks like an AppBay bug.</p>
+</section>
+<section id="d.-ports-dns-and-firewall" class="level3">
+<h3 class="anchored" data-anchor-id="d.-ports-dns-and-firewall">0d. Ports, DNS, and firewall</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Expectation</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>:80 and :443 free</strong></td>
+<td>The edge binds both. One host runs exactly ONE edge — Traefik <em>or</em> Caddy — because they cannot share those ports.</td>
+</tr>
+<tr class="even">
+<td>A wildcard DNS record, or hosts entries</td>
+<td><code>*.your.domain</code> must reach this host. For a local TLD, per-client <code>/etc/hosts</code> entries work.</td>
+</tr>
+<tr class="odd">
+<td>Outbound 443 for ACME</td>
+<td>Only if you want real certificates. A local TLD uses a self-signed wildcard cert instead and needs no outbound access.</td>
+</tr>
+</tbody>
+</table>
+<p>⚠️ If something else already holds :80 or :443, the edge container <strong>starts and immediately exits</strong>, and <code>compose up -d</code> reports success for that — it started a container, it does not wait to see whether it stays up. Check first:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> ss <span class="at">-tlnp</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-E</span> <span class="st">':80 |:443 '</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="appbay-doctor-verify-the-environment" class="level2">
+<h2 class="anchored" data-anchor-id="appbay-doctor-verify-the-environment">1. <code>appbay doctor</code> — verify the environment</h2>
+<p><code>doctor</code> runs every prerequisite and health check and reports pass/fail per check with an actionable fix for each failure. It is the first thing to run on a fresh host.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> doctor</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Expected output (healthy host):</p>
+<pre><code>Appbay Doctor
+
+  ✓ Platform
+    Linux (Docker Engine)
+  ✓ Docker
+    Docker version 29.4.0, build 9d7ad9f
+  ✓ Docker service
+    server v29.4.0
+  ✓ Docker Compose v2
+    v5.1.2
+  ✓ Compose &gt;= 2.23.1
+    v5.1.2
+  ✓ APPBAY_HOME
+    /home/appbay/.appbay
+  ✓ appbay_shared network
+    exists
+  ✓ Shared network DNS
+    container on appbay_shared resolved a sibling by name
+  ✓ Healthcheck start_period
+    no known-slow app has an undersized start_period
+  ...
+  All required checks passed.</code></pre>
+<section id="machine-readable-output" class="level3">
+<h3 class="anchored" data-anchor-id="machine-readable-output">Machine-readable output</h3>
+<p>For AI operators and automation, <code>doctor --json</code> emits a flat envelope:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> doctor <span class="at">--json</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"ok"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"checks"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span> <span class="dt">"name"</span><span class="fu">:</span> <span class="st">"Docker"</span><span class="fu">,</span> <span class="dt">"passed"</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span> <span class="dt">"detail"</span><span class="fu">:</span> <span class="st">"Docker version 29.4.0"</span><span class="fu">,</span> <span class="dt">"required"</span><span class="fu">:</span> <span class="kw">true</span> <span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span> <span class="dt">"name"</span><span class="fu">:</span> <span class="st">"APPBAY_HOME"</span><span class="fu">,</span> <span class="dt">"passed"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span> <span class="dt">"detail"</span><span class="fu">:</span> <span class="st">"/home/appbay/.appbay does not exist"</span><span class="fu">,</span> <span class="dt">"fix"</span><span class="fu">:</span> <span class="st">"Run </span><span class="ch">\"</span><span class="st">appbay init</span><span class="ch">\"</span><span class="st"> to create the Appbay home directory"</span><span class="fu">,</span> <span class="dt">"required"</span><span class="fu">:</span> <span class="kw">true</span> <span class="fu">}</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>ok</code> is <code>true</code> only when every <strong>required</strong> check passed. Optional checks (GPU, vault, server, SOPS, etc.) do not affect <code>ok</code> — they are advisory.</p>
+</section>
+<section id="failure-modes" class="level3">
+<h3 class="anchored" data-anchor-id="failure-modes">Failure modes</h3>
+<ul>
+<li><strong><code>Docker not found</code></strong> — the container runtime is not installed. On a RHEL-family host, run <code>appbay init-system</code> (step 2) to install it.</li>
+<li><strong><code>Docker service not responding</code></strong> — the daemon is installed but not running. Start it: <code>sudo systemctl start docker</code>.</li>
+<li><strong><code>Docker daemon is up but the current user cannot reach it without sudo</code></strong> — the daemon is running, but your user is not in the <code>docker</code> group (rootful Docker). The fix is group membership, <strong>not</strong> running appbay under sudo: <code>sudo usermod -aG docker $USER</code>, then log out and back in. <code>appbay init-system</code> does this for you.</li>
+<li><strong><code>APPBAY_HOME does not exist</code></strong> — expected on a fresh host; run <code>appbay init</code> (step 3).</li>
+<li><strong><code>appbay_shared network not found</code></strong> — run <code>appbay init</code> to create it.</li>
+<li><strong><code>Shared network DNS</code> failed</strong> — a container on the shared network could not resolve a sibling by name. Recreate the network: <code>docker network rm appbay_shared</code>, then <code>appbay init</code>.</li>
+</ul>
+</section>
+<section id="the-sudo-question-once" class="level3">
+<h3 class="anchored" data-anchor-id="the-sudo-question-once">The sudo question, once</h3>
+<p>There are <strong>two deployment models</strong>, and the identity answer differs:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 32%">
+<col style="width: 9%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Who runs appbay</th>
+<th>Why</th>
+<th>What appbay must NOT do</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Standalone host</strong> (<code>appbay init-system</code>)</td>
+<td>the operator’s user, no sudo</td>
+<td><code>init-system</code> adds the user to the container group</td>
+<td>create system accounts / set ACLs (that’s <code>init-system</code>’s one-time job)</td>
+</tr>
+<tr class="even">
+<td><strong>DGX fleet</strong> (Ansible)</td>
+<td>root, via Ansible <code>become: true</code></td>
+<td>Ansible drives it; the tree is owned by the <code>llmsvc</code> service account (uid 950)</td>
+<td>create system accounts / set ACLs — Ansible creates the D-6 uid model, appbay consumes it as data</td>
+</tr>
+</tbody>
+</table>
+<p>The rule that holds in <strong>both</strong> models is not “never sudo” — it is that <strong>appbay never creates system accounts or sets ACLs</strong>. That is Ansible’s job on the fleet, and <code>init-system</code>’s one-time job on a standalone host. Folding uid/ACL creation into the CLI would escalate the whole tool.</p>
+<p>So the two things <code>doctor</code> checks are:</p>
+<ol type="1">
+<li><strong>Is the container binary installed?</strong> (<code>docker --version</code>) — no daemon, no sudo.</li>
+<li><strong>Can the current user reach the daemon without sudo?</strong> (<code>docker info</code>) — this is where sudo would otherwise creep in.</li>
+</ol>
+<p>If check 2 fails because the daemon needs sudo, the fix is to join the container group (<code>sudo usermod -aG docker $USER</code> + re-login), which is exactly what <code>appbay init-system</code> sets up on a standalone host. On an Ansible-managed fleet, Ansible arranges access.</p>
+</section>
+</section>
+<section id="appbay-init-system-host-bootstrap-rhel-family" class="level2">
+<h2 class="anchored" data-anchor-id="appbay-init-system-host-bootstrap-rhel-family">2. <code>appbay init-system</code> — host bootstrap (RHEL-family)</h2>
+<p><code>init-system</code> is a <strong>standalone-host convenience</strong> for a single binary on a fresh box. It installs the container runtime, creates the <code>appbay</code> user/group, <strong>grants that account access to the runtime</strong>, creates <code>$APPBAY_HOME</code> and sets ownership + default ACLs on it, and installs the control-plane systemd unit.</p>
+<blockquote class="blockquote">
+<p><strong>Boundary:</strong> For the DGX fleet, <strong>ansible is authoritative</strong>. <code>init-system</code> is tested to work, but the fleet path is ansible substrate, not this command. It is RHEL-family-first (matches prod); Debian-family and other distros are detected but not bootstrapped.</p>
+</blockquote>
+<p>Preview what would change without touching the host:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init-system <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre><code>Appbay init-system
+
+  Distro: Fedora Linux 43 (Cloud Edition) (rhel)
+  Owner model: service account (D-6)
+  APPBAY_HOME: /var/lib/appbay
+
+  Dry run — would make these changes:
+
+  • Create system group appbay
+    sudo groupadd --system appbay
+  • Create no-login system service account appbay (uid 950)
+    sudo useradd --system --no-create-home --home-dir /var/lib/appbay --shell /usr/sbin/nologin --uid 950 --gid appbay appbay
+  • Grant appbay the rootful Podman socket (SocketGroup on podman.socket)
+  • Let appbay traverse /run/podman (tmpfiles override)
+  • Create /var/lib/appbay
+  • Set ownership on /var/lib/appbay to appbay:appbay (setgid 2770)
+  • Set default ACLs on /var/lib/appbay (appbay:rwx, other::---)
+  • Record the appbay home in /etc/appbay/config
+  • Install /etc/systemd/system/appbay-server.service (not enabled — see the summary)
+
+  No changes made.</code></pre>
+<p>On a Docker host the two Podman lines are replaced by a single <code>sudo usermod -aG docker appbay</code>.</p>
+<p>Apply it (requires sudo):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init-system</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="what-it-grants-the-service-account-in-both-cases" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-grants-the-service-account-in-both-cases">What it grants the service account, in both cases</h3>
+<p><strong>The <code>appbay</code> account gets root-equivalent control of this host’s containers.</strong> That is true on Docker and on Podman, by the same reasoning: anything that can drive the container runtime can start a privileged container that mounts the host filesystem. It is inherent to running a control plane as a non-root account, not something either mechanism adds.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>how</th>
+<th>what it is</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Docker</td>
+<td><code>usermod -aG docker appbay</code></td>
+<td>the <code>docker</code> group on a <code>root:docker 0660</code> daemon socket</td>
+</tr>
+<tr class="even">
+<td>Podman</td>
+<td><code>SocketGroup=appbay</code> on <code>podman.socket</code>, plus a tmpfiles override so the account can traverse <code>/run/podman</code></td>
+<td>the same grant, expressed on the socket rather than found on it — Podman ships no group with those semantics</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Podman here means the ROOTFUL socket, deliberately.</strong> Rootless is not a supported control-plane model: the edge binds <code>:80</code> and <code>:443</code>, which a rootless container cannot do without setting <code>net.ipv4.ip_unprivileged_port_start</code> host-wide — a larger privilege change than granting one account one socket. The unit therefore sets <code>CONTAINER_HOST=unix:///run/podman/podman.sock</code>; without it <code>podman</code> run by a non-root user silently falls back to rootless and the grant does nothing. Rootless Podman for <strong>deployed apps</strong> is a separate question and is unaffected.</p>
+</div>
+</div>
+<p>The two Podman files are declarations systemd re-applies itself, so the grant survives a socket restart and a reboot:</p>
+<ul>
+<li><code>/etc/systemd/system/podman.socket.d/10-appbay.conf</code></li>
+<li><code>/etc/tmpfiles.d/zz-appbay-podman.conf</code></li>
+</ul>
+<p>A one-off <code>setfacl</code> on the socket would not: systemd recreates it on every start of <code>podman.socket</code>, and the ACL was on the old inode.</p>
+<p>The command is <strong>idempotent</strong>: re-running it after a successful bootstrap reports <code>Host is already bootstrapped. Nothing to do.</code> Each step detects the current state and only changes what differs.</p>
+</section>
+<section id="failure-modes-1" class="level3">
+<h3 class="anchored" data-anchor-id="failure-modes-1">Failure modes</h3>
+<ul>
+<li><strong><code>Unsupported distro family "debian"</code></strong> — <code>init-system</code> is RHEL-family-first. Install Docker manually, or use the ansible substrate for the DGX fleet.</li>
+<li><strong><code>sudo: setfacl: command not found</code></strong> — the <code>acl</code> package is absent on a minimal image. <code>init-system</code> falls back to <code>chown -R appbay:appbay</code> on the home directory automatically.</li>
+<li><strong><code>Executable not found in $PATH: "docker"</code> on a Podman host</strong> — the runtime is recorded by <code>appbay init --container-runtime podman</code>, not by <code>init-system</code>. <code>APPBAY_CONTAINER_RUNTIME</code> is a one-invocation override and does not persist.</li>
+<li><strong><code>statfs /run/user/&lt;uid&gt;/podman/podman.sock: no such file or directory</code></strong> — the install predates the rootful grant. Re-run <code>appbay init-system</code>, which writes the <code>CONTAINER_HOST</code> the unit needs.</li>
+<li><strong><code>appbay doctor</code> says the service account cannot reach the runtime</strong> — run <code>appbay init-system</code>. Doctor prints the exact command it used; run that to see the underlying error.</li>
+</ul>
+</section>
+</section>
+<section id="appbay-init-scaffold-appbay_home" class="level2">
+<h2 class="anchored" data-anchor-id="appbay-init-scaffold-appbay_home">3. <code>appbay init</code> — scaffold APPBAY_HOME</h2>
+<p><code>init</code> creates the <code>$APPBAY_HOME</code> directory structure, the shared Docker network, seeds system-app definitions, and writes the server compose file. It is idempotent and resumable.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init <span class="at">--project</span> homelab <span class="at">--domain</span> homelab.example.com <span class="at">--yes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>init</code> runs a <strong>preflight gate</strong> first: it verifies the environment-level required checks (runtime present, service reachable, Compose v2, Compose version). If any fails, it prints the failures + fixes and aborts:</p>
+<pre><code>Preflight check failed — cannot initialize Appbay:
+
+  ✗ Docker
+    Docker not found
+    Fix: Install Docker: https://docs.docker.com/engine/install/  (or run "appbay init-system" on a RHEL-family host to install it)
+
+Appbay runs as your user, not root. If a check says the daemon needs sudo,
+add your user to the container group (or run "appbay init-system") rather
+than running appbay under sudo.
+
+Fix the issues above, then re-run. Or use --force to continue anyway.</code></pre>
+<p>Use <code>--force</code> to skip the gate and continue anyway (not recommended — a host without Docker cannot run Appbay).</p>
+<section id="options" class="level3">
+<h3 class="anchored" data-anchor-id="options">Options</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 60%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flag</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--dir &lt;path&gt;</code></td>
+<td>custom APPBAY_HOME (default <code>~/.appbay</code>)</td>
+</tr>
+<tr class="even">
+<td><code>--project &lt;name&gt;</code></td>
+<td>project name</td>
+</tr>
+<tr class="odd">
+<td><code>--domain &lt;name&gt;</code></td>
+<td>base domain for ingress routing</td>
+</tr>
+<tr class="even">
+<td><code>--container-runtime &lt;docker\|podman&gt;</code></td>
+<td>container binary to invoke</td>
+</tr>
+<tr class="odd">
+<td><code>--ingress-provider &lt;traefik\|caddy&gt;</code></td>
+<td>reverse proxy to emit config for</td>
+</tr>
+<tr class="even">
+<td><code>--refresh-system-apps</code></td>
+<td>replace drifted system-app files (.bak kept)</td>
+</tr>
+<tr class="odd">
+<td><code>--force</code></td>
+<td>skip the preflight gate</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="failure-modes-2" class="level3">
+<h3 class="anchored" data-anchor-id="failure-modes-2">Failure modes</h3>
+<ul>
+<li><strong>Preflight gate aborts</strong> — fix the reported environment issue, or pass <code>--force</code>. See the <code>doctor</code> failure modes above.</li>
+<li><strong><code>Docker network "appbay_shared" already exists</code></strong> — expected on re-init; <code>init</code> is idempotent.</li>
+</ul>
+</section>
+</section>
+<section id="appbay-setup-configure-the-edge-and-deploy-system-apps" class="level2">
+<h2 class="anchored" data-anchor-id="appbay-setup-configure-the-edge-and-deploy-system-apps">4. <code>appbay setup</code> — configure the edge and deploy system apps</h2>
+<p><code>setup</code> is the guided wizard. It calls <code>init</code> internally, then initializes the secrets vault and deploys the selected edge (Traefik or integrated Caddy Security).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>For scripting or CI, pass all options as flags:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup <span class="at">--domain</span> homelab.example.com <span class="at">--project</span> homelab <span class="at">--ingress-provider</span> caddy <span class="at">--yes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>At the end it prints bootstrap credentials for the admin user.</p>
+</section>
+<section id="deploy-your-first-app" class="level2">
+<h2 class="anchored" data-anchor-id="deploy-your-first-app">5. Deploy your first app</h2>
+<p>Appbay ships with a <code>whoami</code> starter app:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up whoami</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Verify it:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> http://localhost:8888</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>You should see the container’s hostname and request headers printed back.</p>
+</section>
+<section id="full-non-interactive-journey-ai-operator" class="level2">
+<h2 class="anchored" data-anchor-id="full-non-interactive-journey-ai-operator">Full non-interactive journey (AI operator)</h2>
+<p>For an AI operator driving a fresh RHEL-family host end-to-end without prompts:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> doctor <span class="at">--json</span>          <span class="co"># verify environment; fix required failures</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init-system            <span class="co"># install Docker + appbay user (sudo)</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> init <span class="at">--project</span> homelab <span class="at">--domain</span> homelab.example.com <span class="at">--yes</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> setup <span class="at">--domain</span> homelab.example.com <span class="at">--project</span> homelab <span class="at">--ingress-provider</span> caddy <span class="at">--yes</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="ex">appbay</span> up whoami</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Check the result with <code>appbay doctor --json</code> again — <code>ok</code> should be <code>true</code>.</p>
+</section>
+<section id="related" class="level2">
+<h2 class="anchored" data-anchor-id="related">Related</h2>
+<ul>
+<li><a href="../guide/quickstart.html">Quickstart</a> — the shorter, interactive path.</li>
+<li><a href="../guide/cli.html">CLI reference</a> — every command and flag.</li>
+<li><a href="../guide/traits.html">Traits</a> — the ingress/auth trait system (provider-agnostic).</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
