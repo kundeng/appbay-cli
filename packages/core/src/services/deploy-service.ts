@@ -31,6 +31,7 @@ import { spawnSync } from "node:child_process";
 import { containerBin, findContainerByLabel, resolveIngressProvider, type Inspection } from "../runtime/container-runtime.js";
 import { APP_LABEL } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
+import { parseEnvFile } from "./config-service.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -603,6 +604,44 @@ async function runShepherdActions(
  *   3. For unchanged apps: re-inject secrets, ensure containers running
  *   4. Post-deploy hooks
  */
+/**
+ * The environment a compose child gets for one app: `.env.local` overrides first, resolved
+ * secret references over them. One resolver for the two deploy paths and for the edge
+ * migration's validate step, which must see the same values the deploy will.
+ *
+ * @returns the env, or an error naming each reference that could not be resolved.
+ */
+export async function resolveDeployEnv(
+  app: Pick<AppCompileResult, "appName" | "traitMetadata">,
+  appsDir: string,
+): Promise<{ env: Record<string, string>; error?: string }> {
+  let env: Record<string, string> = {};
+  const secretRefs = extractSecretRefs(app.traitMetadata);
+  if (secretRefs.length > 0) {
+    const resolveResult = await resolveSecretsForDeploy(secretRefs);
+    if (resolveResult.errors.length > 0) {
+      return {
+        env,
+        error: resolveResult.errors
+          .map((e) => {
+            const hint = e.error.includes("password")
+              ? " Run 'appbay secrets init' to create the vault."
+              : e.error.includes("not found") || e.error.includes("No provider")
+                ? ` Run 'appbay secrets set ${app.appName}/${e.ref.key} <value>' or 'appbay secrets import ${app.appName}'.`
+                : "";
+            return `${e.ref.key} (${e.ref.uri}): ${e.error}${hint}`;
+          })
+          .join("; "),
+      };
+    }
+    env = resolveResult.env;
+  }
+  // Config overrides go first, vault secrets override them.
+  const local = await readFile(join(appsDir, app.appName, ".env.local"), "utf-8").catch(() => null);
+  if (local !== null) env = { ...Object.fromEntries(parseEnvFile(local)), ...env };
+  return { env };
+}
+
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const { appbayHome, dockerCompose: runDockerCompose } = options;
   const appsDir = join(appbayHome, "etc", "apps");
@@ -769,50 +808,18 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         }
       } catch { /* ignore */ }
 
-      // Resolve secrets
-      const secretRefs = extractSecretRefs(app.traitMetadata);
-      let secretEnv: Record<string, string> = {};
-
-      if (secretRefs.length > 0) {
-        const resolveResult = await resolveSecretsForDeploy(secretRefs);
-        if (resolveResult.errors.length > 0) {
-          appResult.status = "failed";
-          appResult.error = resolveResult.errors
-            .map((e) => {
-              const hint = e.error.includes("password")
-                ? " Run 'appbay secrets init' to create the vault."
-                : e.error.includes("not found") || e.error.includes("No provider")
-                  ? ` Run 'appbay secrets set ${app.appName}/${e.ref.key} <value>' or 'appbay secrets import ${app.appName}'.`
-                  : "";
-              return `${e.ref.key} (${e.ref.uri}): ${e.error}${hint}`;
-            })
-            .join("; ");
-          result.apps.push(appResult);
-          result.failed++;
-          continue;
-        }
-        secretEnv = resolveResult.env;
+      const resolved = await resolveDeployEnv(app, appsDir);
+      if (resolved.error) {
+        appResult.status = "failed";
+        appResult.error = resolved.error;
+        result.apps.push(appResult);
+        result.failed++;
+        continue;
       }
-
-      // Load .env.local config overrides into process env (so they participate
-      // in compose-level ${VAR} substitution and override compose defaults)
-      const envLocalPath = join(appsDir, app.appName, ".env.local");
-      try {
-        const envLocalContent = await readFile(envLocalPath, "utf-8");
-        const configEnv: Record<string, string> = {};
-        for (const line of envLocalContent.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) continue;
-          const eq = trimmed.indexOf("=");
-          if (eq > 0) configEnv[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-        }
-        // Config overrides go first, vault secrets override them
-        secretEnv = { ...configEnv, ...secretEnv };
-      } catch {
-        // No .env.local — fine
-      }
+      const secretEnv = resolved.env;
 
       // Resolve wrapper-file secrets (write to shared volume pre-deploy)
+      const secretRefs = extractSecretRefs(app.traitMetadata);
       const wrapperRefs = secretRefs.filter((r) => r.injection === "wrapper-file");
       if (wrapperRefs.length > 0) {
         const wrapperResult = await resolveWrapperFileSecrets(
@@ -909,45 +916,15 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         }
       }
 
-      const unchangedSecretRefs = extractSecretRefs(app.traitMetadata);
-      let unchangedSecretEnv: Record<string, string> = {};
-
-      if (unchangedSecretRefs.length > 0) {
-        const resolveResult = await resolveSecretsForDeploy(unchangedSecretRefs);
-        if (resolveResult.errors.length > 0) {
-          appResult.status = "failed";
-          appResult.error = resolveResult.errors
-            .map((e) => {
-              const hint = e.error.includes("password")
-                ? " Run 'appbay secrets init' to create the vault."
-                : e.error.includes("not found") || e.error.includes("No provider")
-                  ? ` Run 'appbay secrets set ${app.appName}/${e.ref.key} <value>' or 'appbay secrets import ${app.appName}'.`
-                  : "";
-              return `${e.ref.key} (${e.ref.uri}): ${e.error}${hint}`;
-            })
-            .join("; ");
-          result.apps.push(appResult);
-          result.failed++;
-          continue;
-        }
-        unchangedSecretEnv = resolveResult.env;
+      const resolvedUnchanged = await resolveDeployEnv(app, appsDir);
+      if (resolvedUnchanged.error) {
+        appResult.status = "failed";
+        appResult.error = resolvedUnchanged.error;
+        result.apps.push(appResult);
+        result.failed++;
+        continue;
       }
-
-      // Load .env.local config overrides (same as changed path)
-      const unchangedEnvLocalPath = join(appsDir, app.appName, ".env.local");
-      try {
-        const envLocalContent = await readFile(unchangedEnvLocalPath, "utf-8");
-        const configEnv: Record<string, string> = {};
-        for (const line of envLocalContent.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) continue;
-          const eq = trimmed.indexOf("=");
-          if (eq > 0) configEnv[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-        }
-        unchangedSecretEnv = { ...configEnv, ...unchangedSecretEnv };
-      } catch {
-        // No .env.local
-      }
+      const unchangedSecretEnv = resolvedUnchanged.env;
 
       // Pre-deploy shepherd actions (ensure secrets volumes exist even for unchanged apps)
       const unchangedShepherdCtx = { appName: app.appName, appbayHome, secretEnv: unchangedSecretEnv };

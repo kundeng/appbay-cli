@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { randomBytes } from "node:crypto";
 import {
   EdgeIdentityStore, restartEdgeForIdentityChange,
-  migrateEdge, compile, deploy, loadProjectVars, detectRuntimeFacts, writeRenderedOutput,
+  migrateEdge, compile, deploy, loadProjectVars, detectRuntimeFacts, writeRenderedOutput, resolveDeployEnv,
   containerCompose, findContainerByLabel, APP_LABEL, resolveIngressProvider,
   IngressProviderSchema, type IngressProvider,
 } from "@appbay/core";
@@ -137,13 +137,18 @@ const migrate = new Command("migrate")
         if (!app) return `${to} did not compile to an app`;
         const render = await writeRenderedOutput(app, rendersDir, appbayHome);
         if (to !== "caddy") return null; // ponytail: traefik has no offline validator; the health step is its check
-        const build = containerCompose(["build"], render, undefined, appbayHome);
+        // The same env the deploy will pass: secrets and .env.local. Without it the
+        // Caddyfile's secret-bearing directives validate against empty strings and fail.
+        const resolved = await resolveDeployEnv(app, appsDir);
+        if (resolved.error) return resolved.error;
+        const build = containerCompose(["build"], render, resolved.env, appbayHome);
         if (build.exitCode !== 0) return `could not build the ${to} image: ${build.output.trim().split("\n").pop()}`;
         const check = containerCompose(
           ["run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
-          render, undefined, appbayHome,
+          render, resolved.env, appbayHome,
         );
-        return check.exitCode === 0 ? null : check.output.trim();
+        if (check.exitCode === 0) return null;
+        return check.output.trim().split("\n").filter((l) => !l.startsWith("time=") && !l.startsWith(" ")).slice(-3).join("\n");
       },
       stopStack: async (p) => {
         const render = renderFor(p);
