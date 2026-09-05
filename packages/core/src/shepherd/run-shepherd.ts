@@ -11,11 +11,9 @@
  * are declared in appbay.yaml and emitted by the hooks trait.
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from "node:child_process";
 import { containerBin } from "../runtime/container-runtime.js";
 
-const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +36,10 @@ export interface ShepherdOptions {
   }>;
   env?: Record<string, string>;
   timeoutMs?: number;
+  /** Data for the container's stdin. Secrets go here, never in `command` or `env`. */
+  stdin?: string;
+  /** Test seam: runs the container binary with argv and spawn options. */
+  exec?: (argv: string[], spawn: SpawnSyncOptionsWithStringEncoding) => SpawnSyncReturns<string>;
 }
 
 export interface ShepherdResult {
@@ -100,28 +102,22 @@ export async function runShepherd(
 
   const timeoutMs = options.timeoutMs ?? 30_000;
 
-  try {
-    const { stdout, stderr } = await execFileAsync(containerBin(), args, {
-      encoding: "utf-8",
-      timeout: timeoutMs,
-    });
-
-    return { exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() };
-  } catch (err: unknown) {
-    const execErr = err as { code?: number; stdout?: string; stderr?: string; killed?: boolean };
-
-    if (execErr.killed) {
-      return {
-        exitCode: 124,
-        stdout: execErr.stdout?.trim() ?? "",
-        stderr: `Shepherd timed out after ${timeoutMs}ms`,
-      };
-    }
-
-    return {
-      exitCode: execErr.code ?? 1,
-      stdout: execErr.stdout?.trim() ?? "",
-      stderr: execErr.stderr?.trim() ?? (err instanceof Error ? err.message : String(err)),
-    };
+  // The payload, when there is one, travels on stdin. Anything on argv is readable by every
+  // process on the host for the life of the run, which made the encrypted secret bundle
+  // moot: its seed rode beside it on the same command line (review 2026-09-05, ledger 25).
+  const run = options.exec ?? ((argv, spawn) => spawnSync(containerBin(), argv, spawn));
+  const argv = options.stdin !== undefined ? ["run", "--rm", "-i", ...args.slice(2)] : args;
+  const result = run(argv, {
+    encoding: "utf-8",
+    timeout: timeoutMs,
+    stdio: ["pipe", "pipe", "pipe"],
+    ...(options.stdin !== undefined ? { input: options.stdin } : {}),
+  });
+  const stdout = String(result.stdout ?? "").trim();
+  const stderr = String(result.stderr ?? "").trim();
+  if (result.error && (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
+    return { exitCode: 124, stdout, stderr: `Shepherd timed out after ${timeoutMs}ms` };
   }
+  if (result.error) return { exitCode: 1, stdout, stderr: stderr || result.error.message };
+  return { exitCode: result.status ?? 1, stdout, stderr };
 }

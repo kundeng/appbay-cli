@@ -24,6 +24,25 @@ import { runShepherd } from "../shepherd/run-shepherd.js";
 import { containerBin } from "../runtime/container-runtime.js";
 import { shepherdTarget } from "../compiler/identity.js";
 
+/**
+ * Writes files named on stdin, one `name=base64` per line, under /out. The names and the
+ * bytes never appear on the container binary's argv, where every process on the host could
+ * read them for the life of the run.
+ */
+export const STDIN_FILE_WRITER =
+  'mkdir -p /out && while IFS== read -r name b64; do [ -n "$name" ] || continue; ' +
+  'printf %s "$b64" | base64 -d > "/out/$name" || exit 1; done';
+
+/** The stdin stream `STDIN_FILE_WRITER` reads. Names are restricted so they cannot escape /out. */
+export function stdinFiles(files: Record<string, Buffer>): string {
+  return Object.entries(files)
+    .map(([name, bytes]) => {
+      if (!/^[A-Za-z0-9_.-]+$/.test(name) || name === "." || name === "..") throw new Error(`secret file name not allowed: ${name}`);
+      return `${name}=${bytes.toString("base64")}`;
+    })
+    .join("\n") + "\n";
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -215,22 +234,15 @@ export async function writeEncryptedBundle(
 
   // Write all three files via a single shepherd container
   const seedHex = seed.toString("hex");
-  const bundleB64 = encrypted.toString("base64");
   const mappingJson = JSON.stringify(mapping);
-
-  const writeCmd = [
-    `mkdir -p /out`,
-    `echo '${seedHex}' > /out/seed`,
-    `echo '${bundleB64}' | base64 -d > /out/bundle.enc`,
-    `cat > /out/mapping.json << 'MAPEOF'\n${mappingJson}\nMAPEOF`,
-  ].join(" && ");
 
   const result = await runShepherd({
     target: shepherdTarget(appName),
     image: "busybox:latest",
-    command: ["sh", "-c", writeCmd],
+    command: ["sh", "-c", STDIN_FILE_WRITER],
     mounts: [{ source: volumeName, target: "/out" }],
     timeoutMs: 15_000,
+    stdin: stdinFiles({ seed: Buffer.from(seedHex), "bundle.enc": encrypted, "mapping.json": Buffer.from(mappingJson) }),
   });
 
   if (result.exitCode !== 0) {
@@ -300,18 +312,13 @@ export async function resolveWrapperFileSecrets(
   const { spawnSync } = await import("node:child_process");
   spawnSync(containerBin(), ["volume", "create", volumeName], { stdio: "pipe" });
 
-  // Build a shell command that writes each secret to a file
-  const writeCommands = resolved.map(({ key, value }) => {
-    const escaped = value.replace(/'/g, "'\\''");
-    return `printf '%s' '${escaped}' > /out/${key}`;
-  });
-
   const result = await runShepherd({
     target: shepherdTarget(appName),
     image: "busybox:latest",
-    command: ["sh", "-c", writeCommands.join(" && ")],
+    command: ["sh", "-c", STDIN_FILE_WRITER],
     mounts: [{ source: volumeName, target: "/out" }],
     timeoutMs: 15_000,
+    stdin: stdinFiles(Object.fromEntries(resolved.map(({ key, value }) => [key, Buffer.from(value)]))),
   });
 
   if (result.exitCode !== 0) {

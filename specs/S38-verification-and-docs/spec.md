@@ -51,6 +51,12 @@ no longer exists, and the lessons the rewrite has not yet received.
 4.1 stackbay `docs/design/lessons-paid-for.md` SHALL gain L9–L13 as proposed in the seam
     review, each with the appbay-cli file and line it came from.
 
+### Requirement 5: secrets never on argv (from the row-23 audit)
+5.1 THE shepherd SHALL take any payload on stdin; no secret byte, seed, or bundle SHALL
+    appear in the container binary's argv. A test pins it.
+5.2 THE five injection modes SHALL be described in `docs/guide/` with the exposure each one
+    accepts, so the manifest author's choice is informed.
+
 ### Non-Functional
 - **NF 1** — a RHEL-family Docker bootstrap run (issue #8) is attempted; if no VM can be
   provisioned, the attempt and its wall are logged and the issue stays open.
@@ -90,6 +96,7 @@ flowchart TD
 - [ ] 3. Docs · 3.1 `/spec-docs` (R3.1) · 3.2 `when:` docs after the collection sprint (R3.2)
 - [ ] 4. Harvest · 4.1 L9–L13 in stackbay (R4.1)
 - [ ] 5. Bootstrap · 5.1 issue #8 attempt logged (NF 1)
+- [ ] 6. Secrets · 6.1 shepherd payload on stdin, argv clean, test (R5.1) · 6.2 modes documented with exposure (R5.2)
 
 ## Log
 

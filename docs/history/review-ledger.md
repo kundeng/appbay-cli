@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-05):** 1 file read · open: 13 · next: S38 verification and docs.
+**Position (2026-09-05):** 1 file read · open: 12 · next: S38 verification and docs.
 
 ## Protocol
 
@@ -47,3 +47,4 @@ the next session resumes from.
 | 22 | `docs/steering/product.md` | S | Open question from Kun: single-node Swarm mode for its runtime secret store. Unmeasured on both runtimes. | open question | open |
 | 23 | secrets trait, five injection modes | S | Kun: it is not established that every mode keeps the secret out of a render, argv, and log. The security-review pass (S38) audits each mode; product.md states intent, not guarantee, until then. | raised by Kun | open → S38 |
 | 24 | `compiler/identity.ts: shepherdTarget`, `shepherd/run-shepherd.ts:69` | 1 | A shepherd `share` option runs `--network=container:appbay.<app>`, and no container has that name (they are `appbay.<app>.<svc>`). No trait sets `share` today, so it is dead; the day one does it fails at the runtime. Centralised in identity with the caveat. | verified, read | open → S38 |
+| 25 | `secrets/resolve-for-deploy.ts` (both wrapper writers), `shepherd/run-shepherd.ts` | 3 (security) | Both wrapper injection modes passed the secret bytes inside `sh -c` on the docker argv on the HOST: `wrapper-file` the plaintext values, `entrypoint-wrapper` the encrypted bundle and the seed that decrypts it, side by side. Readable from /proc by any host process for the life of the run. Found by the S38 modes audit Kun asked for (row 23). | verified, read | fixed in S38: payload on stdin (`-i`), names validated; test pins argv clean |
