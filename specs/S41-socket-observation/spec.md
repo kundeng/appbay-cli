@@ -1,7 +1,7 @@
 ---
 spec_id: S41-socket-observation
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-05
 until: null
 epic: platform
@@ -69,6 +69,8 @@ compose derives from the render's directory (measured in the review).
 - [x] 2.1, 2.2 `runtime/observe.ts` on the API with the `Observer` seam; `deploy()`, route install and the caddy exec take it
 - [x] 3.1 CLI and core callers converted; `checkNetwork`, `checkServer`, `checkSharedNetworkDns` async
 - [x] 4.1 `engine-observer.test.ts` over a unix-socket server; converge, readiness and route tests feed rows
-- [ ] 5.1 live: init, up, ps, doctor on the local Docker through the socket
+- [x] 5.1 live on the local Docker (OrbStack socket): `up traefik whoami` deployed both, the second `up whoami` was unchanged (snapshots over the API), `ps` listed the running container with its ports, doctor's network and server checks answered over the socket, and with `APPBAY_RUNTIME_SOCKET=/nonexistent.sock` the deploy reported unknown naming the socket instead of guessing
 
 ## Log
+
+**2026-09-05** — shipped on Docker; Podman's compat API is reasoned from its documentation and is on issue #9's list.
