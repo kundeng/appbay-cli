@@ -1,7 +1,7 @@
 ---
 spec_id: S40-namespace-values
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-05
 until: null
 epic: platform
@@ -72,3 +72,5 @@ install's domain to traits.
 
 **2026-09-05** — implemented in one pass after S39, from the review's row-10 proposal and
 Kun's row-21 decision.
+
+**2026-09-05** — shipped. Proved with the built binary on a scratch home: `etc/namespaces/uom.sim.yaml` with `TIER: sim`, an app in `uom.sim` with an ingress trait and no `host:`; `appbay compile` rendered `TIER=sim` and `HOST=uom-sim.svc.appbay.local`. The fragment's host rule is pinned by `namespace-values.test.ts` (`uom-sim.b.example.org`).
