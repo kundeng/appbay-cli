@@ -55,3 +55,7 @@ appbay-eject/
 # rather than /tmp on purpose — one warning under test fires on saved pointers
 # beneath /tmp, so a fixture in /tmp could never exercise the healthy case.
 apps/cli/.tmp-home-tests/
+
+# Review Mode plugin state
+.review/
+.revisions/
