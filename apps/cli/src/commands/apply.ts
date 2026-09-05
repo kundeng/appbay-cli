@@ -5,7 +5,7 @@
  * a previously compiled plan. Useful for review-then-apply workflows.
  */
 import { Command } from "commander";
-import { compile, deploy, type CompileResult, loadProjectVars, detectRuntimeFacts } from "@appbay/core";
+import { compile, deploy, type CompileResult, loadProjectVars, compileInstall } from "@appbay/core";
 import {
   resolveAppsDir,
   resolveRendersDir,
@@ -31,14 +31,7 @@ export const applyCommand = new Command("apply")
 
     let result: CompileResult;
     try {
-      // 🚨 projectVars IS NOT OPTIONAL IN PRACTICE. Without it every `${{project.X}}`
-      // reference fails to resolve, and essentially every app has one — an ingress trait
-      // host is `${{project.DOMAIN}}`. Omitting it made this command fail with
-      //   Undefined variable "DOMAIN" in scope "project"
-      // on apps that `appbay compile` handled fine, because compile.ts passed it and this
-      // did not. Found by the BDD suite (S26 2.2), not by any unit test.
-      // runtimeFacts: see the note in compile.ts — without it the gpu trait sees no GPU.
-      result = await compile({ appsDir, rendersDir, stateDir, apps: targetApps, projectVars: await loadProjectVars(resolveAppbayHome()), runtimeFacts: detectRuntimeFacts({ stateDir }) });
+      result = await compileInstall(resolveAppbayHome(), { apps: targetApps });
     } catch (err) {
       console.error(`Compile failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);

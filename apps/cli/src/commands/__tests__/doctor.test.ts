@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compareSemver } from "../../utils/exec.js";
+import { compareSemver } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // compareSemver

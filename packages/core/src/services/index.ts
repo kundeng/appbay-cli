@@ -29,3 +29,4 @@ export * from "./control-plane-edge.js";
 
 // Recoverable edge stack migration (one host, one edge)
 export * from "./edge-migration-service.js";
+export * from "./compile-install.js";

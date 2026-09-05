@@ -12,8 +12,7 @@ import { createWriteStream, renameSync, chmodSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { VERSION } from "@appbay/core";
-import { compareSemver } from "../utils/exec.js";
+import { VERSION, compareSemver } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 
 const REPO = "kundeng/appbay-cli";

@@ -14,11 +14,7 @@ import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
 import { mkdir, writeFile } from "node:fs/promises";
-import {
-  compile,
-  discoverApps,
-  type CompileResult,
-  type AppCompileResult, loadProjectVars , detectRuntimeFacts } from "@appbay/core";
+import { compile, discoverApps, type CompileResult, type AppCompileResult, compileInstall } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -134,24 +130,7 @@ export const restartCommand = new Command("restart")
 
     let result: CompileResult;
     try {
-      // 🚨 projectVars IS NOT OPTIONAL IN PRACTICE. Without it every `${{project.X}}`
-      // reference fails to resolve, and essentially every app has one — an ingress trait
-      // host is `${{project.DOMAIN}}`. Omitting it made this command fail with
-      //   Undefined variable "DOMAIN" in scope "project"
-      // on apps that `appbay compile` handled fine, because compile.ts passed it and this
-      // did not. Found by the BDD suite (S26 2.2), not by any unit test.
-      result = await compile({
-        appsDir,
-        rendersDir,
-        stateDir,
-        apps: targetNames,
-        projectVars: await loadProjectVars(appbayHome),
-        // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
-        // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller
-        // passed them — so the gpu trait threw "no GPU detected on the host" on every host,
-        // including one with a working GPU. Measured on an RTX 5070 Ti, driver 580.82.09.
-        runtimeFacts: detectRuntimeFacts({ stateDir }),
-      });
+      result = await compileInstall(appbayHome, { apps: targetNames });
     } catch (err) {
       console.error(
         `Compile failed: ${err instanceof Error ? err.message : String(err)}`,

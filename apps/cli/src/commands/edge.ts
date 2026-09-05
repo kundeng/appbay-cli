@@ -1,12 +1,7 @@
 /** Caddy Security local edge-identity administration. */
 import { Command } from "commander";
 import { randomBytes } from "node:crypto";
-import {
-  EdgeIdentityStore, restartEdgeForIdentityChange,
-  migrateEdge, compile, deploy, loadProjectVars, detectRuntimeFacts, writeRenderedOutput, resolveDeployEnv,
-  containerCompose, findContainerByLabel, APP_LABEL, resolveIngressProvider,
-  IngressProviderSchema, type IngressProvider,
-} from "@appbay/core";
+import { EdgeIdentityStore, restartEdgeForIdentityChange, migrateEdge, compile, deploy, writeRenderedOutput, resolveDeployEnv, containerCompose, findContainerByLabel, APP_LABEL, IngressProviderSchema, type IngressProvider, compileInstall } from "@appbay/core";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { dockerCompose } from "../utils/docker.js";
@@ -127,11 +122,7 @@ const migrate = new Command("migrate")
     const result = await migrateEdge({
       appbayHome, from, to,
       validateCandidate: async () => {
-        const compiled = await compile({
-          appsDir, rendersDir, stateDir, apps: [to],
-          projectVars: await loadProjectVars(appbayHome),
-          runtimeFacts: detectRuntimeFacts({ stateDir }),
-        });
+        const compiled = await compileInstall(appbayHome, { apps: [to] });
         if (compiled.errors.length > 0) return compiled.errors.map((e) => `${e.stage}: ${e.message}`).join("; ");
         const app = compiled.apps[0];
         if (!app) return `${to} did not compile to an app`;

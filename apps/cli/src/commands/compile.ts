@@ -16,7 +16,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
-import { compile, loadProjectVars, type CompileResult, type AppCompileResult , detectRuntimeFacts } from "@appbay/core";
+import { compile, loadProjectVars, type CompileResult, type AppCompileResult, compileInstall } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 
@@ -70,18 +70,7 @@ export const compileCommand = new Command("compile")
     // Run the full compiler pipeline.
     let result: CompileResult;
     try {
-      result = await compile({
-        appsDir,
-        rendersDir,
-        stateDir,
-        apps: apps.length > 0 ? apps : undefined,
-        projectVars,
-        // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
-        // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller
-        // passed them — so the gpu trait threw "no GPU detected on the host" on every host,
-        // including one with a working GPU. Measured on an RTX 5070 Ti, driver 580.82.09.
-        runtimeFacts: detectRuntimeFacts({ stateDir }),
-      });
+      result = await compileInstall(appbayHome, { apps: apps.length > 0 ? apps : undefined, projectVars: projectVars });
     } catch (err) {
       console.error(
         `Compile failed: ${err instanceof Error ? err.message : String(err)}`,

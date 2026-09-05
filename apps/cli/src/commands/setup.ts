@@ -21,8 +21,7 @@ import {
   resolveAcmeDnsProvider,
   clearContainerRuntimeCache,
   type AcmeDnsProvider,
-  SHARED_NETWORK,
-} from "@appbay/core";
+  SHARED_NETWORK, checkNetwork } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists } from "@appbay/core";
 
@@ -297,7 +296,7 @@ function showSetupStatus(): void {
 
   const checks = [
     { name: "APPBAY_HOME", ok: existsSync(appbayHome), detail: appbayHome },
-    { name: "Docker network", ok: (() => { const r = networkExists(SHARED_NETWORK, appbayHome); return r.kind === "ok" && r.value; })(), detail: SHARED_NETWORK },
+    { name: "Docker network", ok: checkNetwork(appbayHome).status === "ok", detail: SHARED_NETWORK },
     { name: "Selected edge seeded", ok: existsSync(edgeApp), detail: ingressProvider },
     { name: "Selected edge running", ok: edgeIsRunning(ingressProvider), detail: ingressProvider },
     ...(ingressProvider === "caddy" ? [{

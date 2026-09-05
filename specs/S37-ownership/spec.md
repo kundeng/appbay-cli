@@ -192,7 +192,7 @@ touched; a separate sweep re-reads everything twice.
   - [x] 2.7 `.env` parse is `parseEnvFile` only (the two deploy copies went with S36's `resolveDeployEnv`); the installer's `vars` read and the traefik fragment merge go through zod; the two round-trip editors are exempt with the reason in the arch test · **Requirements**: 2.2, 2.3
   - [x] 2.8 `runtime/home.ts` owns the four tiers; the CLI, the runtime cache and the three secret providers call it; `cli/index.ts` no longer writes `APPBAY_HOME` into its own environment · **Requirements**: 3.1
   - [x] 2.9 `SHARED_NETWORK`, `SERVER_CONTAINER`, `shepherdTarget` live in identity; the build evictor and the ollama probe find containers by label instead of rebuilding names; the arch rules apply to code, not comments · **Requirements**: 4.1
-  - [ ] 2.10 semver, doctor, compile options · **Requirements**: 5.1, 5.2
+  - [x] 2.10 `compileInstall(home, {apps, projectVars})` replaces the six identical compile blocks; one `compareSemver`; setup's network row is doctor's `checkNetwork` (the rest of setup status is setup-specific and stays) · **Requirements**: 5.1, 5.2
 - [ ] 3. Comments
   - [ ] 3.1 every moved function's comment ≤ 3 lines; count of marker blocks in moved files reported before/after · **Requirements**: 6.1
 - [ ] 4. Verification

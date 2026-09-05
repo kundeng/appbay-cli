@@ -25,13 +25,13 @@ import {
   resolveWrapperFileSecrets,
   extractSecretRefs,
 } from "../secrets/resolve-for-deploy.js";
-import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
 import { containerBin, findContainerByLabel, resolveIngressProvider } from "../runtime/container-runtime.js";
 import { composePs, findCrashedServices, snapshotContainers, didConverge, type DockerComposeRunner } from "../runtime/observe.js";
 import { APP_LABEL, shepherdTarget } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
+import { compileInstall } from "./compile-install.js";
 import { parseEnvFile } from "./config-service.js";
 
 // ---------------------------------------------------------------------------
@@ -457,18 +457,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   let compileResult: CompileResult;
   try {
-    compileResult = await compile({
-      appsDir,
-      rendersDir,
-      stateDir,
-      apps: targetApps,
-      projectVars,
-      // 🚨 WITHOUT THIS THE COMPILER SEES A HOST WITH NO GPU. `compile()` falls back to
-      // DEFAULT_RUNTIME_FACTS (`gpu.available: false`) when facts are absent, and NO caller
-      // passed them — so the gpu trait threw "no GPU detected on the host" on every host,
-      // including one with a working GPU. Measured on an RTX 5070 Ti, driver 580.82.09.
-      runtimeFacts: detectRuntimeFacts({ stateDir }),
-    });
+    compileResult = await compileInstall(appbayHome, { apps: targetApps, projectVars });
   } catch (err) {
     return {
       apps: [],
