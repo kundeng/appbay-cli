@@ -109,6 +109,8 @@ export interface DeployOptions {
   sleep?: (ms: number) => Promise<void>;
   /** How the deploy observes the runtime; defaults to the API over the socket. */
   observer?: Observer;
+  /** How long after `up -d` the crash check looks again; a service that dies a moment after start is caught. */
+  crashGraceMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +342,7 @@ interface ShepherdRunResult {
 async function runShepherdActions(
   actions: ShepherdAction[],
   phase: ShepherdPhase,
-  ctx: { appName: string; appbayHome: string; secretEnv?: Record<string, string> },
+  ctx: { appName: string; appbayHome: string; secretEnv?: Record<string, string>; observer: Observer },
 ): Promise<ShepherdRunResult> {
   const phaseActions = actions.filter((a) => a.phase === phase);
   if (phaseActions.length === 0) return { ran: 0, errors: [] };
@@ -354,8 +356,11 @@ async function runShepherdActions(
         await action.run(ctx);
       } else if (action.image) {
         const { runShepherd } = await import("../shepherd/run-shepherd.js");
+        // The namespace-sharing target is the app's real container, found by label; the
+        // literal `appbay.<app>` was never a container's name (ledger row 24).
+        const found = action.share ? await ctx.observer.findByLabel(APP_LABEL, ctx.appName) : null;
         const result = await runShepherd({
-          target: shepherdTarget(ctx.appName),
+          target: found?.kind === "ok" && found.value ? found.value.name : shepherdTarget(ctx.appName),
           image: action.image,
           command: action.command,
           share: action.share,
@@ -536,6 +541,15 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const readinessTimeoutMs = options.readinessTimeoutMs ?? collectionsFile.config.readiness.timeout_seconds * 1000;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const notReady = new Set<string>();
+  const crashGraceMs = options.crashGraceMs ?? 3000;
+  // Read once at once and once after the grace: `up -d` returns before a bad config kills the
+  // process, and one read at t=0 sees only what has died already.
+  const crashCheck = async (project: string) => {
+    const first = await findCrashedServices(observer, project);
+    if (first.kind === "unknown" || first.value.length > 0 || crashGraceMs <= 0) return first;
+    await sleep(crashGraceMs);
+    return findCrashedServices(observer, project);
+  };
 
   // 🚨 AN APP WHOSE CONFIGURATION DID NOT COMPILE IS NOT DEPLOYED.
   //
@@ -642,7 +656,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       }
 
       // Pre-deploy shepherd actions (trait-emitted)
-      const shepherdCtx = { appName: app.appName, appbayHome, secretEnv };
+      const shepherdCtx = { appName: app.appName, appbayHome, secretEnv, observer };
       if (app.shepherdActions?.length) {
         const preResult = await runShepherdActions(app.shepherdActions, "pre-deploy", shepherdCtx);
         if (preResult.errors.length > 0) {
@@ -665,7 +679,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         continue;
       }
       // `up -d` succeeding means "started", not "still running" — see findCrashedServices.
-      const crashed = await findCrashedServices(observer, app.appName);
+      const crashed = await crashCheck(app.appName);
       if (crashed.kind === "unknown") {
         // Compose could not be asked what it did. Not a deployment, not a failure: say so.
         appResult.status = "unchanged";
@@ -736,7 +750,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       const unchangedSecretEnv = resolvedUnchanged.env;
 
       // Pre-deploy shepherd actions (ensure secrets volumes exist even for unchanged apps)
-      const unchangedShepherdCtx = { appName: app.appName, appbayHome, secretEnv: unchangedSecretEnv };
+      const unchangedShepherdCtx = { appName: app.appName, appbayHome, secretEnv: unchangedSecretEnv, observer };
       if (app.shepherdActions?.length) {
         const preResult = await runShepherdActions(app.shepherdActions, "pre-deploy", unchangedShepherdCtx);
         if (preResult.errors.length > 0) {
@@ -770,7 +784,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         } else {
           appResult.convergeAction = converged.value ? "started" : "already-running";
         }
-        const crashedUnchanged = await findCrashedServices(observer, app.appName);
+        const crashedUnchanged = await crashCheck(app.appName);
         if (crashedUnchanged.kind === "unknown") {
           appResult.convergeAction = "unknown";
           appResult.unknownReason ??= crashedUnchanged.reason;

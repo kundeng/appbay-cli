@@ -114,3 +114,31 @@ describe("findCrashedServices — one implementation for the CLI and the web wor
     expect(out).toEqual({ kind: "unknown", reason: "Cannot connect to the Docker daemon" });
   });
 });
+
+describe("🚨 a crash a moment after start, and a restart loop, are both crashes", () => {
+  it("reads again after the grace period and catches a service that died in between", async () => {
+    // t=0: running; after the grace: exited 1. One read at t=0 used to call this deployed.
+    const result = await deploy({
+      appbayHome: home, dockerCompose: compose, crashGraceMs: 1, sleep: async () => {},
+      observer: observerWith([ok(row("running")), ok(row("exited", "id-1", 1))]),
+    });
+    expect(result.failed).toBe(1);
+    expect(result.apps[0]?.error).toContain("exited 1");
+  });
+
+  it("counts a restart-looping service as crashed, not running", async () => {
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("restarting"))]) });
+    expect(result.failed).toBe(1);
+    expect(result.apps[0]?.error).toContain("restart-looping");
+  });
+
+  it("does not wait the grace when the first read already shows a crash", async () => {
+    let slept = 0;
+    const result = await deploy({
+      appbayHome: home, dockerCompose: compose, crashGraceMs: 5000, sleep: async () => { slept++; },
+      observer: observerWith([ok(row("exited", "id-1", 2))]),
+    });
+    expect(result.failed).toBe(1);
+    expect(slept).toBe(0);
+  });
+});

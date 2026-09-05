@@ -165,13 +165,20 @@ export async function runningContainerNames(namePart: string, appbayHome?: strin
 }
 
 /**
- * Services that exited non-zero. `up -d` exiting 0 means started, not still running; a
- * zero exit is a completed one-shot, not a crash. `ok([])` is "nothing crashed".
+ * Services that exited non-zero, or are restart-looping (a `restart:` policy keeps a crashed
+ * service in state `restarting`, which is a crash wearing a different word). `up -d`
+ * exiting 0 means started, not still running; a zero exit is a completed one-shot, not a
+ * crash. `ok([])` is "nothing crashed".
  */
 export async function findCrashedServices(observer: Observer, project: string): Promise<Inspection<string[]>> {
   const rows = await observer.project(project);
   if (rows.kind === "unknown") return rows;
-  return { kind: "ok", value: rows.value.filter((r) => r.state === "exited" && r.exitCode !== 0).map((r) => `${r.service} exited ${String(r.exitCode)}`) };
+  const dead: string[] = [];
+  for (const r of rows.value) {
+    if (r.state === "exited" && r.exitCode !== 0) dead.push(`${r.service} exited ${String(r.exitCode)}`);
+    else if (r.state === "restarting") dead.push(`${r.service} is restart-looping`);
+  }
+  return { kind: "ok", value: dead };
 }
 
 /** One container's identity and run state. */
