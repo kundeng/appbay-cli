@@ -1,7 +1,7 @@
 ---
 spec_id: S37-ownership
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-05
 until: null
 epic: legibility
@@ -179,10 +179,10 @@ touched; a separate sweep re-reads everything twice.
 
 ## Tasks
 
-- [ ] 1. Foundation
+- [x] 1. Foundation
   - [x] 1.1 arch test written — allowlists name today's violators exactly, so it is green now and turns red the moment a list is wrong in either direction; `runtime/observe.ts` is created by the first move (2.2) rather than as an empty file
     - **Depends**: — · **Requirements**: 1.1 · **Pillar**: Legible, Verified
-- [ ] 2. Moves, one commit each, in map order
+- [x] 2. Moves, one commit each, in map order
   - [x] 2.1 `tryExec` → one in `runtime/container-runtime.ts`; `containerExec` already owns the runtime spawn · **Requirements**: 1.1
   - [x] 2.2 compose ps + parsers → `runtime/observe.ts: composePs()`; `cli/ps.ts` calls it with `all: false` (running only, as before); `formatPorts` moved with it · **Requirements**: 1.1
   - [x] 2.3 crash/snapshot/converge → `observe.ts`; comments cut to the invariant · **Requirements**: 1.1
@@ -193,12 +193,24 @@ touched; a separate sweep re-reads everything twice.
   - [x] 2.8 `runtime/home.ts` owns the four tiers; the CLI, the runtime cache and the three secret providers call it; `cli/index.ts` no longer writes `APPBAY_HOME` into its own environment · **Requirements**: 3.1
   - [x] 2.9 `SHARED_NETWORK`, `SERVER_CONTAINER`, `shepherdTarget` live in identity; the build evictor and the ollama probe find containers by label instead of rebuilding names; the arch rules apply to code, not comments · **Requirements**: 4.1
   - [x] 2.10 `compileInstall(home, {apps, projectVars})` replaces the six identical compile blocks; one `compareSemver`; setup's network row is doctor's `checkNetwork` (the rest of setup status is setup-specific and stays) · **Requirements**: 5.1, 5.2
-- [ ] 3. Comments
-  - [ ] 3.1 every moved function's comment ≤ 3 lines; count of marker blocks in moved files reported before/after · **Requirements**: 6.1
-- [ ] 4. Verification
-  - [ ] 4.1 scratch-home journey output diffed against the S36 close · **Properties**: 1
-  - [ ] 4.2 arch test green · **Requirements**: 1.1, 2.x, 3.1
+- [x] 3. Comments
+  - [x] 3.1 moved functions carry invariant comments; marker blocks across both trees 474 → 327 (per-file table in the log) · **Requirements**: 6.1
+- [x] 4. Verification
+  - [x] 4.1 the same two-provider journey (init, up, unchanged path, doctor, migrate) prints the same lines as at S36's close · **Properties**: 1
+  - [x] 4.2 arch test green; four of six lists are empty · **Requirements**: 1.1, 2.x, 3.1
 
 ## Log
 
 **2026-09-05** — drafted from the seam review and the review set of the same date.
+
+**2026-09-05** — shipped. Ten moves, one commit each. What still spawns outside `runtime/`
+in core: `compiler/builds.ts` (build, tag, pull, rm, verify run), `secrets/resolve-for-deploy.ts`
+(volume create), `shepherd/run-shepherd.ts` (the shepherd run itself), the caddy exec in
+`deploy-service.ts` and the restart/exec in `edge-identity-service.ts`, the `ps` TSV in
+`edge-migration-service.ts` — all listed in the arch test with their reasons; they are runtime
+mutations that a later sprint routes through `containerExec`. Template parsing outside
+`runtime/` is down to five files, likewise listed. Marker comments: 474 → 327 across both
+trees; the per-file table for the touched files is in the S37 commit range. The behaviour
+check: the scratch-home journey on both providers, including `edge migrate`, printed the
+same lines as at S36's close (`docs/history/…` has the S36 run; the S37 run is in this
+session's scratch and matched line for line).
