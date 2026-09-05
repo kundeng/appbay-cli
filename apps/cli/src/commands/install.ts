@@ -137,9 +137,13 @@ export const installCommand = new Command("install")
             env: { ...process.env, APPBAY_HOME: home },
           });
         } catch {
-          console.log(
-            "\nValidation had issues — review the output above. The app is still installed.",
+          // The files are on disk, and that is all "installed" can honestly mean here: the
+          // manifest does not compile on this install, so it is not ready to deploy.
+          console.error(
+            `\nInstalled to ${result.appDir}, but validation FAILED — see above. ` +
+            `Fix the manifest (or re-run appbay init with the provider it needs), then: appbay up ${name}`,
           );
+          process.exit(1);
         }
       }
 

@@ -89,7 +89,11 @@ export const InstanceConfigSchema = z.object({
    * files mid-migration is the confusion §2 exists to end.
    */
   home: z.string().optional(),
-  /** Project name — the compose project prefix and ingress label root. */
+  /**
+   * Project name, as `appbay init --project` recorded it. Display only: the compose project
+   * is the app directory name (compose derives it from the render's directory; nothing sets
+   * `-p`), and ingress hosts come from `domain`.
+   */
   project: z.string().optional(),
 
   /** Base domain for ingress routing (exposed to compiles as DOMAIN). */

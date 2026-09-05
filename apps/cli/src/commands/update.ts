@@ -192,11 +192,13 @@ async function pullSystemImages(): Promise<void> {
 
   for (const img of SYSTEM_IMAGES) {
     process.stdout.write(`  ${img}...`);
-    try {
-      spawnSync(cliContainerBin(), ["pull", img], { stdio: "pipe" });
+    // spawnSync does not throw on a non-zero exit; the status is the only signal.
+    const pull = spawnSync(cliContainerBin(), ["pull", img], { stdio: "pipe", encoding: "utf-8" });
+    if (pull.status === 0) {
       process.stdout.write(" done\n");
-    } catch {
-      process.stdout.write(" skipped (pull failed)\n");
+    } else {
+      const reason = (pull.stderr || pull.error?.message || `exit ${String(pull.status)}`).trim().split("\n").pop();
+      process.stdout.write(` FAILED (${reason})\n`);
     }
   }
 }

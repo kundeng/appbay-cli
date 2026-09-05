@@ -277,11 +277,11 @@ identity module, and the lookup keeps working if the namespace changes again.
     - **Depends**: 2.1 · **Requirements**: 4.1
   - [x] 2.7 twelve literal `docker` sites → `cliContainerBin()`; one `findOllamaContainer` in core; `dive` socket from `resolveRuntimeSocket`
     - **Depends**: — · **Requirements**: 5.1, 5.2
-  - [ ] 2.8 `install` exits 1 on validation failure; `update` reads `status`
+  - [x] 2.8 `install` exits 1 on validation failure; `update` reads `status`
     - **Depends**: — · **Requirements**: 6.1, 6.2
   - [ ] 2.9 `appbay edge migrate --to`; init advice repointed
     - **Depends**: 2.5 · **Requirements**: 7.1
-  - [ ] 2.10 `keepassxc-cli.test.ts` skips `/proc` off Linux; `instance.ts:92` comment corrected
+  - [x] 2.10 `keepassxc-cli.test.ts` skips `/proc` off Linux; `instance.ts:92` comment corrected
     - **Depends**: — · **Requirements**: 8.2, NF 2
 - [ ] 3. Verification
   - [ ] 3.1 `s29-journey-deploy-reporting.sh` on Docker

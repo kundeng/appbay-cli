@@ -104,7 +104,7 @@ describe("runKeepassxc", () => {
     expect(argv).not.toContain("pw");
   });
 
-  it("spawns NO SHELL — the secret is absent from the parent's /proc cmdline", async () => {
+  it.skipIf(process.platform !== "linux")("spawns NO SHELL — the secret is absent from the parent's /proc cmdline (Linux: /proc is where the exposure lives)", async () => {
     // ⚠️ This is the assertion that actually pins §3.1. The child's own argv is clean under
     // either implementation; a composed `sh -c "keepassxc-cli 'show' '--password' 'x'"` puts
     // every argument into the shell's cmdline, world-readable for the life of the call.
