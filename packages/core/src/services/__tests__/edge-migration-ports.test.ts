@@ -25,6 +25,14 @@ vi.mock("node:child_process", async (importOriginal) => ({
 
 import { spawnSync } from "node:child_process";
 import { blockingPortConflicts, inspectEdgePorts } from "../edge-migration-service.js";
+import type { IngressProvider } from "../../schemas/instance.js";
+
+/** The owners list, or a thrown error when the runtime could not be asked. */
+function portOwners(outgoing: IngressProvider) {
+  const r = inspectEdgePorts(outgoing);
+  if (r.kind !== "ok") throw new Error(`unexpected unknown: ${r.reason}`);
+  return r.value;
+}
 
 const mockedSpawn = vi.mocked(spawnSync);
 
@@ -58,7 +66,7 @@ afterEach(() => {
 describe("finding the holder", () => {
   it("names the container holding each edge port", () => {
     ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp\tcom.appbay.app=caddy");
-    const owners = inspectEdgePorts("traefik");
+    const owners = portOwners("traefik");
     expect(owners.map((o) => [o.port, o.heldBy])).toEqual([
       [80, "appbay.system.caddy.caddy"],
       [443, "appbay.system.caddy.caddy"],
@@ -67,16 +75,17 @@ describe("finding the holder", () => {
 
   it("reports a free port as unheld rather than guessing", () => {
     ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp\tcom.appbay.app=caddy");
-    const owners = inspectEdgePorts("traefik");
+    const owners = portOwners("traefik");
     expect(owners.find((o) => o.port === 443)?.heldBy).toBeNull();
   });
 
-  it("survives the runtime failing entirely — no holder, not a crash", () => {
-    // `docker ps` failing is not evidence that the ports are free, but it is also not a
-    // reason to throw inside a pre-flight check. It reports nothing held; step 2's config
-    // validation and the bind itself still stand behind it.
+  it("is UNKNOWN when the runtime fails — a failed ps is not evidence the ports are free", () => {
+    // It used to report every port as unheld, and the migration went ahead onto a bound
+    // port (review 2026-09-05, F6). Now the caller has to refuse or ask again.
     mockedSpawn.mockReturnValue({ status: 1, stdout: "", stderr: "no daemon", error: undefined } as never);
-    expect(inspectEdgePorts("traefik").every((o) => o.heldBy === null)).toBe(true);
+    const r = inspectEdgePorts("traefik");
+    expect(r.kind).toBe("unknown");
+    if (r.kind === "unknown") expect(r.reason).toContain("no daemon");
   });
 });
 
@@ -85,23 +94,23 @@ describe("🚨 the port matcher", () => {
     // The documented hazard. A dev container on 8080 must not look like it holds the edge
     // port — that would refuse every migration on a host that has one.
     ps("some-dev-thing\t0.0.0.0:8080->80/tcp\t");
-    expect(inspectEdgePorts("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
+    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
   });
 
   it("does not read :180 or :8443 as :80 or :443 either", () => {
     ps("a\t0.0.0.0:180->80/tcp\t", "b\t0.0.0.0:8443->443/tcp\t");
-    expect(inspectEdgePorts("traefik").every((o) => o.heldBy === null)).toBe(true);
+    expect(portOwners("traefik").every((o) => o.heldBy === null)).toBe(true);
   });
 
   it("matches the HOST port, not the container port", () => {
     // `0.0.0.0:9000->80/tcp` publishes 9000 on the host. The edge needs host :80.
     ps("x\t0.0.0.0:9000->80/tcp\t");
-    expect(inspectEdgePorts("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
+    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
   });
 
   it("still matches when the port list has an IPv6 entry alongside", () => {
     ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp, :::80->80/tcp\tcom.appbay.app=caddy");
-    expect(inspectEdgePorts("traefik").find((o) => o.port === 80)?.heldBy).toBe(
+    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBe(
       "appbay.system.caddy.caddy",
     );
   });
@@ -115,7 +124,7 @@ describe("🚨 telling the outgoing edge apart from a real conflict", () => {
     ps(
       "appbay.system.traefik.traefik\t0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp\tcom.appbay.app=traefik,com.appbay.namespace=system",
     );
-    const owners = inspectEdgePorts("traefik");
+    const owners = portOwners("traefik");
     expect(owners.every((o) => o.isOutgoingEdge)).toBe(true);
     expect(blockingPortConflicts(owners)).toEqual([]);
   });
@@ -124,14 +133,14 @@ describe("🚨 telling the outgoing edge apart from a real conflict", () => {
     // Migrating traefik -> caddy while caddy already holds :80 means something is already
     // there that this migration did not put there.
     ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp\tcom.appbay.app=caddy");
-    const blocking = blockingPortConflicts(inspectEdgePorts("traefik"));
+    const blocking = blockingPortConflicts(portOwners("traefik"));
     expect(blocking.map((o) => o.port)).toEqual([80]);
     expect(blocking[0]?.heldBy).toBe("appbay.system.caddy.caddy");
   });
 
   it("an unrelated container is a conflict", () => {
     ps("nginx-from-last-year\t0.0.0.0:443->443/tcp\t");
-    const blocking = blockingPortConflicts(inspectEdgePorts("caddy"));
+    const blocking = blockingPortConflicts(portOwners("caddy"));
     expect(blocking.map((o) => o.heldBy)).toEqual(["nginx-from-last-year"]);
   });
 
@@ -139,7 +148,7 @@ describe("🚨 telling the outgoing edge apart from a real conflict", () => {
     // Matching the whole `k=v` pair is what makes this safe; a prefix test on the label value
     // would wave `com.appbay.app=traefik-old` through as "the edge we are replacing".
     ps("appbay.system.traefik-old.x\t0.0.0.0:80->80/tcp\tcom.appbay.app=traefik-old");
-    const owners = inspectEdgePorts("traefik");
+    const owners = portOwners("traefik");
     expect(owners.find((o) => o.port === 80)?.isOutgoingEdge).toBe(false);
     expect(blockingPortConflicts(owners)).toHaveLength(1);
   });
@@ -148,11 +157,11 @@ describe("🚨 telling the outgoing edge apart from a real conflict", () => {
     // Pre-§4 containers, and anything not deployed by appbay, carry no label. Treating a
     // missing label as a match would silently stop a stranger's container.
     ps("appbay.traefik.traefik\t0.0.0.0:80->80/tcp\t");
-    expect(inspectEdgePorts("traefik").find((o) => o.port === 80)?.isOutgoingEdge).toBe(false);
+    expect(portOwners("traefik").find((o) => o.port === 80)?.isOutgoingEdge).toBe(false);
   });
 
   it("nothing held is nothing blocking", () => {
     ps();
-    expect(blockingPortConflicts(inspectEdgePorts("traefik"))).toEqual([]);
+    expect(blockingPortConflicts(portOwners("traefik"))).toEqual([]);
   });
 });

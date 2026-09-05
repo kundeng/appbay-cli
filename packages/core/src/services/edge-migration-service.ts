@@ -19,7 +19,7 @@
 import { spawnSync } from "node:child_process";
 import { cp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerBin , type Inspection } from "../runtime/container-runtime.js";
 import { APP_LABEL } from "../compiler/identity.js";
 import type { IngressProvider } from "../schemas/instance.js";
 
@@ -58,7 +58,7 @@ const EDGE_PORTS = [80, 443] as const;
  * So an unreported port conflict looks exactly like a healthy deploy followed by an edge
  * that is mysteriously absent. Detect it first and name the holder.
  */
-export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string): PortOwner[] {
+export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string): Inspection<PortOwner[]> {
   const runtime = containerBin(appbayHome);
   const owners: PortOwner[] = [];
 
@@ -78,7 +78,11 @@ export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string)
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const lines = ps.status === 0 ? String(ps.stdout).trim().split("\n").filter(Boolean) : [];
+  if (ps.status !== 0) {
+    // A failed `ps` is not evidence that the ports are free (review 2026-09-05, F6).
+    return { kind: "unknown", reason: String(ps.stderr ?? "").trim() || `ps exited with code ${String(ps.status)}` };
+  }
+  const lines = String(ps.stdout).trim().split("\n").filter(Boolean);
 
   for (const port of EDGE_PORTS) {
     let heldBy: string | null = null;
@@ -99,7 +103,7 @@ export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string)
     }
     owners.push({ port, heldBy, isOutgoingEdge });
   }
-  return owners;
+  return { kind: "ok", value: owners };
 }
 
 /**
@@ -155,7 +159,13 @@ export async function migrateEdge(opts: {
   }
 
   // 1. Port ownership — before anything is touched.
-  const owners = inspectEdgePorts(opts.from, opts.appbayHome);
+  const inspected = inspectEdgePorts(opts.from, opts.appbayHome);
+  if (inspected.kind === "unknown") {
+    record("ports", "Edge ports are available", false,
+      `could not inspect the edge ports (${inspected.reason}); refusing to migrate blind`);
+    return fail();
+  }
+  const owners = inspected.value;
   const conflicts = blockingPortConflicts(owners);
   if (conflicts.length > 0) {
     const detail = conflicts
