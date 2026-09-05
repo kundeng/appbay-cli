@@ -28,7 +28,7 @@ import {
 import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
-import { containerBin, findContainerByLabel, type Inspection } from "../runtime/container-runtime.js";
+import { containerBin, findContainerByLabel, resolveIngressProvider, type Inspection } from "../runtime/container-runtime.js";
 import { APP_LABEL } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 
@@ -484,25 +484,59 @@ export async function installCaddyConfig(
   };
 }
 
+/** The shape every route install answers with, on either provider. */
+export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavailable"; detail?: string }
+
 /**
- * Turn a failed Caddy install into a sentence that names what is actually wrong.
+ * Install the app's edge route on whichever provider fronts this install, and observe the
+ * edge before saying so. Caddy validates and reloads; traefik watches its dynamic directory,
+ * so the fragment on disk is the install and the observation is that a running traefik
+ * exists to read it. Writing the file with no edge is not a route (review 2026-09-05, F1).
+ */
+export async function installRoute(
+  app: Pick<AppCompileResult, "auxiliaryFiles">,
+  appbayHome: string,
+  deps: { findEdge: typeof findContainerByLabel } = { findEdge: findContainerByLabel },
+): Promise<RouteInstallResult> {
+  const provider = resolveIngressProvider(appbayHome);
+  if (provider === "caddy") return installCaddyConfig(app, appbayHome);
+
+  const files = app.auxiliaryFiles.filter((aux) => aux.path.startsWith(`etc/apps/${provider}/config/dynamic/`));
+  if (files.length === 0) return { ok: true };
+
+  const edge = deps.findEdge(APP_LABEL, provider, { appbayHome });
+  if (edge.kind === "unknown") {
+    return { ok: false, reason: "unavailable", detail: `could not ask the runtime for the edge (${edge.reason})` };
+  }
+  if (edge.value === null) {
+    return { ok: false, reason: "unavailable", detail: `no container carries ${APP_LABEL}=${provider} — the ${provider} edge is not deployed` };
+  }
+  if (!edge.value.running) {
+    return { ok: false, reason: "unavailable", detail: `the ${provider} edge container "${edge.value.name}" exists but is ${edge.value.state}` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Turn a failed route install into a sentence that names what is actually wrong.
  *
  * ⚠️ ONE HELPER, TWO CALL SITES, ON PURPOSE. `installCaddyConfig` is called from both the
  * new/changed and the unchanged deploy paths, and this repo's dominant defect shape is a
  * fix applied to one of two identical-looking paths (CLAUDE.md records three in one day).
  */
-function describeCaddyFailure(
+function describeRouteFailure(
   appName: string,
-  install: { reason?: "rejected" | "unavailable"; detail?: string },
+  install: RouteInstallResult,
+  provider: string,
 ): string {
   if (install.reason === "unavailable") {
     return (
-      `edge routes NOT installed — the Caddy edge container is not running, so its ` +
-      `configuration was never checked (${install.detail}). ${appName}'s own container is ` +
-      `up, but it is not reachable through the edge. Deploy the edge first: \`appbay up caddy\`.`
+      `edge routes NOT installed — the ${provider} edge is not running, so ${appName}'s route ` +
+      `was never installed (${install.detail}). ${appName}'s own container is up, but it is ` +
+      `not reachable through the edge. Deploy the edge first: \`appbay up ${provider}\`.`
     );
   }
-  return `Caddy rejected the generated configuration; generated files rolled back: ${install.detail}`;
+  return `${provider} rejected the generated configuration; generated files rolled back: ${install.detail}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -836,10 +870,10 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         continue;
       }
 
-      const caddyInstall = await installCaddyConfig(app, appbayHome);
+      const caddyInstall = await installRoute(app, appbayHome);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
-        appResult.error = describeCaddyFailure(app.appName, caddyInstall);
+        appResult.error = describeRouteFailure(app.appName, caddyInstall, resolveIngressProvider(appbayHome));
         // The compose converge already succeeded to reach this line, so the app's own
         // container is running while its routes are not installed. Recording it as a plain
         // failure reported a PARTIAL converge as a total one (appbay-cli#5).
@@ -967,10 +1001,10 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         }
       }
 
-      const caddyInstall = await installCaddyConfig(app, appbayHome);
+      const caddyInstall = await installRoute(app, appbayHome);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
-        appResult.error = describeCaddyFailure(app.appName, caddyInstall);
+        appResult.error = describeRouteFailure(app.appName, caddyInstall, resolveIngressProvider(appbayHome));
         // The compose converge already succeeded to reach this line, so the app's own
         // container is running while its routes are not installed. Recording it as a plain
         // failure reported a PARTIAL converge as a total one (appbay-cli#5).
