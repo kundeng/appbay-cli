@@ -71,7 +71,7 @@ describe("checkDockerAccessible — sudo detection", () => {
   it("passes when the current user reaches the daemon without sudo", () => {
     mockedServerVersion.mockReturnValue("29.4.0");
     const result = checkDockerAccessible("/tmp/appbay-sudo-test");
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
     expect(result.detail).toContain("server v29.4.0");
     // No sudo probe should have been attempted.
     expect(mockedSpawn).not.toHaveBeenCalledWith("sudo", expect.anything());
@@ -87,7 +87,7 @@ describe("checkDockerAccessible — sudo detection", () => {
     });
 
     const result = checkDockerAccessible("/tmp/appbay-sudo-test");
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
     expect(result.detail).toContain("cannot reach it without sudo");
     // The fix must point at group membership, and must state the escalation
     // boundary (appbay never creates system accounts / sets ACLs).
@@ -100,7 +100,7 @@ describe("checkDockerAccessible — sudo detection", () => {
     mockedSpawn.mockImplementation(() => failSpawn());
 
     const result = checkDockerAccessible("/tmp/appbay-sudo-test");
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
     expect(result.detail).toContain("not responding");
     // The fix is the start hint (start the daemon), not group membership.
     expect(result.fix).toContain("Start Docker");

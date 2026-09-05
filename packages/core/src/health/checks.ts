@@ -182,9 +182,16 @@ export type HealthCheckId =
 /** A check result carrying its stable id — what `runChecks` returns. */
 export type IdentifiedHealthCheck = HealthCheckResult & { id: HealthCheckId };
 
+/**
+ * Three answers, and the third is not a pass: `unknown` means the check could not be
+ * performed (runtime not answering, cannot probe). A required check that is unknown keeps
+ * `doctor --json` from reporting `ok` (review 2026-09-05, F4).
+ */
+export type CheckStatus = "ok" | "failed" | "unknown";
+
 export interface HealthCheckResult {
   name: string;
-  passed: boolean;
+  status: CheckStatus;
   detail: string;
   fix?: string;
   /** Whether this check is required for Appbay to function. */
@@ -207,11 +214,11 @@ export function checkDocker(appbayHome: string): HealthCheckResult {
   const { displayName, installUrl } = runtimeProfile(appbayHome);
   const version = tryExec(containerBin(appbayHome), ["--version"]);
   if (version) {
-    return { name: displayName, passed: true, detail: version, required: true };
+    return { name: displayName, status: "ok", detail: version, required: true };
   }
   return {
     name: displayName,
-    passed: false,
+    status: "failed",
     detail: `${displayName} not found`,
     fix: `Install ${displayName}: ${installUrl}  (or run "appbay init-system" on a RHEL-family host to install it)`,
     required: true,
@@ -260,7 +267,7 @@ export function checkStoreBinding(appbayHome: string): HealthCheckResult {
   if (!recorded) {
     return {
       name,
-      passed: true,
+      status: "ok",
       detail: "not recorded (install predates the key) — run `appbay init` to record it",
       required: true,
     };
@@ -270,19 +277,19 @@ export function checkStoreBinding(appbayHome: string): HealthCheckResult {
   if (!live) {
     return {
       name,
-      passed: true,
+      status: "unknown",
       detail: `recorded ${recorded}; runtime not answering — see runtime-access`,
       required: true,
     };
   }
 
   if (live === recorded) {
-    return { name, passed: true, detail: recorded, required: true };
+    return { name, status: "ok", detail: recorded, required: true };
   }
 
   return {
     name,
-    passed: false,
+    status: "failed",
     detail: `bound to ${recorded}, but this shell reaches ${live}`,
     fix:
       `This install's networks and volumes live in ${recorded}. ${otherStoreHint}. ` +
@@ -304,11 +311,11 @@ export function checkComposeInstalled(appbayHome: string): HealthCheckResult {
   const label = `${displayName} Compose v2`;
   const version = tryExec(containerBin(appbayHome), ["compose", "version", "--short"]);
   if (version) {
-    return { name: label, passed: true, detail: `v${version}`, required: true };
+    return { name: label, status: "ok", detail: `v${version}`, required: true };
   }
   return {
     name: label,
-    passed: false,
+    status: "failed",
     detail: `${label} not found`,
     fix: "Install Docker Compose v2: https://docs.docker.com/compose/install/ (podman uses it as its compose provider too)",
     required: true,
@@ -326,11 +333,11 @@ export function checkComposeVersion(appbayHome: string): HealthCheckResult {
     const label = `${provider.name} >= ${provider.minimum}`;
     const clean = provider.version.replace(/^v/, "");
     if (compareSemver(clean, provider.minimum) >= 0) {
-      return { name: label, passed: true, detail: `v${clean}`, required: true };
+      return { name: label, status: "ok", detail: `v${clean}`, required: true };
     }
     return {
       name: label,
-      passed: false,
+      status: "failed",
       detail: `v${clean} (too old)`,
       fix: `Upgrade ${provider.name} to >= ${provider.minimum}`,
       required: true,
@@ -341,7 +348,7 @@ export function checkComposeVersion(appbayHome: string): HealthCheckResult {
   if (!version) {
     return {
       name: `Compose >= ${MIN_COMPOSE_VERSION}`,
-      passed: false,
+      status: "failed",
       detail: "Could not determine Compose version",
       fix: "Install or upgrade Docker Compose v2",
       required: true,
@@ -353,7 +360,7 @@ export function checkComposeVersion(appbayHome: string): HealthCheckResult {
   if (compareSemver(clean, MIN_COMPOSE_VERSION) >= 0) {
     return {
       name: `Compose >= ${MIN_COMPOSE_VERSION}`,
-      passed: true,
+      status: "ok",
       detail: `v${clean}`,
       required: true,
     };
@@ -361,7 +368,7 @@ export function checkComposeVersion(appbayHome: string): HealthCheckResult {
 
   return {
     name: `Compose >= ${MIN_COMPOSE_VERSION}`,
-    passed: false,
+    status: "failed",
     detail: `v${clean} (too old)`,
     fix: `Upgrade Docker Compose to >= ${MIN_COMPOSE_VERSION}`,
     required: true,
@@ -376,14 +383,14 @@ export async function checkAppbayHome(appbayHome: string): Promise<HealthCheckRe
   try {
     const info = await stat(home);
     if (info.isDirectory()) {
-      return { name: "APPBAY_HOME", passed: true, detail: home, required: true };
+      return { name: "APPBAY_HOME", status: "ok", detail: home, required: true };
     }
   } catch {
     // Does not exist.
   }
   return {
     name: "APPBAY_HOME",
-    passed: false,
+    status: "failed",
     detail: `${home} does not exist`,
     fix: 'Run "appbay init" to create the Appbay home directory',
     required: true,
@@ -434,22 +441,22 @@ export function checkServiceAccountRuntimeAccess(
   const me = currentUser();
 
   if (!owner || !me) {
-    return { name, passed: true, detail: "cannot determine the owning account (skip)", required: false };
+    return { name, status: "unknown", detail: "cannot determine the owning account", required: false };
   }
   if (owner === me) {
     // An operator install: the account that runs the control plane is the one asking, and
     // `checkDockerAccessible` already answered for it.
-    return { name, passed: true, detail: `runs as you (${me})`, required: false };
+    return { name, status: "ok", detail: `runs as you (${me})`, required: false };
   }
 
   const result = probe(owner, bin, appbayHome);
   if (result === "ok") {
-    return { name, passed: true, detail: `${owner} can reach ${bin}`, required: false };
+    return { name, status: "ok", detail: `${owner} can reach ${bin}`, required: false };
   }
   if (result === "cannot-probe") {
     return {
       name,
-      passed: true,
+      status: "unknown",
       detail: `cannot verify ${owner}'s access from here (needs passwordless sudo)`,
       // The same argv the check would have run. A hand-typed `sudo -u appbay podman info`
       // exercises the ROOTLESS path and fails on a correctly configured host, so handing the
@@ -461,7 +468,7 @@ export function checkServiceAccountRuntimeAccess(
 
   return {
     name,
-    passed: false,
+    status: "failed",
     detail: `${owner} owns ${appbayHome} but cannot reach ${bin} — the control plane runs as ${owner}, not as you`,
     fix:
       `Run "appbay init-system" — it grants ${owner} access to the runtime.\n` +
@@ -547,11 +554,11 @@ export function probeArgv(bin: string, appbayHome: string): string[] {
 export function checkNetwork(appbayHome: string): HealthCheckResult {
   const result = tryExec(containerBin(appbayHome), ["network", "inspect", SHARED_NETWORK]);
   if (result !== null) {
-    return { name: "appbay_shared network", passed: true, detail: "exists", required: true };
+    return { name: "appbay_shared network", status: "ok", detail: "exists", required: true };
   }
   return {
     name: "appbay_shared network",
-    passed: false,
+    status: "failed",
     detail: "network not found",
     fix: `Run "appbay init" or "${containerBin(appbayHome)} network create ${SHARED_NETWORK}"`,
     required: true,
@@ -569,7 +576,7 @@ export function checkServer(appbayHome: string): HealthCheckResult {
   if (state === "true") {
     return {
       name: "Appbay server",
-      passed: true,
+      status: "ok",
       detail: `${SERVER_CONTAINER} is running`,
       required: false,
     };
@@ -577,7 +584,7 @@ export function checkServer(appbayHome: string): HealthCheckResult {
 
   return {
     name: "Appbay server",
-    passed: false,
+    status: "failed",
     detail: `${SERVER_CONTAINER} is not running`,
     fix: 'Run "appbay server start" to start the control plane',
     required: false,
@@ -593,14 +600,14 @@ export function checkGpu(appbayHome: string): HealthCheckResult {
     const gpus = output.split("\n").filter(Boolean);
     return {
       name: "GPU",
-      passed: true,
+      status: "ok",
       detail: `${gpus.length} GPU(s): ${gpus.join(", ")}`,
       required: false,
     };
   }
   return {
     name: "GPU",
-    passed: false,
+    status: "failed",
     detail: "nvidia-smi not found or no GPUs detected",
     fix: "Install NVIDIA drivers and nvidia-container-toolkit for GPU support",
     required: false,
@@ -650,7 +657,7 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
   const bin = containerBin(appbayHome);
   const version = containerServerVersion(appbayHome);
   if (version) {
-    return { name: label, passed: true, detail: `server v${version}`, required: true };
+    return { name: label, status: "ok", detail: `server v${version}`, required: true };
   }
 
   // The daemon did not answer the current user. Distinguish "down" from
@@ -660,7 +667,7 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
   if (sudoProbe !== null) {
     return {
       name: label,
-      passed: false,
+      status: "failed",
       detail: `${displayName} daemon is up but the current user cannot reach it without sudo`,
       fix:
         `Add your user to the ${displayName.toLowerCase()} group, then log out and back in: ` +
@@ -673,7 +680,7 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
 
   return {
     name: label,
-    passed: false,
+    status: "failed",
     detail: `${displayName} service not responding`,
     fix: startHint,
     required: true,
@@ -703,7 +710,7 @@ export function checkPlatform(appbayHome: string): HealthCheckResult {
 
   return {
     name: "Platform",
-    passed: true,
+    status: "ok",
     detail: `${platform} (${runtime})`,
     required: false,
   };
@@ -717,16 +724,16 @@ export function checkTraefikConfig(appbayHome: string): HealthCheckResult {
   const traefikDir = join(home, "etc", "apps", "traefik");
 
   if (!existsSync(traefikDir)) {
-    return { name: "Traefik config", passed: true, detail: "traefik not installed (skip)", required: false };
+    return { name: "Traefik config", status: "ok", detail: "traefik not installed (skip)", required: false };
   }
 
   const configPath = join(traefikDir, "config", "traefik.yml");
   if (existsSync(configPath)) {
-    return { name: "Traefik config", passed: true, detail: configPath, required: false };
+    return { name: "Traefik config", status: "ok", detail: configPath, required: false };
   }
   return {
     name: "Traefik config",
-    passed: false,
+    status: "failed",
     detail: "traefik installed but config/traefik.yml missing",
     fix: 'Run "appbay setup" to scaffold Traefik config, or create it manually',
     required: false,
@@ -737,17 +744,17 @@ export function checkTraefikConfig(appbayHome: string): HealthCheckResult {
 export function checkCaddySecurityConfig(appbayHome: string): HealthCheckResult {
   const home = appbayHome;
   if (resolveIngressProvider(home) !== "caddy") {
-    return { name: "Caddy Security config", passed: true, detail: "Traefik edge selected (skip)", required: false };
+    return { name: "Caddy Security config", status: "ok", detail: "Traefik edge selected (skip)", required: false };
   }
   const configDir = join(home, "etc", "apps", "caddy", "config");
   const caddyfile = join(configDir, "Caddyfile");
   const securityDir = join(configDir, "security");
   if (existsSync(caddyfile) && existsSync(securityDir)) {
-    return { name: "Caddy Security config", passed: true, detail: "Caddyfile + security directory present", required: true };
+    return { name: "Caddy Security config", status: "ok", detail: "Caddyfile + security directory present", required: true };
   }
   return {
     name: "Caddy Security config",
-    passed: false,
+    status: "failed",
     detail: "selected Caddy edge is missing its Caddyfile or security directory",
     fix: 'Run "appbay init --refresh-system-apps" to restore the shipped Caddy stack',
     required: true,
@@ -762,11 +769,11 @@ export function checkVault(appbayHome: string): HealthCheckResult {
   const vaultPath = join(home, "var", "lib", "vault.enc");
 
   if (existsSync(vaultPath)) {
-    return { name: "Secrets vault", passed: true, detail: "vault.enc initialized", required: false };
+    return { name: "Secrets vault", status: "ok", detail: "vault.enc initialized", required: false };
   }
   return {
     name: "Secrets vault",
-    passed: false,
+    status: "failed",
     detail: "vault.enc not initialized",
     fix: 'Run "appbay secrets init" to create the local AES-256-GCM vault',
     required: false,
@@ -781,11 +788,11 @@ export function checkKeePassDb(appbayHome: string): HealthCheckResult {
   const kdbxPath = join(home, "var", "lib", "secrets.kdbx");
 
   if (existsSync(kdbxPath)) {
-    return { name: "KeePass database", passed: true, detail: "secrets.kdbx initialized", required: false };
+    return { name: "KeePass database", status: "ok", detail: "secrets.kdbx initialized", required: false };
   }
   return {
     name: "KeePass database",
-    passed: false,
+    status: "failed",
     detail: "secrets.kdbx not found",
     fix: 'Run "appbay secrets init-kdbx" to create a KeePass database for keepass:// URIs',
     required: false,
@@ -800,14 +807,14 @@ export function checkKeePassCli(appbayHome: string): HealthCheckResult {
   if (version) {
     return {
       name: "keepassxc-cli",
-      passed: true,
+      status: "ok",
       detail: version.split("\n")[0].trim(),
       required: false,
     };
   }
   return {
     name: "keepassxc-cli",
-    passed: false,
+    status: "failed",
     detail: "keepassxc-cli not found",
     fix: "Required only for keepass:// secret URIs. Install: apt install keepassxc (or brew install keepassxc)",
     required: false,
@@ -822,14 +829,14 @@ export function checkSops(appbayHome: string): HealthCheckResult {
   if (version) {
     return {
       name: "SOPS",
-      passed: true,
+      status: "ok",
       detail: version.split("\n")[0].trim(),
       required: false,
     };
   }
   return {
     name: "SOPS",
-    passed: false,
+    status: "failed",
     detail: "sops binary not found",
     fix: "Required only for sops:// secret URIs. Install: https://github.com/getsops/sops",
     required: false,
@@ -885,7 +892,7 @@ export function checkSharedNetworkDns(appbayHome: string): HealthCheckResult {
   if (netExists === null) {
     return {
       name: "Shared network DNS",
-      passed: false,
+      status: "failed",
       detail: `${SHARED_NETWORK} network not found — cannot probe DNS resolution`,
       fix: `Run "appbay init" or "${bin} network create ${SHARED_NETWORK}"`,
       required: true,
@@ -924,7 +931,7 @@ export function checkSharedNetworkDns(appbayHome: string): HealthCheckResult {
   if (probe !== null) {
     return {
       name: "Shared network DNS",
-      passed: true,
+      status: "ok",
       detail: `container on ${SHARED_NETWORK} resolved a name via the embedded DNS`,
       required: true,
     };
@@ -932,7 +939,7 @@ export function checkSharedNetworkDns(appbayHome: string): HealthCheckResult {
 
   return {
     name: "Shared network DNS",
-    passed: false,
+    status: "failed",
     detail: `could not resolve a name via the embedded DNS on ${SHARED_NETWORK}`,
     fix: `Recreate the shared network: "${bin} network rm ${SHARED_NETWORK}" then "appbay init"`,
     required: true,
@@ -985,7 +992,7 @@ export function checkHealthcheckStartPeriod(appbayHome: string): HealthCheckResu
   if (offenders.length === 0) {
     return {
       name: "Healthcheck start_period",
-      passed: true,
+      status: "ok",
       detail: "no known-slow app has an undersized start_period",
       required: false,
     };
@@ -993,7 +1000,7 @@ export function checkHealthcheckStartPeriod(appbayHome: string): HealthCheckResu
 
   return {
     name: "Healthcheck start_period",
-    passed: false,
+    status: "failed",
     detail: offenders.join("; "),
     fix: "Raise start_period above the observed startup time in the app's healthcheck (see docs/guide/bootstrap.md)",
     required: false,
@@ -1047,7 +1054,7 @@ export async function runChecks(appbayHome: string): Promise<IdentifiedHealthChe
  * The subset of checks that failed and are required.
  */
 export function requiredChecksFailed(checks: HealthCheckResult[]): HealthCheckResult[] {
-  return checks.filter((c) => !c.passed && c.required);
+  return checks.filter((c) => c.status !== "ok" && c.required);
 }
 
 /**
@@ -1072,10 +1079,10 @@ export async function runInitPreflight(appbayHome: string): Promise<HealthCheckR
  * Format a single check as a human-readable line.
  */
 export function formatCheck(check: HealthCheckResult): string {
-  const icon = check.passed ? "\u2713" : "\u2717";
+  const icon = check.status === "ok" ? "\u2713" : check.status === "failed" ? "\u2717" : "?";
   const reqLabel = check.required ? "" : " (optional)";
   let out = `  ${icon} ${check.name}${reqLabel}\n    ${check.detail}`;
-  if (!check.passed && check.fix) {
+  if (check.status !== "ok" && check.fix) {
     out += `\n    Fix: ${check.fix}`;
   }
   return out;
@@ -1087,7 +1094,7 @@ export function formatCheck(check: HealthCheckResult): string {
  * Returns an empty string when nothing failed, so callers can skip the block.
  */
 export function formatRemediation(checks: HealthCheckResult[]): string {
-  const failed = checks.filter((c) => !c.passed);
+  const failed = checks.filter((c) => c.status !== "ok");
   if (failed.length === 0) return "";
 
   const required = failed.filter((c) => c.required);
@@ -1112,6 +1119,8 @@ export function formatRemediation(checks: HealthCheckResult[]): string {
 /** A single check in the machine-readable `--json` envelope. */
 export interface JsonCheck {
   name: string;
+  status: CheckStatus;
+  /** `status === "ok"`, kept for consumers that read the old boolean. */
   passed: boolean;
   detail: string;
   fix?: string;
@@ -1121,7 +1130,8 @@ export interface JsonCheck {
 /**
  * Build the `doctor --json` payload: `{ ok, checks[] }` with flat entries.
  *
- * `ok` is true only when every required check passed. Extracted as a pure
+ * `ok` is true only when every required check ran and passed; a required check that
+ * could not run (`unknown`) is not a pass. Extracted as a pure
  * function so the output shape is unit-testable without invoking the command.
  */
 export function buildDoctorJson(checks: HealthCheckResult[]): { ok: boolean; checks: JsonCheck[] } {
@@ -1129,7 +1139,8 @@ export function buildDoctorJson(checks: HealthCheckResult[]): { ok: boolean; che
     ok: requiredChecksFailed(checks).length === 0,
     checks: checks.map((c) => ({
       name: c.name,
-      passed: c.passed,
+      status: c.status,
+      passed: c.status === "ok",
       detail: c.detail,
       fix: c.fix,
       required: c.required,

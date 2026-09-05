@@ -35,7 +35,7 @@ function check(
 describe("an operator install", () => {
   it("skips — the account that runs it is the one asking", () => {
     const r = check("kundeng", "kundeng");
-    expect(r.passed).toBe(true);
+    expect(r.status).toBe("ok");
     expect(r.detail).toContain("runs as you");
   });
 });
@@ -43,13 +43,13 @@ describe("an operator install", () => {
 describe("a service install", () => {
   it("passes when the owning account can reach the runtime", () => {
     const r = check("appbay", "kundeng", "ok");
-    expect(r.passed).toBe(true);
+    expect(r.status).toBe("ok");
     expect(r.detail).toContain("appbay");
   });
 
   it("🚨 FAILS when the owning account cannot — the case doctor used to call healthy", () => {
     const r = check("appbay", "kundeng", "denied");
-    expect(r.passed).toBe(false);
+    expect(r.status).toBe("failed");
     // The detail must name the principal, or the operator reads it as their own problem and
     // "fixes" their own group membership, which was never wrong.
     expect(r.detail).toContain("appbay");

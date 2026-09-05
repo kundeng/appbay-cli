@@ -28,7 +28,7 @@ import {
 function check(overrides: Partial<CheckResult>): CheckResult {
   return {
     name: "test",
-    passed: true,
+    status: "ok",
     detail: "ok",
     required: true,
     ...overrides,
@@ -38,10 +38,10 @@ function check(overrides: Partial<CheckResult>): CheckResult {
 describe("requiredChecksFailed", () => {
   it("returns only required checks that failed", () => {
     const checks: CheckResult[] = [
-      check({ name: "a", passed: true, required: true }),
-      check({ name: "b", passed: false, required: true }),
-      check({ name: "c", passed: false, required: false }),
-      check({ name: "d", passed: true, required: false }),
+      check({ name: "a", status: "ok", required: true }),
+      check({ name: "b", status: "failed", required: true }),
+      check({ name: "c", status: "failed", required: false }),
+      check({ name: "d", status: "ok", required: false }),
     ];
     const failed = requiredChecksFailed(checks);
     expect(failed.map((c) => c.name)).toEqual(["b"]);
@@ -49,8 +49,8 @@ describe("requiredChecksFailed", () => {
 
   it("returns empty when all required checks pass", () => {
     const checks: CheckResult[] = [
-      check({ name: "a", passed: true, required: true }),
-      check({ name: "b", passed: false, required: false }),
+      check({ name: "a", status: "ok", required: true }),
+      check({ name: "b", status: "failed", required: false }),
     ];
     expect(requiredChecksFailed(checks)).toEqual([]);
   });
@@ -58,7 +58,7 @@ describe("requiredChecksFailed", () => {
 
 describe("formatCheck", () => {
   it("marks a passed check with a checkmark and no fix", () => {
-    const out = formatCheck(check({ name: "Docker", passed: true, detail: "v24" }));
+    const out = formatCheck(check({ name: "Docker", status: "ok", detail: "v24" }));
     expect(out).toContain("✓ Docker");
     expect(out).toContain("v24");
     expect(out).not.toContain("Fix:");
@@ -66,7 +66,7 @@ describe("formatCheck", () => {
 
   it("marks a failed required check with a cross and its fix", () => {
     const out = formatCheck(
-      check({ name: "Docker", passed: false, detail: "not found", fix: "Install Docker" }),
+      check({ name: "Docker", status: "failed", detail: "not found", fix: "Install Docker" }),
     );
     expect(out).toContain("✗ Docker");
     expect(out).toContain("not found");
@@ -74,20 +74,20 @@ describe("formatCheck", () => {
   });
 
   it("labels optional checks", () => {
-    const out = formatCheck(check({ name: "GPU", passed: false, required: false }));
+    const out = formatCheck(check({ name: "GPU", status: "failed", required: false }));
     expect(out).toContain("(optional)");
   });
 });
 
 describe("formatRemediation", () => {
   it("returns empty string when nothing failed", () => {
-    expect(formatRemediation([check({ passed: true }), check({ passed: true })])).toBe("");
+    expect(formatRemediation([check({ status: "ok" }), check({ status: "ok" })])).toBe("");
   });
 
   it("groups required failures under a Required heading", () => {
     const out = formatRemediation([
-      check({ name: "Docker", passed: false, required: true, fix: "Install Docker" }),
-      check({ name: "GPU", passed: true }),
+      check({ name: "Docker", status: "failed", required: true, fix: "Install Docker" }),
+      check({ name: "GPU", status: "ok" }),
     ]);
     expect(out).toContain("Required fixes:");
     expect(out).toContain("Docker: Install Docker");
@@ -96,8 +96,8 @@ describe("formatRemediation", () => {
 
   it("groups optional failures under an Optional heading", () => {
     const out = formatRemediation([
-      check({ name: "GPU", passed: false, required: false, fix: "Install drivers" }),
-      check({ name: "Docker", passed: true }),
+      check({ name: "GPU", status: "failed", required: false, fix: "Install drivers" }),
+      check({ name: "Docker", status: "ok" }),
     ]);
     expect(out).toContain("Optional (recommended):");
     expect(out).toContain("GPU: Install drivers");
@@ -106,8 +106,8 @@ describe("formatRemediation", () => {
 
   it("lists both groups when both kinds fail", () => {
     const out = formatRemediation([
-      check({ name: "Docker", passed: false, required: true, fix: "Install Docker" }),
-      check({ name: "GPU", passed: false, required: false, fix: "Install drivers" }),
+      check({ name: "Docker", status: "failed", required: true, fix: "Install Docker" }),
+      check({ name: "GPU", status: "failed", required: false, fix: "Install drivers" }),
     ]);
     expect(out).toContain("Required fixes:");
     expect(out).toContain("Optional (recommended):");
@@ -140,14 +140,15 @@ describe("runInitPreflight", () => {
 describe("buildDoctorJson", () => {
   it("produces the flat {ok, checks[]} envelope", () => {
     const checks: CheckResult[] = [
-      check({ name: "Docker", passed: true, detail: "v24", required: true }),
-      check({ name: "GPU", passed: false, detail: "no gpu", fix: "install", required: false }),
+      check({ name: "Docker", status: "ok", detail: "v24", required: true }),
+      check({ name: "GPU", status: "failed", detail: "no gpu", fix: "install", required: false }),
     ];
     const payload = buildDoctorJson(checks);
     expect(payload.ok).toBe(true);
     expect(payload.checks).toHaveLength(2);
     expect(payload.checks[0]).toEqual({
       name: "Docker",
+      status: "ok",
       passed: true,
       detail: "v24",
       fix: undefined,
@@ -155,6 +156,7 @@ describe("buildDoctorJson", () => {
     });
     expect(payload.checks[1]).toEqual({
       name: "GPU",
+      status: "failed",
       passed: false,
       detail: "no gpu",
       fix: "install",
@@ -162,18 +164,34 @@ describe("buildDoctorJson", () => {
     });
   });
 
+  it("is not ok over a required check that could not run", () => {
+    // Review 2026-09-05 F4: seven checks returned passed:true with "runtime not answering",
+    // and ok derived from failures only, so an unreachable runtime read as healthy.
+    const checks: CheckResult[] = [
+      check({ name: "Store binding", status: "unknown", detail: "runtime not answering", required: true }),
+    ];
+    expect(buildDoctorJson(checks).ok).toBe(false);
+  });
+
+  it("stays ok over an optional check that could not run", () => {
+    const checks: CheckResult[] = [
+      check({ name: "Owner probe", status: "unknown", detail: "cannot determine", required: false }),
+    ];
+    expect(buildDoctorJson(checks).ok).toBe(true);
+  });
+
   it("sets ok=false when any required check fails", () => {
     const checks: CheckResult[] = [
-      check({ name: "Docker", passed: true, required: true }),
-      check({ name: "Compose", passed: false, required: true }),
+      check({ name: "Docker", status: "ok", required: true }),
+      check({ name: "Compose", status: "failed", required: true }),
     ];
     expect(buildDoctorJson(checks).ok).toBe(false);
   });
 
   it("keeps ok=true when only optional checks fail", () => {
     const checks: CheckResult[] = [
-      check({ name: "Docker", passed: true, required: true }),
-      check({ name: "GPU", passed: false, required: false }),
+      check({ name: "Docker", status: "ok", required: true }),
+      check({ name: "GPU", status: "failed", required: false }),
     ];
     expect(buildDoctorJson(checks).ok).toBe(true);
   });
@@ -194,7 +212,7 @@ describe("checkHealthcheckStartPeriod", () => {
 
   it("passes when no known-slow app has a rendered compose", () => {
     const result = checkHealthcheckStartPeriod();
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
     expect(result.required).toBe(false);
   });
 
@@ -207,7 +225,7 @@ describe("checkHealthcheckStartPeriod", () => {
       "utf-8",
     );
     const result = checkHealthcheckStartPeriod();
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
   });
 
   it("fails when a known-slow app has an undersized start_period", () => {
@@ -219,7 +237,7 @@ describe("checkHealthcheckStartPeriod", () => {
       "utf-8",
     );
     const result = checkHealthcheckStartPeriod();
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
     expect(result.detail).toContain("ollama");
     expect(result.fix).toBeTruthy();
   });

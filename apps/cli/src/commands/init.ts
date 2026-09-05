@@ -858,7 +858,7 @@ export const initCommand = new Command("init")
         if (failed.length > 0) {
           console.log("Preflight check failed — cannot initialize Appbay:\n");
           for (const check of preflight) {
-            if (!check.passed) console.log(formatCheck(check));
+            if (check.status !== "ok") console.log(formatCheck(check));
           }
           console.log("");
           console.log(

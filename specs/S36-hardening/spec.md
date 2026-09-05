@@ -267,9 +267,9 @@ identity module, and the lookup keeps working if the namespace changes again.
     - **Depends**: 1.1 · **Requirements**: 2.1, 2.2 · **Properties**: 1
   - [x] 2.2 `runCaddyCommand` and `edge-identity-service.ts` and `setup.ts` resolve the edge by label; literals deleted
     - **Depends**: 1.1, 1.2 · **Requirements**: 1.1, 1.2, 1.3
-  - [ ] 2.3 traefik edge confirmation on the deploy path
+  - [x] 2.3 traefik edge confirmation on the deploy path
     - **Depends**: 2.2 · **Requirements**: 3.1
-  - [ ] 2.4 doctor three-valued; `ok` false on unknown; doctor tests updated
+  - [x] 2.4 doctor three-valued; `ok` false on unknown; doctor tests updated
     - **Depends**: — · **Requirements**: 2.3
   - [ ] 2.5 `inspectEdgePorts` returns unknown on `ps` failure; migration refuses
     - **Depends**: 1.1 · **Requirements**: 2.4

@@ -70,7 +70,7 @@ describe("checkStoreBinding", () => {
     mockedStoreRoot.mockReturnValue(ROOTFUL);
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
     expect(result.detail).toBe(ROOTFUL);
   });
 
@@ -80,7 +80,7 @@ describe("checkStoreBinding", () => {
     mockedStoreRoot.mockReturnValue(ROOTFUL);
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
     expect(result.required).toBe(true);
     // Both paths must appear — a mismatch message naming only one of them leaves the
     // operator unable to tell which way round it is.
@@ -93,7 +93,7 @@ describe("checkStoreBinding", () => {
     mockedStoreRoot.mockReturnValue(ROOTLESS);
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
   });
 
   it("names sudo in the fix on podman, because that IS the other store", () => {
@@ -117,7 +117,7 @@ describe("checkStoreBinding", () => {
     mockedStoreRoot.mockReturnValue("/mnt/big/docker");
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(false);
+    expect(result.status).toBe("failed");
     expect(result.fix).toContain("DOCKER_HOST");
     expect(result.fix).not.toContain("sudo");
   });
@@ -127,7 +127,7 @@ describe("checkStoreBinding", () => {
     mockedStoreRoot.mockReturnValue(ROOTFUL);
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
     expect(result.detail).toContain("not recorded");
     // Failing this closed would break every existing homelab on upgrade.
   });
@@ -140,19 +140,19 @@ describe("checkStoreBinding", () => {
     expect(mockedStoreRoot).not.toHaveBeenCalled();
   });
 
-  it("passes when the runtime is not answering — runtime-access owns that", () => {
+  it("is UNKNOWN when the runtime is not answering — a check that could not look is not a pass", () => {
     install(ROOTFUL);
     mockedStoreRoot.mockReturnValue(null);
 
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("unknown");
     expect(result.detail).toContain("runtime-access");
-    // Reporting one outage under two names sends the operator hunting a second fault.
+    // The outage itself is runtime-access's to report; this check only says it could not compare.
   });
 
   it("passes when there is no project.yaml at all", () => {
     // Uninitialised install — `appbay-home` reports that, not this check.
     const result = checkStoreBinding(home);
-    expect(result.passed).toBe(true);
+    expect(result.status).toBe("ok");
   });
 });
