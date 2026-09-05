@@ -5,14 +5,13 @@
  * a previously compiled plan. Useful for review-then-apply workflows.
  */
 import { Command } from "commander";
-import { compile, type CompileResult, loadProjectVars , detectRuntimeFacts } from "@appbay/core";
+import { compile, deploy, type CompileResult, loadProjectVars, detectRuntimeFacts } from "@appbay/core";
 import {
   resolveAppsDir,
   resolveRendersDir,
   resolveStateDir, resolveAppbayHome } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { join, dirname } from "node:path";
-import { writeFile, mkdir } from "node:fs/promises";
+import { printDeployReport } from "../utils/deploy-report.js";
 
 export const applyCommand = new Command("apply")
   .description("Apply a deployment plan (compile → review → deploy)")
@@ -83,40 +82,15 @@ export const applyCommand = new Command("apply")
       return;
     }
 
-    // Apply
+    // Apply — through the one deploy path, so the crash check, the route install and the
+    // observed tally are the same ones `appbay up` has (review 2026-09-05, F2).
     console.log("Applying...\n");
-    let deployed = 0;
-
-    for (const app of changed) {
-      const renderDir = join(rendersDir, app.appName);
-      const composePath = join(renderDir, "docker-compose.rendered.yml");
-
-      await mkdir(renderDir, { recursive: true });
-      await writeFile(composePath, app.rendered);
-
-      // Write auxiliary files
-      for (const aux of app.auxiliaryFiles) {
-        const auxPath = join(renderDir, aux.path);
-        await mkdir(dirname(auxPath), { recursive: true });
-        await writeFile(auxPath, aux.content);
-      }
-
-      // Ensure .env exists
-      const appEnvPath = join(appsDir, app.appName, ".env");
-      try {
-        await writeFile(appEnvPath, "", { flag: "a" });
-      } catch { /* ignore */ }
-
-      console.log(`  Deploying ${app.appName}...`);
-      const dc = dockerCompose(["up", "-d"], composePath);
-      if (dc.exitCode === 0) {
-        console.log(`    deployed`);
-        deployed++;
-      } else {
-        console.error(`    failed: ${dc.output.trim().split("\n")[0]}`);
-      }
-    }
-
-    console.log(`\n${deployed} deployed, ${result.errors.length} error(s)`);
-    process.exit(result.errors.length > 0 ? 1 : 0);
+    const deployResult = await deploy({
+      appbayHome: resolveAppbayHome(),
+      targetApps: changed.map((a) => a.appName),
+      projectVars: await loadProjectVars(resolveAppbayHome()),
+      dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),
+    });
+    const { hasFailures } = printDeployReport(deployResult);
+    process.exit(hasFailures || result.errors.length > 0 ? 1 : 0);
   });
