@@ -39,14 +39,14 @@ const unknown = (reason: string): Inspection<ComposePsRow[]> => ({ kind: "unknow
 const compose: DockerComposeRunner = () => ({ exitCode: 0, output: "" });
 
 async function seedRender(): Promise<void> {
-  await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([ok(row("running", "seed-id"))]) });
+  await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "seed-id"))]) });
 }
 
 describe("🚨 an UNCHANGED artifact does not mean an unchanged deployment", () => {
   it("a container that was gone and is now created counts as DEPLOYED", async () => {
     await seedRender();
     // later deploys ask: before-snapshot, after-snapshot, crash check
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([ok(), ok(row("running", "new-id")), ok(row("running", "new-id"))]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(), ok(row("running", "new-id")), ok(row("running", "new-id"))]) });
     expect(result.apps[0]?.planStatus).toBe("unchanged");
     expect(result.deployed).toBe(1);
     expect(result.unchanged).toBe(0);
@@ -55,14 +55,14 @@ describe("🚨 an UNCHANGED artifact does not mean an unchanged deployment", () 
   it("already running, same id, is the one genuinely unchanged case", async () => {
     await seedRender();
     const running = ok(row("running", "same-id"));
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([running, running, running]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([running, running, running]) });
     expect(result.unchanged).toBe(1);
     expect(result.deployed).toBe(0);
   });
 
   it("a RECREATED container — same name, new id — is deployed", async () => {
     await seedRender();
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([ok(row("running", "old-id")), ok(row("running", "new-id")), ok(row("running", "new-id"))]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "old-id")), ok(row("running", "new-id")), ok(row("running", "new-id"))]) });
     expect(result.deployed).toBe(1);
     expect(result.unchanged).toBe(0);
   });
@@ -70,13 +70,13 @@ describe("🚨 an UNCHANGED artifact does not mean an unchanged deployment", () 
 
 describe("🚨 a service that starts and immediately dies is NOT a success", () => {
   it("is reported as failed, not deployed", async () => {
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([ok(row("exited", "id-1", 1))]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("exited", "id-1", 1))]) });
     expect(result.failed).toBe(1);
     expect(result.deployed).toBe(0);
   });
 
   it("an exit code of 0 is a completed one-shot, not a crash", async () => {
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([ok(row("exited", "id-1", 0))]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("exited", "id-1", 0))]) });
     expect(result.failed).toBe(0);
   });
 });
@@ -84,7 +84,7 @@ describe("🚨 a service that starts and immediately dies is NOT a success", () 
 describe("when the runtime cannot be asked, the unknown is recorded, not guessed", () => {
   it("records convergeAction as unknown rather than a verdict, and neither deployed nor failed", async () => {
     await seedRender();
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([unknown("no socket at /var/run/docker.sock")]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([unknown("no socket at /var/run/docker.sock")]) });
     expect(result.apps[0]?.convergeAction).toBe("unknown");
     expect(result.apps[0]?.unknownReason).toContain("docker.sock");
     expect(result.deployed).toBe(0);
@@ -92,7 +92,7 @@ describe("when the runtime cannot be asked, the unknown is recorded, not guessed
   });
 
   it("on a FIRST deploy, an unreadable crash check is unknown too — not deployed", async () => {
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, observer: observerWith([unknown("api unavailable")]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([unknown("api unavailable")]) });
     expect(result.apps[0]?.planStatus).toBe("new");
     expect(result.apps[0]?.convergeAction).toBe("unknown");
     expect(result.deployed).toBe(0);
