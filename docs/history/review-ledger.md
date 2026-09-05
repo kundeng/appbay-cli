@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-05):** 1 file read · open: 11 · next: S37 ownership; stackbay L9–L13 in S38.
+**Position (2026-09-05):** 1 file read · open: 14 · next: S37 ownership; stackbay L9–L13 in S38.
 
 ## Protocol
 
@@ -43,3 +43,6 @@ the next session resumes from.
 | 18 | `edge-migration-service.ts:77-81` | 1 | `ps` non-zero → `lines = []` → every edge port reported free. | verified, read | committed 6bfb832 (S36 2.5) |
 | 19 | see seam-review.md Seam 4 | 2 | `tryExec` ×3, `findOllamaContainer` ×3, `.env` parser ×3, home resolver ×5, `compile()` caller ×5 identical, second doctor in `setup.ts:284`, `appbay.yaml` parsed without schema ×4. | sweep, spot-checked | open |
 | 20 | see seam-review.md Seam 5 | 3 | Four tests assert only `toHaveBeenCalled*`; no test compiles a system app and asks the deploy path which container it execs into, which is how row 13 slipped. | sweep, spot-checked | committed 73660f7 (S36 1.2): the compile-then-target test exists; the mock-call tests are S38 |
+| 21 | `docs/steering/product.md` | S | Owner decision, 2026-09-05: a namespace is identity and a value store, `${{namespace.KEY}}` from a per-namespace values file over the per-host `${{project.KEY}}`. Reverses S32's rejection of RFC-001 4.6 and resolves R4 in the loader direction; the derived default host (row 10) becomes the default value inside that store. | decided by Kun | open: needs a sprint (values loader, scope in the resolver) |
+| 22 | `docs/steering/product.md` | S | Open question from Kun: single-node Swarm mode for its runtime secret store. Unmeasured on both runtimes. | open question | open |
+| 23 | secrets trait, five injection modes | S | Kun: it is not established that every mode keeps the secret out of a render, argv, and log. The security-review pass (S38) audits each mode; product.md states intent, not guarantee, until then. | raised by Kun | open → S38 |

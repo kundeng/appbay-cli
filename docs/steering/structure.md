@@ -43,6 +43,14 @@ The rule each layer owes:
 A fact has one reader. When a second reader appears, the first one moves to where
 both can call it, and the second is deleted.
 
+**Runtime differences live in the adapter, not in the core.** Docker and Podman differ in
+flags, output shapes, socket paths and defaults. Those differences are data in
+`runtime/` (a profile table) or a distinct adapter implementation. An `if` on the runtime
+name inside `services`, `compiler` or `health` is the wrong shape, and a retry that papers
+over a runtime difference is worse, because it hides which runtime misbehaved. Podman
+support arrived after Docker; the layer that absorbs the difference is what keeps the
+second runtime from spreading through the first one's code.
+
 ## Where truth lives
 
 | kind | place |
