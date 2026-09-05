@@ -1,13 +1,13 @@
 ---
 spec_id: S36-hardening
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: FORK-FORWARD
 since: 2026-09-05
 until: null
 epic: correctness
 features: [edge-by-identity, inspection-type, three-valued-doctor, one-deploy-path, runtime-bin-everywhere, edge-migrate-command]
 supersedes: []
-superseded_by: null
+superseded_by: S38-verification-and-docs
 depends_on: [S34-service-account-runtime-access]
 anchors: [data-architecture]
 ---
@@ -257,12 +257,12 @@ identity module, and the lookup keeps working if the namespace changes again.
 
 ## Tasks
 
-- [ ] 1. Foundation
+- [x] 1. Foundation
   - [x] 1.1 `Inspection<T>` and `findContainerByLabel` in `runtime/container-runtime.ts`, with unit tests for both providers' output shapes
     - **Depends**: — · **Requirements**: 1.1, 2.1 · **Pillar**: Correct
   - [x] 1.2 Compile-then-target test (fails against the literal)
     - **Depends**: 1.1 · **Requirements**: 8.1 · **Properties**: 2 · **Pillar**: Verified
-- [ ] 2. Core
+- [x] 2. Core
   - [x] 2.1 `deploy-service.ts`: the four functions return `Inspection`; callers handle `unknown`; `unknownReason` on the result; tally prints it
     - **Depends**: 1.1 · **Requirements**: 2.1, 2.2 · **Properties**: 1
   - [x] 2.2 `runCaddyCommand` and `edge-identity-service.ts` and `setup.ts` resolve the edge by label; literals deleted
@@ -283,13 +283,13 @@ identity module, and the lookup keeps working if the namespace changes again.
     - **Depends**: 2.5 · **Requirements**: 7.1
   - [x] 2.10 `keepassxc-cli.test.ts` skips `/proc` off Linux; `instance.ts:92` comment corrected
     - **Depends**: — · **Requirements**: 8.2, NF 2
-- [ ] 3. Verification
-  - [ ] 3.1 `s29-journey-deploy-reporting.sh` on Docker
+- [x] 3. Verification
+  - [x] 3.1 `s29-journey-deploy-reporting.sh` on Docker — run as an equivalent hand journey on the local Docker (see log); the script itself needs a multipass VM
     - **Depends**: 2.3 · **Requirements**: 8.3
-  - [ ] 3.2 the same on Podman
+  - [>] → S38-verification-and-docs 3.2 the same on Podman — no Podman host reachable from this machine (`multipass list`: no instances)
     - **Depends**: 3.1 · **Requirements**: 8.3
-- [ ] 4. Close
-  - [ ] 4.1 ledger rows 1, 11, 13–18, 20 → committed <sha>; issue #7 closed with the command named
+- [x] 4. Close
+  - [x] 4.1 ledger rows 1, 11, 13–18, 20 → committed; issue #7 closed with the command named
     - **Depends**: 3.1
 
 ## Log
@@ -306,3 +306,20 @@ noted, not mine: `apps/cli home.test.ts` "warns when a saved pointer is under a 
 directory" fails on macOS (`/var/folders` is not recognised as temp) — S38 test list.
 `ok`/`unknown` constructors stay module-private so the core barrel does not export two
 generic names.
+
+**2026-09-05** — 2.1, 2.3–2.10 done; 3.1 done by hand on the local Docker (OrbStack, Docker
+29.4.0) with the rebuilt binary, in a scratch home for each provider:
+- caddy: `up caddy` → `up whoami` → `1 deployed`, `etc/apps/caddy/config/dynamic/whoami.caddy`
+  written; second `up whoami` → `0 deployed, 1 unchanged`. Before the fix the same sequence
+  reported "the Caddy edge container does not exist (no such object: appbay.caddy)".
+- traefik: `up whoami` with no edge → "edge routes NOT installed — the traefik edge is not
+  running … no container carries com.appbay.app=traefik"; after `up traefik` → unchanged.
+- `doctor --json` → ok with one optional unknown (service account runtime access).
+- `edge migrate --to caddy` on the traefik home: ports held by the outgoing edge → candidate
+  validated in the built image with the deploy env → backup → stop traefik → start caddy →
+  healthy by label → `ingress_provider: caddy` recorded; the next `up whoami` put
+  `whoami.caddy` on the new edge. The first attempt failed validation because `caddy validate`
+  ran without the secret env deploy resolves; fixed in 6b8d54c by extracting the one resolver
+  both deploy paths had duplicated.
+- The s29 script was not run: it drives a multipass VM and none exists here. 3.2 (Podman)
+  is carried to S38. Closed FORK-FORWARD on that leftover.
