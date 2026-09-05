@@ -1,5 +1,5 @@
 ---
-spec_id: S35-collection-boot-order
+spec_id: S39-collection-boot-order
 status: DRAFT
 closed_as: null
 since: 2026-09-01
@@ -8,11 +8,19 @@ epic: platform
 features: [collection-registry, dependency-ordered-deploy, readiness-gating]
 supersedes: []
 superseded_by: null
-depends_on: [S34-service-account-runtime-access]
+depends_on: [S38-verification-and-docs]
 anchors: [data-architecture]
 ---
 
-# S35: declared start order among collections
+# S39: declared start order among collections
+
+<!-- Renumbered from S35 on 2026-09-05: RENUMBER-OPEN behind S36-S38 (no code had been written). -->
+
+**Decided definition (2026-09-05, Kun):** `when:` is about where, not when. An overlay clause
+asks whether the peer is declared in the same collection as this app, never whether it is
+installed elsewhere in the home and never whether it is running. A collection is therefore a
+thing with members, and this sprint makes it one. Recorded in `docs/steering/product.md`;
+reconciled as R16 in the 2026-09-05 review.
 
 <!-- DRAFT. The requested feature is a `collections.yaml` that declares which collection starts
      after which. The measured obstacle is NOT the file — it is that appbay has no notion of an
