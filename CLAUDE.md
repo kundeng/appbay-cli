@@ -44,6 +44,10 @@ notes: 3 · next: packages/core/src/services/deploy-service.ts`) and a reading
 list of at most two files with line ranges. Nothing beyond the list is assumed
 read.
 
+Every finding is a row in `docs/history/review-ledger.md`, appended the turn it is
+raised. The ledger holds the position line and the status of each row; chat holds the
+discussion. A session resumes from the ledger, not from the transcript.
+
 **Where a review starts.** The history is the map. `git log --grep '^fix'`
 lists the defects this codebase has already paid for, written as symptoms; the
 open GitHub issues are the ones it has not. The dominant shapes, named in the
