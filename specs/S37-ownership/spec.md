@@ -180,7 +180,7 @@ touched; a separate sweep re-reads everything twice.
 ## Tasks
 
 - [ ] 1. Foundation
-  - [ ] 1.1 `runtime/observe.ts` created; arch test written (red on today's tree)
+  - [x] 1.1 arch test written — allowlists name today's violators exactly, so it is green now and turns red the moment a list is wrong in either direction; `runtime/observe.ts` is created by the first move (2.2) rather than as an empty file
     - **Depends**: — · **Requirements**: 1.1 · **Pillar**: Legible, Verified
 - [ ] 2. Moves, one commit each, in map order
   - [ ] 2.1 spawn + `tryExec` → `exec()` · **Requirements**: 1.1
