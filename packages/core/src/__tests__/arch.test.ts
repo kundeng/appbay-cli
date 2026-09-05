@@ -13,6 +13,11 @@ import { join, relative } from "node:path";
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const SRC = ["packages/core/src", "apps/cli/src"];
 
+/** Rules are about code; a comment may name a thing by its real name. */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 function sources(): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
@@ -52,7 +57,6 @@ const RULES: Rule[] = [
     },
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",
-      "packages/core/src/compiler/compile.ts": "2.4 (ollama probe)",
       "packages/core/src/secrets/resolve-for-deploy.ts": "2.1 (volume create)",
       "packages/core/src/services/deploy-service.ts": "2.2/2.3",
       "packages/core/src/services/edge-identity-service.ts": "2.4",
@@ -71,7 +75,6 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/size.ts": "2.4",
       "apps/cli/src/commands/stats.ts": "2.4",
       "packages/core/src/compiler/builds.ts": "2.4",
-      "packages/core/src/compiler/compile.ts": "2.4",
       "packages/core/src/health/checks.ts": "2.4/2.5",
       "packages/core/src/services/edge-migration-service.ts": "2.4",
     },
@@ -98,35 +101,14 @@ const RULES: Rule[] = [
     pattern: /process\.env\.APPBAY_HOME/,
     owners: ["packages/core/src/runtime/home.ts"],
     exempt: {},
-    allowed: {
-      "apps/cli/src/commands/init.ts": "2.8",
-      "apps/cli/src/index.ts": "2.8",
-      "apps/cli/src/utils/appbay-home.ts": "2.8",
-      "packages/core/src/runtime/container-runtime.ts": "2.8",
-      "packages/core/src/secrets/master-password.ts": "2.8",
-      "packages/core/src/secrets/providers/keepass.ts": "2.8",
-      "packages/core/src/secrets/providers/vault.ts": "2.8",
-    },
+    allowed: {},
   },
   {
     name: "the shared network's name comes from identity",
     pattern: /appbay_shared\b/,
     owners: ["packages/core/src/compiler/identity.ts", "packages/core/src/system-apps.ts", "packages/core/src/schemas/"],
     exempt: {},
-    allowed: {
-      "apps/cli/src/commands/init.ts": "2.9",
-      "apps/cli/src/commands/mcp.ts": "2.9",
-      "apps/cli/src/commands/models.ts": "2.9",
-      "apps/cli/src/commands/server.ts": "2.9",
-      "apps/cli/src/commands/setup.ts": "2.9",
-      "apps/cli/src/commands/tunnel.ts": "2.9",
-      "packages/core/src/compiler/compile.ts": "2.9",
-      "packages/core/src/compiler/upstream-transform.ts": "2.9",
-      "packages/core/src/health/checks.ts": "2.9",
-      "packages/core/src/runtime/container-runtime.ts": "2.9",
-      "packages/core/src/services/control-plane-edge.ts": "2.9",
-      "packages/core/src/traits/definitions/ingress.ts": "2.9",
-    },
+    allowed: {},
   },
 ];
 
@@ -140,7 +122,7 @@ describe("ownership rules (docs/steering/structure.md)", () => {
         if (rule.scope && !rule.scope.some((r) => rel.startsWith(r))) continue;
         if (rule.owners.some((o) => rel.startsWith(o))) continue;
         if (rel in rule.exempt) continue;
-        if (rule.pattern.test(readFileSync(abs, "utf-8"))) violators.add(rel);
+        if (rule.pattern.test(stripComments(readFileSync(abs, "utf-8")))) violators.add(rel);
       }
       const expected = new Set(Object.keys(rule.allowed));
       const unexpected = [...violators].filter((v) => !expected.has(v));

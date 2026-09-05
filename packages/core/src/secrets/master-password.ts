@@ -25,8 +25,8 @@
 
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { resolveHome } from "../runtime/home.js";
 
 /** Where the master password lives from RFC-001 §2 onward, relative to APPBAY_HOME. */
 export const MASTER_PASSWORD_REL = join("var", "lib", "secrets", "master-password");
@@ -50,7 +50,7 @@ const LEGACY_ENV_VARS = ["APPBAY_VAULT_PASSWORD", "APPBAY_KEEPASS_PASSWORD"] as 
  * as they did rather than changing two questions at once.
  */
 function defaultHome(): string {
-  return process.env.APPBAY_HOME ?? join(homedir() || "/root", ".appbay");
+  return resolveHome();
 }
 
 /** Read a password file, returning null when it is absent or blank. */

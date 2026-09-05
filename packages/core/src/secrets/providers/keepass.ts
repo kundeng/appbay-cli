@@ -26,6 +26,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CheckResult, SecretProvider } from "../types.js";
 import { resolveMasterPassword } from "../master-password.js";
+import { resolveHome } from "../../runtime/home.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -81,10 +82,7 @@ function resolveDbPath(): string {
     return process.env.APPBAY_KEEPASS_DB;
   }
 
-  const appbayHome =
-    process.env.APPBAY_HOME ??
-    join(process.env.HOME ?? "/root", ".appbay");
-  return join(appbayHome, "var", "lib", DEFAULT_DB_NAME);
+  return join(resolveHome(), "var", "lib", DEFAULT_DB_NAME);
 }
 
 // ---------------------------------------------------------------------------

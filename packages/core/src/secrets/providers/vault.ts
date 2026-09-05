@@ -34,6 +34,7 @@ import {
 import type { CheckResult, SecretProvider } from "../types.js";
 import { resolveMasterPassword } from "../master-password.js";
 import { splitScopedKey } from "../scoped-key.js";
+import { resolveHome } from "../../runtime/home.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -416,10 +417,7 @@ export class Vault {
 // ---------------------------------------------------------------------------
 
 function resolveVaultPath(): string {
-  const appbayHome =
-    process.env.APPBAY_HOME ??
-    join(process.env.HOME ?? "/root", ".appbay");
-  return join(appbayHome, "var", "lib", VAULT_FILENAME);
+  return join(resolveHome(), "var", "lib", VAULT_FILENAME);
 }
 
 /**

@@ -100,3 +100,18 @@ export const APP_LABEL = "com.appbay.app";
 
 /** Docker label carrying the namespace, `default` when unset. */
 export const NAMESPACE_LABEL = "com.appbay.namespace";
+
+/** The network every app with a route joins, and the one the edge dials across. */
+export const SHARED_NETWORK = "appbay_shared";
+
+/**
+ * The container a shepherd shares a namespace with when an action asks for `share`.
+ * No trait sets `share` today; if one does, this must become the app's real container
+ * (`containerName`), since `appbay.<app>` is not one (review ledger row 24).
+ */
+export function shepherdTarget(appName: string): string {
+  return `appbay.${appName}`;
+}
+
+/** The web control plane's container. Dots in the name are why it has its own alias on the shared network. */
+export const SERVER_CONTAINER = "appbay.server";

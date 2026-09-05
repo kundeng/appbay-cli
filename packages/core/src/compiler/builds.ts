@@ -27,7 +27,8 @@
 import { spawnSync } from "node:child_process";
 import type { BuildSpec } from "../schemas/appbay-yaml.js";
 import type { ShepherdAction } from "../traits/types.js";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { APP_LABEL } from "./identity.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -281,10 +282,13 @@ function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string)
     return r.status === 0 ? String(r.stdout ?? "").trim() : "";
   };
 
-  // The compiler names containers `appbay.<app>.<service>` (upstream-transform).
-  const container = `appbay.${appName}.${build.service}`;
+  // The container is found by the labels the compiler stamps, not by rebuilding its name:
+  // the namespace is part of the name and this function does not know it.
+  const found = findContainerByLabel(APP_LABEL, appName, { labels: { "com.docker.compose.service": build.service } });
+  if (found.kind !== "ok" || found.value === null) return; // no container yet, or cannot tell — `up -d` decides
+  const container = found.value.name;
   const running = inspectId(container, "{{.Image}}");
-  if (!running) return; // no container yet — `up -d` will create it
+  if (!running) return;
 
   const tagged = inspectId(build.image, "{{.Id}}");
   if (!tagged || tagged === running) return; // already on the right bytes

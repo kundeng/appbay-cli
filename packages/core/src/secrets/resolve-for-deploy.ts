@@ -22,6 +22,7 @@ import { VaultSecretProvider } from "./providers/vault.js";
 import { KeePassSecretProvider } from "./providers/keepass.js";
 import { runShepherd } from "../shepherd/run-shepherd.js";
 import { containerBin } from "../runtime/container-runtime.js";
+import { shepherdTarget } from "../compiler/identity.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -225,7 +226,7 @@ export async function writeEncryptedBundle(
   ].join(" && ");
 
   const result = await runShepherd({
-    target: `appbay.${appName}`,
+    target: shepherdTarget(appName),
     image: "busybox:latest",
     command: ["sh", "-c", writeCmd],
     mounts: [{ source: volumeName, target: "/out" }],
@@ -306,7 +307,7 @@ export async function resolveWrapperFileSecrets(
   });
 
   const result = await runShepherd({
-    target: `appbay.${appName}`,
+    target: shepherdTarget(appName),
     image: "busybox:latest",
     command: ["sh", "-c", writeCommands.join(" && ")],
     mounts: [{ source: volumeName, target: "/out" }],

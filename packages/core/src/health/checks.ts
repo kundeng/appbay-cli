@@ -124,10 +124,10 @@ export function parseComposeProvider(output: string): ComposeProvider | null {
 }
 
 /** Container name for the server. */
-export const SERVER_CONTAINER = "appbay.server";
+export { SERVER_CONTAINER, SHARED_NETWORK } from "../compiler/identity.js";
+import { SERVER_CONTAINER, SHARED_NETWORK } from "../compiler/identity.js";
 
 /** Docker network name used by all appbay apps. */
-export const SHARED_NETWORK = "appbay_shared";
 
 /** Result of a single check. */
 /**
@@ -532,13 +532,13 @@ export function probeArgv(bin: string, appbayHome: string): string[] {
 export function checkNetwork(appbayHome: string): HealthCheckResult {
   const net = networkExists(SHARED_NETWORK, appbayHome);
   if (net.kind === "unknown") {
-    return { name: "appbay_shared network", status: "unknown", detail: `could not ask the runtime (${net.reason})`, required: true };
+    return { name: `${SHARED_NETWORK} network`, status: "unknown", detail: `could not ask the runtime (${net.reason})`, required: true };
   }
   if (net.value) {
-    return { name: "appbay_shared network", status: "ok", detail: "exists", required: true };
+    return { name: `${SHARED_NETWORK} network`, status: "ok", detail: "exists", required: true };
   }
   return {
-    name: "appbay_shared network",
+    name: `${SHARED_NETWORK} network`,
     status: "failed",
     detail: "network not found",
     fix: `Run "appbay init" or "${containerBin(appbayHome)} network create ${SHARED_NETWORK}"`,

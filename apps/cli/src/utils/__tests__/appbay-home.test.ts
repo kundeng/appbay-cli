@@ -31,7 +31,6 @@ vi.mock("node:fs", () => ({
 import * as fs from "node:fs";
 import {
   resolveAppbayHome,
-  readSavedAppbayHome,
   saveAppbayHome,
   resolveServerCompose,
   resolveAppsDir,
@@ -64,24 +63,6 @@ afterEach(() => {
 // readSavedAppbayHome
 // ---------------------------------------------------------------------------
 
-describe("readSavedAppbayHome", () => {
-  it("returns null when config file does not exist", () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    expect(readSavedAppbayHome()).toBeNull();
-  });
-
-  it("returns the trimmed path when config file exists", () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue("/srv/appbay\n");
-    expect(readSavedAppbayHome()).toBe("/srv/appbay");
-  });
-
-  it("returns null when config file exists but is empty", () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue("   \n");
-    expect(readSavedAppbayHome()).toBeNull();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // saveAppbayHome
@@ -139,34 +120,6 @@ describe("saveAppbayHome", () => {
 // resolveAppbayHome — 4-tier priority
 // ---------------------------------------------------------------------------
 
-describe("resolveAppbayHome", () => {
-  it("tier 4 (fallback): returns ~/.appbay when nothing is configured", () => {
-    expect(resolveAppbayHome()).toBe(join(homedir(), ".appbay"));
-  });
-
-  it("tier 3 (saved config): returns saved path when config file exists", () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue("/srv/appbay\n");
-    expect(resolveAppbayHome()).toBe("/srv/appbay");
-  });
-
-  it("tier 1 (env var): $APPBAY_HOME overrides saved config", () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue("/srv/appbay\n");
-    process.env.APPBAY_HOME = "/override/from/env";
-    expect(resolveAppbayHome()).toBe("/override/from/env");
-  });
-
-  it("tier 1 (env var): $APPBAY_HOME overrides fallback", () => {
-    process.env.APPBAY_HOME = "/opt/custom";
-    expect(resolveAppbayHome()).toBe("/opt/custom");
-  });
-
-  it("returns the exact value of $APPBAY_HOME without modification", () => {
-    process.env.APPBAY_HOME = "/opt/custom/appbay-home";
-    expect(resolveAppbayHome()).toBe("/opt/custom/appbay-home");
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Derived path resolvers

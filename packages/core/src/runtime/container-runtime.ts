@@ -24,7 +24,6 @@
 
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import {
   loadInstanceConfig,
   ContainerRuntimeSchema,
@@ -38,6 +37,7 @@ import {
   type InstanceConfig,
 } from "../schemas/instance.js";
 import { podmanRootfulEnv } from "./podman-rootful.js";
+import { resolveHome } from "./home.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
 // Both barrels (schemas/index.ts and this file) are pulled into the package root
@@ -83,7 +83,7 @@ function instanceConfig(appbayHome?: string): InstanceConfig {
  * exists for core-internal callers that have no home in hand.
  */
 function defaultAppbayHome(): string {
-  return process.env.APPBAY_HOME ?? join(homedir(), ".appbay");
+  return resolveHome();
 }
 
 /**
@@ -495,10 +495,11 @@ export type ContainerRunner = (args: string[]) => ContainerResult;
 export function findContainerByLabel(
   label: string,
   value: string,
-  options: { appbayHome?: string; run?: ContainerRunner } = {},
+  options: { appbayHome?: string; run?: ContainerRunner; labels?: Record<string, string> } = {},
 ): Inspection<ContainerMatch | null> {
   const run = options.run ?? ((args) => containerExec(args, { appbayHome: options.appbayHome, label: "ps" }));
-  const result = run(["ps", "-a", "--filter", `label=${label}=${value}`, "--format", "{{.Names}}\t{{.State}}"]);
+  const filters = [`label=${label}=${value}`, ...Object.entries(options.labels ?? {}).map(([k, v]) => `label=${k}=${v}`)];
+  const result = run(["ps", "-a", ...filters.flatMap((f) => ["--filter", f]), "--format", "{{.Names}}\t{{.State}}"]);
   if (result.exitCode !== 0) return unknown(result.output.trim() || `ps exited with code ${String(result.exitCode)}`);
 
   const matches: ContainerMatch[] = [];

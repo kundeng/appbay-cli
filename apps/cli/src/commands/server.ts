@@ -19,7 +19,7 @@ import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { tryExec, isRunning, networkExists, containerExec } from "@appbay/core";
+import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -31,10 +31,8 @@ import {
 } from "@appbay/core";
 
 /** Container name used by the server compose stack. */
-const SERVER_CONTAINER = "appbay.server";
 
 /** Docker network shared across all appbay apps. */
-const SHARED_NETWORK = "appbay_shared";
 
 /** URL the server listens on. */
 const SERVER_URL = "http://localhost:3000";

@@ -45,6 +45,7 @@ export * from "./runtime/facts.js";
 
 // Re-export the container runtime resolver — the single place the container
 // binary is chosen. Spawn sites must use containerBin()/containerExec(), never "docker".
+export * from "./runtime/home.js";
 export * from "./runtime/container-runtime.js";
 // What compose reports about a project's containers, as values — the one compose-ps parser.
 export * from "./runtime/observe.js";

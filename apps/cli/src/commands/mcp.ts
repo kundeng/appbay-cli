@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { SHARED_NETWORK } from "@appbay/core";
 import { spawnSync } from "node:child_process";
 import { cliContainerBin } from "../utils/docker.js";
 
@@ -11,7 +12,7 @@ export const mcpCommand = new Command("mcp")
       .action((url?: string) => {
         const args = [
           "run", "--rm", "-it",
-          "--network", "appbay_shared",
+          "--network", SHARED_NETWORK,
           "-p", "6274:6274",
           "node:22-slim",
           "npx", "-y", "@modelcontextprotocol/inspector",

@@ -22,7 +22,7 @@ import type {
   TraitTransformInput,
   TraitTransformOutput,
 } from "../types.js";
-import { sharedNetworkAlias, auxFileStem } from "../../compiler/identity.js";
+import { sharedNetworkAlias, auxFileStem, SHARED_NETWORK } from "../../compiler/identity.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -246,19 +246,19 @@ function attachToSharedNetwork(
     : typeof svc.networks === "object" && svc.networks !== null
       ? { ...(svc.networks as Record<string, unknown>) }
       : {};
-  const shared = typeof serviceNetworks.appbay_shared === "object" && serviceNetworks.appbay_shared !== null
-    ? { ...(serviceNetworks.appbay_shared as Record<string, unknown>) }
+  const shared = typeof serviceNetworks[SHARED_NETWORK] === "object" && serviceNetworks[SHARED_NETWORK] !== null
+    ? { ...(serviceNetworks[SHARED_NETWORK] as Record<string, unknown>) }
     : {};
   const aliases = Array.isArray(shared.aliases) ? shared.aliases.map(String) : [];
   shared.aliases = [...new Set([...aliases, alias])];
-  serviceNetworks.appbay_shared = shared;
+  serviceNetworks[SHARED_NETWORK] = shared;
   svc.networks = serviceNetworks;
 
   services[service] = svc;
   result.services = services;
   const networks = { ...((result.networks ?? {}) as Record<string, unknown>) };
-  networks.appbay_shared = {
-    ...((networks.appbay_shared ?? {}) as Record<string, unknown>),
+  networks[SHARED_NETWORK] = {
+    ...((networks[SHARED_NETWORK] ?? {}) as Record<string, unknown>),
     external: true,
   };
   result.networks = networks;
@@ -312,7 +312,7 @@ export const ingressTraitDefinition: TraitDefinition<"ingress"> = {
   description:
     "Traefik dynamic config YAML generation (file provider). Per-service " +
     "exposure: internal (LAN), external (WAN), or both. TLS " +
-    "staging/production cert resolvers. Attaches service to appbay_shared " +
+    `staging/production cert resolvers. Attaches service to ${SHARED_NETWORK} ` +
     "network.",
   schema: IngressTraitSchema,
   transform(input: TraitTransformInput): TraitTransformOutput {

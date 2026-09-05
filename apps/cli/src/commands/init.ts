@@ -49,12 +49,14 @@ import {
   networkExists,
   containerExec,
   parseInstanceConfig,
+  SERVER_CONTAINER,
+  SHARED_NETWORK,
 } from "@appbay/core";
 import {
   resolveAppbayHome,
   saveAppbayHome,
   type SaveHomeResult,
-  APPBAY_HOME_FROM_ENV,
+  explainAppbayHome,
 } from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
 import { cliContainerBin, cliRuntimeProfile } from "../utils/docker.js";
@@ -89,7 +91,6 @@ function resolveCatalogSource(explicit?: string): string {
 }
 
 /** Docker network name used by all appbay apps. */
-const SHARED_NETWORK = "appbay_shared";
 
 /** Numbered step logger, matching setup.ts's `step(n,total,msg)`. */
 function step(n: number, total: number, msg: string): void {
@@ -187,7 +188,7 @@ name: appbay-server
 
 services:
   server:
-    container_name: appbay.server
+    container_name: ${SERVER_CONTAINER}
     image: \${APPBAY_SERVER_IMAGE:-ghcr.io/kundeng/appbay-server:latest}
     user: "\${APPBAY_UID:-1000}:\${APPBAY_GID:-1000}"
     restart: unless-stopped
@@ -238,7 +239,7 @@ ${socketGroupBlock}${securityOptBlock}    networks:
       # site block (services/control-plane-edge.ts). appbay.server contains dots, which read
       # as label separators wherever a name reaches DNS; appbay_server matches the
       # <app>_<service> shape every other upstream on this network uses.
-      appbay_shared:
+      ${SHARED_NETWORK}:
         aliases:
           - appbay_server
     healthcheck:
@@ -276,7 +277,7 @@ volumes:
       device: \${APPBAY_HOME_PATH:-~/.appbay}
 
 networks:
-  appbay_shared:
+  ${SHARED_NETWORK}:
     external: true
 `;
 }
@@ -748,6 +749,9 @@ async function readProjectConfig(
   const { project, domain } = loadInstanceConfig(appbayHome).config;
   return { project, domain };
 }
+
+/** The env tier at startup, so a re-init can say the value came from $APPBAY_HOME. */
+const APPBAY_HOME_FROM_ENV = explainAppbayHome().tiers.find((t) => t.source === "env")?.value ?? undefined;
 
 export const initCommand = new Command("init")
   .description("Initialize Appbay home directory scaffold")

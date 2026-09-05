@@ -30,7 +30,7 @@ import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
 import { containerBin, findContainerByLabel, resolveIngressProvider } from "../runtime/container-runtime.js";
 import { composePs, findCrashedServices, snapshotContainers, didConverge, type DockerComposeRunner } from "../runtime/observe.js";
-import { APP_LABEL } from "../compiler/identity.js";
+import { APP_LABEL, shepherdTarget } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 import { parseEnvFile } from "./config-service.js";
 
@@ -346,7 +346,7 @@ async function runShepherdActions(
       } else if (action.image) {
         const { runShepherd } = await import("../shepherd/run-shepherd.js");
         const result = await runShepherd({
-          target: `appbay.${ctx.appName}`,
+          target: shepherdTarget(ctx.appName),
           image: action.image,
           command: action.command,
           share: action.share,

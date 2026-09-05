@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-05):** 1 file read · open: 14 · next: S37 ownership; stackbay L9–L13 in S38.
+**Position (2026-09-05):** 1 file read · open: 15 · next: S37 ownership; stackbay L9–L13 in S38.
 
 ## Protocol
 
@@ -46,3 +46,4 @@ the next session resumes from.
 | 21 | `docs/steering/product.md` | S | Owner decision, 2026-09-05: a namespace is identity and a value store, `${{namespace.KEY}}` from a per-namespace values file over the per-host `${{project.KEY}}`. Reverses S32's rejection of RFC-001 4.6 and resolves R4 in the loader direction; the derived default host (row 10) becomes the default value inside that store. | decided by Kun | open: needs a sprint (values loader, scope in the resolver) |
 | 22 | `docs/steering/product.md` | S | Open question from Kun: single-node Swarm mode for its runtime secret store. Unmeasured on both runtimes. | open question | open |
 | 23 | secrets trait, five injection modes | S | Kun: it is not established that every mode keeps the secret out of a render, argv, and log. The security-review pass (S38) audits each mode; product.md states intent, not guarantee, until then. | raised by Kun | open → S38 |
+| 24 | `compiler/identity.ts: shepherdTarget`, `shepherd/run-shepherd.ts:69` | 1 | A shepherd `share` option runs `--network=container:appbay.<app>`, and no container has that name (they are `appbay.<app>.<svc>`). No trait sets `share` today, so it is dead; the day one does it fails at the runtime. Centralised in identity with the caveat. | verified, read | open → S38 |

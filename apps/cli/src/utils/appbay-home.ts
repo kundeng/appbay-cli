@@ -14,8 +14,9 @@
 
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { readSystemConfig, SYSTEM_CONFIG_FILE } from "./system-config.js";
+import { explainHome, resolveHome, readUserPointer, type HomeTier } from "@appbay/core";
 
 /** Path to the persisted home-directory config (outside APPBAY_HOME itself). */
 export const CONFIG_DIR = join(homedir(), ".config", "appbay");
@@ -27,9 +28,7 @@ export const CONFIG_FILE = join(CONFIG_DIR, "home");
  * Returns null if no config has been saved yet.
  */
 export function readSavedAppbayHome(): string | null {
-  if (!existsSync(CONFIG_FILE)) return null;
-  const line = readFileSync(CONFIG_FILE, "utf-8").trim();
-  return line || null;
+  return readUserPointer(CONFIG_FILE);
 }
 
 /** What `saveAppbayHome` did. */
@@ -103,67 +102,15 @@ export function clearSavedAppbayHome(): boolean {
  *
  * This module is imported by `index.ts`, so its top level runs BEFORE that assignment.
  */
-export const APPBAY_HOME_FROM_ENV: string | undefined = process.env.APPBAY_HOME;
 
-export type HomeSource = "env" | "system" | "saved" | "default";
+export type { HomeSource, HomeTier } from "@appbay/core";
+export type HomeExplanation = ReturnType<typeof explainHome>;
 
-/** One tier of the resolution order, and what it currently holds. */
-export interface HomeTier {
-  source: HomeSource;
-  /** Human-readable origin, e.g. `$APPBAY_HOME` or the config file path. */
-  origin: string;
-  /** The path this tier supplies, or null when the tier is not set. */
-  value: string | null;
-}
-
-/** The full resolution picture: every tier, and the one that wins. */
-export interface HomeExplanation {
-  tiers: HomeTier[];
-  winner: HomeTier;
-}
-
-/**
- * Resolve the home path AND report which tier decided it.
- *
- * `resolveAppbayHome` answers "where"; this answers "why". Keeping the two in
- * one place means `appbay home`, `appbay home set` and `doctor` cannot drift
- * from each other on precedence — a drift that is invisible until a command
- * silently reads a different tree than the operator believes it does.
- */
+/** Every tier and the winner, over this CLI's two pointer files. */
 export function explainAppbayHome(): HomeExplanation {
-  const tiers: HomeTier[] = [
-    {
-      source: "env",
-      origin: "$APPBAY_HOME",
-      value: process.env.APPBAY_HOME || null,
-    },
-    {
-      source: "system",
-      origin: SYSTEM_CONFIG_FILE,
-      value: readSystemConfig()?.home ?? null,
-    },
-    {
-      source: "saved",
-      origin: CONFIG_FILE,
-      value: readSavedAppbayHome(),
-    },
-    {
-      source: "default",
-      origin: "built-in default",
-      value: join(homedir(), ".appbay"),
-    },
-  ];
-  // The `default` tier always has a value, so this always finds a winner.
-  const winner = tiers.find((t) => t.value !== null) as HomeTier;
-  return { tiers, winner };
+  return explainHome({ hostPointerFile: SYSTEM_CONFIG_FILE, userPointerFile: CONFIG_FILE });
 }
 
-/**
- * Tiers that outrank `saved`, restricted to those actually set.
- *
- * A non-empty result means a `home set` will be persisted but NOT observed —
- * the case worth refusing loudly instead of printing a cheerful confirmation.
- */
 export function tiersShadowingSaved(): HomeTier[] {
   return explainAppbayHome().tiers.filter(
     (t) => (t.source === "env" || t.source === "system") && t.value !== null,
@@ -180,19 +127,7 @@ export function tiersShadowingSaved(): HomeTier[] {
  *   4. `~/.appbay` (silent fallback)
  */
 export function resolveAppbayHome(): string {
-  // 1. Env var override — always wins.
-  if (process.env.APPBAY_HOME) return process.env.APPBAY_HOME;
-  // 2. System-level decision from `appbay init-system` — this is the host-level
-  //    truth about where the tree lives and who owns it. Consulted before the
-  //    per-operator config so a service-account install (home under /var/lib,
-  //    not ~/appbay) is honoured by every command.
-  const system = readSystemConfig();
-  if (system?.home) return system.home;
-  // 3. Persisted choice from `appbay init`.
-  const saved = readSavedAppbayHome();
-  if (saved) return saved;
-  // 4. Default.
-  return join(homedir(), ".appbay");
+  return resolveHome({ hostPointerFile: SYSTEM_CONFIG_FILE, userPointerFile: CONFIG_FILE });
 }
 
 /**

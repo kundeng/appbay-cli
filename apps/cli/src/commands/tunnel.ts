@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { runningContainerNames } from "@appbay/core";
+import { runningContainerNames, SHARED_NETWORK } from "@appbay/core";
 import { spawnSync, spawn } from "node:child_process";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
@@ -97,7 +97,7 @@ export const tunnelCommand = new Command("tunnel")
       [
         "run", "--rm",
         "--name", containerName,
-        "--network", "appbay_shared",
+        "--network", SHARED_NETWORK,
         "cloudflare/cloudflared:latest",
         "tunnel", "--url", targetUrl,
       ],

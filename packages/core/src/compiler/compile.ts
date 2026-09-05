@@ -24,6 +24,7 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { APP_LABEL, SHARED_NETWORK } from "./identity.js";
 import { z } from "zod";
 
 /** A YAML document that must be a mapping; anything else is a parse error, not `{}`. */
@@ -43,7 +44,7 @@ import { renderCompose } from "./renderer.js";
 import { generatePlan } from "./plan.js";
 import type { DiscoveredApp } from "./types.js";
 import type { Plan } from "./plan.js";
-import { containerBin, resolveIngressProvider } from "../runtime/container-runtime.js";
+import { containerBin, resolveIngressProvider, findContainerByLabel, containerExec } from "../runtime/container-runtime.js";
 import { readFileSync } from "node:fs";
 import { loadInstanceConfig, } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
@@ -424,7 +425,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   // already written this way and could never fire, because the fields carried a Zod
   // default. Making the schema field `.optional()` is what makes it correct.
   const appNamespace = config?.namespace ?? invocationNamespace ?? "default";
-  const sharedNetworks = config?.shared_network ?? ["appbay_shared"];
+  const sharedNetworks = config?.shared_network ?? [SHARED_NETWORK];
 
   let compose: Record<string, unknown> = { ...app.composeContent };
 
@@ -646,29 +647,20 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       label: `Pull default models: ${models.join(", ")}`,
       timeoutMs: 600_000,
       run: async (ctx) => {
-        const { execFile } = await import("node:child_process");
-        const { promisify } = await import("node:util");
-        const execFileAsync = promisify(execFile);
+        // The app's container, by the label the compiler stamped; a name would carry the namespace.
+        const found = findContainerByLabel(APP_LABEL, ctx.appName);
+        if (found.kind === "unknown") throw new Error(`could not find the ${ctx.appName} container: ${found.reason}`);
+        if (!found.value?.running) throw new Error(`${ctx.appName} is not running; models were not pulled`);
+        const container = found.value.name;
 
-        // Find the running Ollama container
-        const { stdout: psOut } = await execFileAsync(containerBin(), [
-          "ps", "--format", "{{.Names}}", "--filter", `name=${ctx.appName}`,
-        ], { encoding: "utf-8", timeout: 5_000 });
-        const container = psOut.trim().split("\n").filter(Boolean)
-          .find((n: string) => n.includes("ollama")) ?? `appbay.${ctx.appName}.${ctx.appName}`;
-
-        // Check if models already exist
-        const { stdout: tagResp } = await execFileAsync(containerBin(), [
-          "exec", container, "ollama", "list",
-        ], { encoding: "utf-8", timeout: 10_000 });
-        const existingLines = tagResp.trim().split("\n").filter(Boolean);
-        if (existingLines.length > 1) return; // Header + at least one model = skip
+        const list = containerExec(["exec", container, "ollama", "list"], { timeout: 10_000, label: "ollama list" });
+        if (list.exitCode !== 0) throw new Error(`ollama list failed: ${list.output.trim()}`);
+        if (list.output.trim().split("\n").filter(Boolean).length > 1) return; // header + a model = skip
 
         for (const model of models) {
           console.log(`  Pulling default model: ${model}`);
-          await execFileAsync(containerBin(), [
-            "exec", container, "ollama", "pull", model,
-          ], { encoding: "utf-8", timeout: 600_000 });
+          const pull = containerExec(["exec", container, "ollama", "pull", model], { timeout: 600_000, label: "ollama pull" });
+          if (pull.exitCode !== 0) throw new Error(`ollama pull ${model} failed: ${pull.output.trim()}`);
         }
       },
     });
