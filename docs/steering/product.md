@@ -40,6 +40,22 @@ came from.
 | Kun reviewing the code | the seam and ledger records in `docs/history/`, then the file under review |
 | the rewrite | `docs/history/`, the fix history in git, the journeys under `scripts/journeys/` |
 
+## Decided definitions
+
+These are Kun's, and a spec or a doc that contradicts one is wrong.
+
+- **`when:` is about where, not when.** An overlay clause `when: [ollama]` asks whether
+  `ollama` is declared in the same collection as this app. It is a statement about the
+  composition of a stack, made at declaration time. It does not ask whether `ollama` is
+  installed elsewhere in the home, and it never asks whether `ollama` is running. A
+  dependent that is declared and not yet running still gets its overlay; readiness is the
+  deploy path's problem, not the compiler's.
+- **A collection is a stack.** The apps that declare the same collection are one deployable
+  unit with a boot order. A collection is therefore a thing with a name and members, not a
+  label that apps happen to share.
+- **A namespace is identity.** It disambiguates two deployments of one app on one host by
+  entering every generated name. It is not a value store.
+
 ## Boundaries
 
 - The web control plane (`apps/web`) is a separate private repository. This tree holds

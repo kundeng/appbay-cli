@@ -1,0 +1,75 @@
+review_date: 2026-09-05
+repo: appbay-cli
+commit_reviewed: 6ea2d33
+gates:
+  tsc: pass
+  tests: { passed: 1069, failed: 1, skipped: 6, failing: "keepassxc-cli.test.ts:115 (linux-only /proc on darwin)" }
+  journeys: { docker: "scratch home on local OrbStack, this session", podman: "no host available" }
+pillars:
+  correct: failing
+  legible: failing
+  verified: partial
+  harvested: partial
+  documented: partial
+journeys:
+  - id: install-host
+    status: verified
+    components: [cli/init, schemas/instance, system-apps]
+  - id: install-app
+    status: partial
+    components: [cli/install, services/catalog-service]
+    break: "validation failure ignored; 'ready to deploy' unconditional"
+  - id: deploy-caddy
+    status: broken
+    components: [cli/up, services/deploy-service, compiler, runtime]
+    break: "exec target appbay.caddy.caddy; edge is appbay.system.caddy.caddy"
+  - id: deploy-traefik
+    status: partial
+    break: "route file written, edge never observed"
+  - id: doctor
+    status: partial
+    break: "ok true over checks that could not run"
+  - id: second-instance
+    status: partial
+    break: "hostname collides; identity separates"
+components:
+  - { id: cli, path: apps/cli/src, role: inbound }
+  - { id: services, path: packages/core/src/services, role: use-cases }
+  - { id: health, path: packages/core/src/health, role: use-cases }
+  - { id: compiler, path: packages/core/src/compiler, role: domain }
+  - { id: traits, path: packages/core/src/traits, role: domain }
+  - { id: schemas, path: packages/core/src/schemas, role: domain }
+  - { id: runtime, path: packages/core/src/runtime, role: adapter }
+relationships:
+  - { from: cli, to: runtime, kind: violation, note: "12 literal docker spawns; 3 tryExec copies" }
+  - { from: services, to: runtime, kind: violation, note: "deploy-service parses compose ps itself" }
+  - { from: compiler, to: runtime, kind: violation, note: "compile.ts:650 spawns for ollama" }
+findings:
+  - { id: F0, lens: S1, severity: CRITICAL, file: "packages/core/src/services/deploy-service.ts:416", ledger: 13, disposition: FIX_NOW, action: approved }
+  - { id: F1, lens: S1, severity: HIGH, journey: deploy-traefik, disposition: FIX_NOW, action: approved }
+  - { id: F2, lens: S3, severity: HIGH, file: "apps/cli/src/commands/apply.ts:111", ledger: 14, disposition: FIX_NOW, action: approved }
+  - { id: F3, lens: Q5, severity: HIGH, file: "packages/core/src/services/deploy-service.ts:194", ledger: 11, disposition: FIX_NOW, action: approved }
+  - { id: F4, lens: Q5, severity: HIGH, file: "packages/core/src/health/checks.ts:262", ledger: 17, disposition: FIX_NOW, action: approved }
+  - { id: F5, lens: Q1, severity: MEDIUM, file: "apps/cli/src/commands/update.ts:195", ledger: 15, disposition: FIX_NOW, action: approved }
+  - { id: F6, lens: Q5, severity: MEDIUM, file: "packages/core/src/services/edge-migration-service.ts:77", ledger: 18, disposition: FIX_NOW, action: approved }
+  - { id: F7, lens: S1, severity: MEDIUM, file: "apps/cli/src/commands/install.ts:139", disposition: FIX_NOW, action: approved }
+  - { id: F8, lens: S5, severity: HIGH, file: "apps/cli/src/commands/exec.ts:22", ledger: 16, disposition: FIX_NOW, action: approved }
+  - { id: F9, lens: S3, severity: HIGH, scope: repo, ledger: 19, disposition: SCHEDULE, action: approved, sprint: S37 }
+  - { id: F10, lens: S5, severity: MEDIUM, file: "packages/core/src/services/deploy-service.ts:100", ledger: 7, disposition: SCHEDULE, action: approved, sprint: S37 }
+  - { id: F11, lens: S3, severity: MEDIUM, scope: identity consumers, disposition: SCHEDULE, action: approved, sprint: S37 }
+  - { id: F12, lens: S11, severity: MEDIUM, scope: specs anchors, disposition: FIX_NOW, action: approved }
+  - { id: F13, lens: S13, severity: MEDIUM, scope: config plane, disposition: SCHEDULE, action: approved, sprint: S37 }
+  - { id: F14, lens: Q6, severity: MEDIUM, file: "packages/core/src/compiler/scope-resolver.ts:50", ledger: 10, disposition: HUMAN_DECISION, action: proposed }
+  - { id: F15, lens: Q7, severity: MEDIUM, scope: comments, disposition: SCHEDULE, action: approved, sprint: S37 }
+  - { id: F16, lens: Q7, severity: LOW, scope: dead code, disposition: SCHEDULE, action: approved, sprint: S38 }
+  - { id: F17, lens: Q5, severity: LOW, file: "packages/core/src/secrets/__tests__/keepassxc-cli.test.ts:115", disposition: FIX_NOW, action: approved }
+  - { id: F18, lens: S1, severity: MEDIUM, scope: tests, ledger: 20, disposition: FIX_NOW, action: approved }
+reconciliation: 04-RECONCILIATION_PLAN.md
+human_decisions_open: [R4, R7]
+next_sprint: S36-hardening
+findings_added_after_owner_note:
+  - { id: F19, lens: S2, severity: HIGH, file: "packages/core/src/services/edge-migration-service.ts", issue: 7, disposition: FIX_NOW, action: approved, sprint: S36 }
+  - { id: F20, lens: S1, severity: INFO, scope: "init-system docker on RHEL-family", issue: 8, disposition: SCHEDULE, action: approved }
+  - { id: F21, lens: S7, severity: HIGH, file: "packages/core/src/compiler/compile.ts:251", scope: "when: is collection membership", disposition: DECIDED_BY_OWNER, action: approved, sprint: S35 }
+  - { id: F22, lens: S1, severity: INFO, scope: "certificate issuance", issue: "kundeng/appbay#75", disposition: SCHEDULE, action: proposed }
+decided_definitions: docs/steering/product.md
