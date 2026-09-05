@@ -410,11 +410,11 @@ export type Inspection<T> =
   | { kind: "ok"; value: T }
   | { kind: "unknown"; reason: string };
 
-export function ok<T>(value: T): Inspection<T> {
+function ok<T>(value: T): Inspection<T> {
   return { kind: "ok", value };
 }
 
-export function unknown<T = never>(reason: string): Inspection<T> {
+function unknown<T = never>(reason: string): Inspection<T> {
   return { kind: "unknown", reason };
 }
 

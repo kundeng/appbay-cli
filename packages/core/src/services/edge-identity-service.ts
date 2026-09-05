@@ -4,7 +4,8 @@ import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { EdgeIdentityDocumentSchema, type EdgeIdentityDocument, type EdgeUser } from "../schemas/edge-identities.js";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { APP_LABEL } from "../compiler/identity.js";
 
 export const EDGE_USERS_RELATIVE_PATH = join("etc", "apps", "caddy", "config", "security", "users.json");
 export const DEFAULT_CADDY_SECURITY_IMAGE = "localhost/appbay-caddy-security:2.11.4-v1.1.64";
@@ -136,13 +137,18 @@ export class EdgeIdentityStore {
  * startup, so an edge that is down will load the change when it next starts.
  */
 export function restartEdgeForIdentityChange(): boolean {
-  for (const container of ["appbay.caddy.caddy", "appbay.caddy"]) {
-    const result = spawnSync(containerBin(), ["restart", container], {
-      stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8",
-    });
-    if (result.status === 0) return true;
-  }
-  return false;
+  const edge = runningEdge();
+  if (!edge) return false;
+  const result = spawnSync(containerBin(), ["restart", edge], {
+    stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8",
+  });
+  return result.status === 0;
+}
+
+/** The running Caddy edge, by label — a literal name went stale when the system apps were namespaced. */
+function runningEdge(): string | null {
+  const edge = findContainerByLabel(APP_LABEL, "caddy");
+  return edge.kind === "ok" && edge.value?.running ? edge.value.name : null;
 }
 
 /**
@@ -154,14 +160,13 @@ function claimIdentityStoreOwnership(): boolean {
   const uid = process.getuid?.();
   const gid = process.getgid?.();
   if (uid === undefined || gid === undefined) return false;
-  for (const container of ["appbay.caddy.caddy", "appbay.caddy"]) {
-    const result = spawnSync(containerBin(), [
-      "exec", "--user", "0", container, "sh", "-c",
-      `chown ${uid}:${gid} /etc/caddy/security/users.json && chmod 600 /etc/caddy/security/users.json`,
-    ], { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8" });
-    if (result.status === 0) return true;
-  }
-  return false;
+  const edge = runningEdge();
+  if (!edge) return false;
+  const result = spawnSync(containerBin(), [
+    "exec", "--user", "0", edge, "sh", "-c",
+    `chown ${uid}:${gid} /etc/caddy/security/users.json && chmod 600 /etc/caddy/security/users.json`,
+  ], { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8" });
+  return result.status === 0;
 }
 
 function toRole(role: string) {

@@ -57,3 +57,7 @@ export * from "./services/index.js";
 // Re-export shepherd runner (namespace-sharing ephemeral containers)
 export * from "./shepherd/index.js";
 export * from "./health/checks.js";
+
+// The names appbay generates — container, network, alias, edge fragment, labels — and
+// the label the deploy path uses to find the edge.
+export * from "./compiler/identity.js";

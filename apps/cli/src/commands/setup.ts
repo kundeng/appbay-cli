@@ -23,7 +23,7 @@ import {
   type AcmeDnsProvider,
 } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
-import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL } from "@appbay/core";
+import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -258,23 +258,21 @@ function waitForHealth(url: string, timeoutMs: number): boolean {
   return false;
 }
 
-function waitForContainerHealth(containerName: string, timeoutMs: number): boolean {
+function waitForEdge(provider: string, timeoutMs: number): boolean {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    // Caddy's admin endpoint is intentionally container-local, so setup's contract here is
-    // process availability. `.State.Running` is shared by Docker and Podman; Docker's nested
-    // `.State.Health` template is rejected by Podman 4.9 before it can evaluate the fallback.
-    if (containerIsRunning(containerName)) return true;
+    // Caddy's admin endpoint is container-local, so the contract here is process
+    // availability: the edge, found by its label, reports state "running".
+    if (edgeIsRunning(provider)) return true;
     spawnSync("sleep", ["3"]);
   }
   return false;
 }
 
-function containerIsRunning(containerName: string): boolean {
-  const result = spawnSync(cliContainerBin(), [
-    "inspect", "--format", "{{.State.Running}}", containerName,
-  ], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" });
-  return result.status === 0 && String(result.stdout).trim() === "true";
+/** The edge is found by label, not by name: the system namespace is in the name. */
+function edgeIsRunning(provider: string): boolean {
+  const edge = findContainerByLabel(APP_LABEL, provider);
+  return edge.kind === "ok" && edge.value?.running === true;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +298,7 @@ function showSetupStatus(): void {
     { name: "APPBAY_HOME", ok: existsSync(appbayHome), detail: appbayHome },
     { name: "Docker network", ok: (() => { const r = spawnSync(cliContainerBin(), ["network", "inspect", "appbay_shared"], { stdio: "pipe" }); return r.status === 0; })(), detail: "appbay_shared" },
     { name: "Selected edge seeded", ok: existsSync(edgeApp), detail: ingressProvider },
-    { name: "Selected edge running", ok: containerIsRunning(`appbay.${ingressProvider}.${ingressProvider}`) || containerIsRunning(`appbay.${ingressProvider}`), detail: ingressProvider },
+    { name: "Selected edge running", ok: edgeIsRunning(ingressProvider), detail: ingressProvider },
     ...(ingressProvider === "caddy" ? [{
       name: "Caddy Security identities",
       ok: existsSync(join(edgeApp, "config", "security", "users.json")),
@@ -608,7 +606,7 @@ export const setupCommand = new Command("setup")
         // state is the available signal — and it is the honest one, since "the process is up"
         // is exactly what this gate is for.
         console.log("    Waiting for Caddy health...");
-        const healthy = waitForContainerHealth("appbay.caddy.caddy", 60_000) || waitForContainerHealth("appbay.caddy", 1);
+        const healthy = waitForEdge("caddy", 60_000);
         if (!healthy) {
           console.error("    Caddy health check failed.");
           process.exit(1);

@@ -258,14 +258,14 @@ identity module, and the lookup keeps working if the namespace changes again.
 ## Tasks
 
 - [ ] 1. Foundation
-  - [ ] 1.1 `Inspection<T>` and `findContainerByLabel` in `runtime/container-runtime.ts`, with unit tests for both providers' output shapes
+  - [x] 1.1 `Inspection<T>` and `findContainerByLabel` in `runtime/container-runtime.ts`, with unit tests for both providers' output shapes
     - **Depends**: — · **Requirements**: 1.1, 2.1 · **Pillar**: Correct
-  - [ ] 1.2 Compile-then-target test (fails against the literal)
+  - [x] 1.2 Compile-then-target test (fails against the literal)
     - **Depends**: 1.1 · **Requirements**: 8.1 · **Properties**: 2 · **Pillar**: Verified
 - [ ] 2. Core
   - [ ] 2.1 `deploy-service.ts`: the four functions return `Inspection`; callers handle `unknown`; `unknownReason` on the result; tally prints it
     - **Depends**: 1.1 · **Requirements**: 2.1, 2.2 · **Properties**: 1
-  - [ ] 2.2 `runCaddyCommand` and `edge-identity-service.ts` and `setup.ts` resolve the edge by label; literals deleted
+  - [x] 2.2 `runCaddyCommand` and `edge-identity-service.ts` and `setup.ts` resolve the edge by label; literals deleted
     - **Depends**: 1.1, 1.2 · **Requirements**: 1.1, 1.2, 1.3
   - [ ] 2.3 traefik edge confirmation on the deploy path
     - **Depends**: 2.2 · **Requirements**: 3.1
@@ -295,3 +295,14 @@ identity module, and the lookup keeps working if the namespace changes again.
 ## Log
 
 **2026-09-05** — drafted from the review set of the same date.
+
+**2026-09-05** — 1.1, 1.2, 2.2 done. `findContainerByLabel` asks `ps -a --filter label=…`
+(Docker 29.4.0 verified: `{{.Names}}\t{{.State}}` gives `name\trunning`). The three
+literal sites now resolve the edge by `com.appbay.app`; `edge-target.test.ts` compiles the
+caddy system app and pins the name and the absence of literals. 1.3's message names the
+label and says the edge is not deployed; the generated name is not repeated in the message
+because the namespace is the manifest's fact, not the deploy path's. Pre-existing failure
+noted, not mine: `apps/cli home.test.ts` "warns when a saved pointer is under a temp
+directory" fails on macOS (`/var/folders` is not recognised as temp) — S38 test list.
+`ok`/`unknown` constructors stay module-private so the core barrel does not export two
+generic names.

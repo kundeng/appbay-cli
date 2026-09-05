@@ -28,7 +28,8 @@ import {
 import { detectRuntimeFacts } from "../runtime/facts.js";
 import { sortByDeployOrder, isSystemApp } from "../boot-order.js";
 import { spawnSync } from "node:child_process";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { APP_LABEL } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 
 // ---------------------------------------------------------------------------
@@ -411,35 +412,31 @@ function runCaddyCommand(
   appbayHome: string,
   args: string[],
 ): { status: CaddyCommandStatus; detail: string } {
-  const runtime = containerBin(appbayHome);
-  let missing = "the Caddy edge container does not exist";
-  for (const container of ["appbay.caddy.caddy", "appbay.caddy"]) {
-    // ⚠️ ASK WHETHER IT IS RUNNING, NOT MERELY WHETHER IT EXISTS. A STOPPED container
-    // passes a bare `inspect`, so the old check went on to `exec` — which fails with
-    // "container state improper" — and that was classified as the CONFIGURATION being
-    // rejected. Same lie as the missing-container case (appbay-cli#5), one state along.
-    const inspect = spawnSync(runtime, ["inspect", "--format", "{{.State.Running}}", container], {
-      stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
-    });
-    if (inspect.status !== 0) {
-      missing = `the Caddy edge container does not exist (${String(inspect.stderr || "").trim()})`;
-      continue;
-    }
-    if (String(inspect.stdout ?? "").trim() !== "true") {
-      return {
-        status: "unavailable",
-        detail: `the Caddy edge container "${container}" exists but is not running`,
-      };
-    }
-    const result = spawnSync(runtime, ["exec", container, "caddy", ...args], {
-      stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
-    });
-    const detail = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-    return { status: result.status === 0 ? "ok" : "rejected", detail };
+  // The edge is found by its label, never by a literal name: the namespace enters every
+  // generated name (identity.ts), and a literal went stale the day the system apps were
+  // namespaced. A stopped edge is found and reported as not running; a lookup that could
+  // not be made is `unavailable` with the runtime's reason, not a verdict about the config.
+  const edge = findContainerByLabel(APP_LABEL, "caddy", { appbayHome });
+  if (edge.kind === "unknown") {
+    return { status: "unavailable", detail: `could not ask the runtime for the edge (${edge.reason})` };
   }
-  // Every candidate container was absent — Caddy was never reached, so there is no verdict
-  // about the configuration to report.
-  return { status: "unavailable", detail: missing };
+  if (edge.value === null) {
+    return {
+      status: "unavailable",
+      detail: `no container carries ${APP_LABEL}=caddy — the Caddy edge is not deployed`,
+    };
+  }
+  if (!edge.value.running) {
+    return {
+      status: "unavailable",
+      detail: `the Caddy edge container "${edge.value.name}" exists but is ${edge.value.state}`,
+    };
+  }
+  const result = spawnSync(containerBin(appbayHome), ["exec", edge.value.name, "caddy", ...args], {
+    stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
+  });
+  const detail = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  return { status: result.status === 0 ? "ok" : "rejected", detail };
 }
 
 /**
