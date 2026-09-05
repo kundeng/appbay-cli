@@ -1,6 +1,6 @@
 ---
 spec_id: S39-collection-boot-order
-status: DRAFT
+status: ACTIVE
 closed_as: null
 since: 2026-09-01
 until: null
@@ -217,10 +217,7 @@ To be written at activation, once §1.4 is decided. The shape is constrained alr
 <!-- [ ] pending | [x] done | [!] BLOCKED: reason | [-] DROPPED: <reason> | [>] → <spec_id> -->
 
 - [ ] 1. Decide the granularity
-  - [ ] 1.1 Owner picks A, B or C from §1.4 — collection-level with overlap rejected,
-        collection-level with earliest-wins, or expand-to-app-level.
-    - **Requirements**: 1.2 · Recommendation: C, argued in §1.4.
-- [ ] 2. Readiness, before any ordering work
+  - [x] 1.1 C. Collections expand to app-level edges; cycles and unknown names fail before anything starts. Kun's frame: a collection is a stack, and `when:` is membership in a shared one (implemented first: overlay peers = installed apps sharing a collection; no collection = `default`).
   - [ ] 2.1 Define what "ready" means, including for an app that declares nothing
     - **Requirements**: 2.1, 2.2 · **Pillar**: Design
   - [ ] 2.2 Implement the bounded wait in the deploy loop; timeout fails the app and skips

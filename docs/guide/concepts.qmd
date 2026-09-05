@@ -240,7 +240,7 @@ variant in `namespace:` — `namespace: uom.sim` — and deploy a second copy al
 
 ### Collection
 
-A **collection** is an operational grouping -- a named set of apps that deploy, restart, or stop together. Collections are multi-valued and purely a selection mechanism.
+A **collection** is a stack: a named set of apps that are composed together, deploy, restart and stop together, and may declare a start order among collections in `etc/collections.yaml`. An app can be in several. An app that declares none is in `default`.
 
 ```yaml
 # appbay.yaml
@@ -249,7 +249,7 @@ collection: [ai-stack, gpu-apps]
 
 Usage: `appbay up --collection ai-stack` deploys all apps tagged with that collection.
 
-Collections do **not** participate in variable resolution. They are selectors, not scope levels.
+Collections decide what an overlay's `when:` can see: a peer counts only if it shares a collection with the app. They do not participate in variable resolution; that is the namespace's job.
 
 ## Variable resolution
 

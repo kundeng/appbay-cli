@@ -24,11 +24,12 @@ export interface OverlayInput {
     services: Record<string, Record<string, unknown>>;
   }>;
   /**
-   * Names of INSTALLED apps — the full declared set, not what happens to be running.
-   * RFC-001 §5: `when: [a, b]` asserts a and b are installed, which is a fact about
-   * desired state, knowable at compile time and needing no container runtime.
+   * The apps this one may be wired to: installed apps that share a collection with it.
+   * `when: [a, b]` asks where a and b are declared, never whether they are running
+   * (docs/steering/product.md, decided definitions). An app that declares no
+   * collection is in `default`, so a home with no collections behaves as one stack.
    */
-  installedApps: Set<string>;
+  peers: Set<string>;
 }
 
 /** An overlay whose `when` clause was satisfied. */
@@ -43,7 +44,7 @@ export interface InactiveOverlay {
   reason: string;
 }
 
-/** Result of evaluating all overlays against the installed app set. */
+/** Result of evaluating all overlays against the app's peers. */
 export interface OverlayResult {
   activeOverlays: ActiveOverlay[];
   inactiveOverlays: InactiveOverlay[];
@@ -68,22 +69,18 @@ function isAndClause(clause: WhenClause): clause is string[] {
  */
 function evaluateClause(
   clause: WhenClause,
-  installedApps: Set<string>,
+  peers: Set<string>,
 ): string | null {
   if (isAndClause(clause)) {
-    // AND -- every listed app must be installed.
-    const missing = clause.filter((app) => !installedApps.has(app));
+    const missing = clause.filter((app) => !peers.has(app));
     if (missing.length > 0) {
-      return `AND clause not met: app(s) not installed: ${missing.join(", ")}`;
+      return `AND clause not met: not declared in a shared collection: ${missing.join(", ")}`;
     }
     return null;
   }
-
-  // OR -- at least one of the listed apps must be installed.
   const { any: apps } = clause;
-  const found = apps.some((app) => installedApps.has(app));
-  if (!found) {
-    return `OR clause not met: none of ${apps.join(", ")} are installed`;
+  if (!apps.some((app) => peers.has(app))) {
+    return `OR clause not met: none of ${apps.join(", ")} are declared in a shared collection`;
   }
   return null;
 }
@@ -101,7 +98,7 @@ export function selectActiveOverlays(input: OverlayInput): OverlayResult {
   const inactiveOverlays: InactiveOverlay[] = [];
 
   for (const overlay of input.overlays) {
-    const reason = evaluateClause(overlay.when, input.installedApps);
+    const reason = evaluateClause(overlay.when, input.peers);
     if (reason === null) {
       activeOverlays.push({
         when: overlay.when,

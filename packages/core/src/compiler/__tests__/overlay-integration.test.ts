@@ -25,12 +25,12 @@ let stateDir: string;
 /**
  * Materialise apps into a fresh appsDir and return it.
  *
- * `names` are taken from SYSTEM_APPS when present. ⚠️ `searxng` is NOT a system app, but
- * open-webui's AND overlay names it as a peer — and since installed-ness now comes from the
- * tree, the only way to satisfy that clause is for a directory called `searxng` to exist.
- * A bare compose file is enough: `when:` asks whether the app is declared, not what it is.
+ * `names` are taken from SYSTEM_APPS when present. `searxng` is not a system app; open-webui's
+ * AND overlay names it as a peer, and `when:` asks where a peer is DECLARED: it must share a
+ * collection with open-webui (`ai-stack`). A stub app is written with that collection unless
+ * `collections` overrides it, which is how the scoping test puts a peer out of reach.
  */
-async function appsDirWith(label: string, names: string[]): Promise<string> {
+async function appsDirWith(label: string, names: string[], collections: Record<string, string[]> = {}): Promise<string> {
   const appsDir = join(testDir, label, "etc/apps");
   await mkdir(appsDir, { recursive: true });
   const fromSystem = new Set(SYSTEM_APPS.map((a) => a.name));
@@ -52,6 +52,8 @@ async function appsDirWith(label: string, names: string[]): Promise<string> {
       join(appDir, "docker-compose.yml"),
       `services:\n  ${name}:\n    image: ${name}:latest\n`,
     );
+    const collection = collections[name] ?? ["ai-stack"];
+    await writeFile(join(appDir, "appbay.yaml"), `collection: [${collection.join(", ")}]\n`);
   }
 
   return appsDir;
@@ -128,6 +130,14 @@ describe("Overlay integration", () => {
     });
     expect(resultFull.apps[0]!.rendered).toContain("ENABLE_RAG_WEB_SEARCH=true");
     expect(resultFull.apps[0]!.rendered).toContain("SEARXNG_QUERY_URL");
+  });
+
+  it("does not wire a peer declared in a different collection — when: is about where", async () => {
+    // searxng exists in the home but in `search`, not `ai-stack`: not open-webui's stack.
+    const dir = await appsDirWith("other-collection", ["ollama", "searxng", "open-webui"], { searxng: ["search"] });
+    const result = await compile({ appsDir: dir, rendersDir: join(testDir, "renders-4c"), stateDir, apps: ["open-webui"] });
+    expect(result.apps[0]!.rendered).not.toContain("ENABLE_RAG_WEB_SEARCH");
+    expect(result.warnings.join("\n")).toContain("not declared in a shared collection: searxng");
   });
 
   it("compiles an app without overlays unchanged, whatever else is installed", async () => {

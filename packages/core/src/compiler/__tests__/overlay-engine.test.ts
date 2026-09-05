@@ -20,7 +20,7 @@ describe("selectActiveOverlays", () => {
           },
         },
       ],
-      installedApps: new Set(["ollama", "whisper", "webui"]),
+      peers: new Set(["ollama", "whisper", "webui"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -44,7 +44,7 @@ describe("selectActiveOverlays", () => {
           },
         },
       ],
-      installedApps: new Set(["ollama"]),
+      peers: new Set(["ollama"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -68,7 +68,7 @@ describe("selectActiveOverlays", () => {
           },
         },
       ],
-      installedApps: new Set(["stt"]),
+      peers: new Set(["stt"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -91,7 +91,7 @@ describe("selectActiveOverlays", () => {
           },
         },
       ],
-      installedApps: new Set(["ollama"]),
+      peers: new Set(["ollama"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -122,7 +122,7 @@ describe("selectActiveOverlays", () => {
           services: { webui: { environment: ["SHOULD_NOT=appear"] } },
         },
       ],
-      installedApps: new Set(["ollama", "tts"]),
+      peers: new Set(["ollama", "tts"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -139,7 +139,7 @@ describe("selectActiveOverlays", () => {
   it("returns empty results for an empty overlays list", () => {
     const input: OverlayInput = {
       overlays: [],
-      installedApps: new Set(["anything"]),
+      peers: new Set(["anything"]),
     };
 
     const result = selectActiveOverlays(input);
@@ -160,7 +160,7 @@ describe("selectActiveOverlays", () => {
           services: { webui: { environment: ["ALWAYS=true"] } },
         },
       ],
-      installedApps: new Set(),
+      peers: new Set(),
     };
 
     const result = selectActiveOverlays(input);
@@ -182,7 +182,7 @@ describe("selectActiveOverlays", () => {
           services: { webui: { environment: ["NEVER=true"] } },
         },
       ],
-      installedApps: new Set(["any-app"]),
+      peers: new Set(["any-app"]),
     };
 
     const result = selectActiveOverlays(input);

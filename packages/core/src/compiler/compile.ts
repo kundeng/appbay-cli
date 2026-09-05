@@ -25,6 +25,9 @@ import { readFile } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { APP_LABEL, SHARED_NETWORK } from "./identity.js";
+
+/** The collection an app is in when it declares none: a home with no collections is one stack. */
+export const DEFAULT_COLLECTION = "default";
 import { z } from "zod";
 
 /** A YAML document that must be a mapping; anything else is a parse error, not `{}`. */
@@ -254,6 +257,13 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
   // set meant `appbay up openwebui` saw one app installed and `appbay up` saw all of them,
   // so the same manifest compiled to different artifacts depending on the command line.
   const installedApps = new Set(discovered.map((app) => app.name));
+  // Collection membership over the FULL declared set: `when:` asks where a peer is declared.
+  const collectionsOf = (app: DiscoveredApp): string[] => app.appbayConfig?.collection?.length ? app.appbayConfig.collection : [DEFAULT_COLLECTION];
+  const membership = new Map(discovered.map((app) => [app.name, new Set(collectionsOf(app))]));
+  const peersOf = (name: string): Set<string> => {
+    const mine = membership.get(name) ?? new Set([DEFAULT_COLLECTION]);
+    return new Set([...membership].filter(([, theirs]) => [...theirs].some((c) => mine.has(c))).map(([n]) => n));
+  };
 
   // Filter to requested apps if specified.
   if (requestedApps && requestedApps.length > 0) {
@@ -290,6 +300,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
         appsDir,
         rendersDir,
         installedApps,
+        peers: peersOf(app.name),
         runtimeFacts,
         registry,
         generatedValueStore,
@@ -385,6 +396,8 @@ interface CompileAppInput {
   appsDir: string;
   rendersDir: string;
   installedApps: Set<string>;
+  /** Installed apps sharing a collection with this one — the set `when:` is evaluated against. */
+  peers: Set<string>;
   runtimeFacts: RuntimeFacts;
   registry: TraitRegistry;
   generatedValueStore: GeneratedValueStore;
@@ -409,6 +422,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     appsDir,
     rendersDir,
     installedApps,
+    peers,
     runtimeFacts,
     registry,
     generatedValueStore,
@@ -504,7 +518,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   if (config?.overlays && config.overlays.length > 0) {
     const overlayResult = selectActiveOverlays({
       overlays: config.overlays,
-      installedApps,
+      peers,
     });
     activeOverlaysForLog = overlayResult.activeOverlays;
 

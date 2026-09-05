@@ -5,22 +5,27 @@ description: "Declarative cross-app wiring with when clauses"
 
 ## What are overlays?
 
-Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The condition is **which apps are installed** -- enabling automatic cross-app wiring without manual configuration.
+Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The condition is **which apps are declared in the same collection** -- a statement about how a stack is composed, evaluated at compile time.
 
 For example, Open WebUI can connect to Ollama when Ollama is installed alongside it, and fall back to a standalone configuration when it is not. This is declared once and evaluated automatically at compile time.
 
 ::: {.callout-important}
-## `when:` means installed, not running
+## `when:` is about where, not when
 
-A `when` clause asks whether a peer app is **declared in this installation** -- a fact about
-your desired state. It does not ask the container runtime anything, so it is the same answer
-whether Docker is up, down, or absent, and whether the peer is healthy, restarting or
-stopped.
+A `when` clause asks whether the peer is **declared in a collection this app is also in**.
+It is a statement about the composition of a stack, made when the manifests are written. It
+never asks whether the peer is running: a peer that is declared and not yet up still gets
+its overlay, and readiness is the deploy's job, not the compiler's.
 
-This changed in `v0.0.1-alpha.12`. Overlays previously evaluated against a `docker ps`
-snapshot taken at compile time, which meant a restart-looping peer satisfied a clause, a
-stopped peer silently removed configuration, and a compile on a host with no Docker daemon
-deactivated every overlay while still reporting success.
+An app that declares no `collection:` is in the implicit collection `default`, so a home
+with no collections behaves as one stack and `when: [ollama]` means what it always did.
+Once apps declare collections, a peer in a different collection is not wired: to connect
+`searxng` to `open-webui`'s RAG overlay, put `ai-stack` in searxng's collections.
+
+Two earlier meanings were retired. Overlays once evaluated against a `docker ps` snapshot,
+so a restart-looping peer satisfied a clause and a host with no daemon lost every overlay;
+then against every app in the home, so a peer installed for a different stack wired itself
+into this one.
 :::
 
 ## Basic syntax
@@ -37,7 +42,7 @@ overlays:
           - OLLAMA_BASE_URL=http://ollama_web:11434
 ```
 
-The `when` clause specifies which apps must be installed. The `services` block is a standard Compose fragment that gets merged into the app's rendered output.
+The `when` clause names the peers that must be declared alongside this app. The `services` block is a standard Compose fragment that gets merged into the app's rendered output.
 
 ### How service names work in overlays
 
