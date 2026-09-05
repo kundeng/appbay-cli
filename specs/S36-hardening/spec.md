@@ -279,7 +279,7 @@ identity module, and the lookup keeps working if the namespace changes again.
     - **Depends**: — · **Requirements**: 5.1, 5.2
   - [x] 2.8 `install` exits 1 on validation failure; `update` reads `status`
     - **Depends**: — · **Requirements**: 6.1, 6.2
-  - [ ] 2.9 `appbay edge migrate --to`; init advice repointed
+  - [x] 2.9 `appbay edge migrate --to`; init advice repointed
     - **Depends**: 2.5 · **Requirements**: 7.1
   - [x] 2.10 `keepassxc-cli.test.ts` skips `/proc` off Linux; `instance.ts:92` comment corrected
     - **Depends**: — · **Requirements**: 8.2, NF 2

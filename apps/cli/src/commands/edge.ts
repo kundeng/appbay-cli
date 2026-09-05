@@ -1,7 +1,16 @@
 /** Caddy Security local edge-identity administration. */
 import { Command } from "commander";
 import { randomBytes } from "node:crypto";
-import { EdgeIdentityStore, restartEdgeForIdentityChange } from "@appbay/core";
+import {
+  EdgeIdentityStore, restartEdgeForIdentityChange,
+  migrateEdge, compile, deploy, loadProjectVars, detectRuntimeFacts, writeRenderedOutput,
+  containerCompose, findContainerByLabel, APP_LABEL, resolveIngressProvider,
+  IngressProviderSchema, type IngressProvider,
+} from "@appbay/core";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { dockerCompose } from "../utils/docker.js";
+import { upsertIngressProvider } from "./init.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { askSecret } from "../utils/prompt.js";
 
@@ -83,6 +92,98 @@ const resetPassword = new Command("reset-password")
 const users = new Command("users").description("Manage users who sign in to your DEPLOYED APPS (not to AppBay itself)")
   .addCommand(listUsers).addCommand(createUser).addCommand(resetPassword);
 
+/**
+ * `appbay edge migrate --to <provider>` — change the ingress provider without a window in
+ * which the host has no edge. Calls core's `migrateEdge()`, which had no caller (issue #7)
+ * while `init` advised the unsafe stop-then-hope sequence it was written to replace.
+ *
+ * The four operations it needs, in this install's terms:
+ *   validate  compile the target edge and, for caddy, run `caddy validate` in the edge image
+ *             with the candidate tree mounted — while the current edge still serves
+ *   stop      `compose down` on the outgoing render
+ *   start     `deploy()` for the target edge
+ *   health    the target edge, found by label, is running within 60 s
+ */
+const migrate = new Command("migrate")
+  .description("Switch the ingress provider, validating first and restoring the old edge on any failure")
+  .requiredOption("--to <provider>", "target provider: traefik or caddy")
+  .action(async (options: { to: string }) => {
+    const parsed = IngressProviderSchema.safeParse(options.to);
+    if (!parsed.success) throw new Error(`--to must be "traefik" or "caddy", got "${options.to}"`);
+    const to = parsed.data;
+    const from: IngressProvider = to === "caddy" ? "traefik" : "caddy";
+    const appbayHome = resolveAppbayHome();
+    const appsDir = join(appbayHome, "etc", "apps");
+    const rendersDir = join(appbayHome, "var", "lib", "renders");
+    const stateDir = join(appbayHome, "var", "lib", "state");
+
+    if (!existsSync(join(appsDir, to, "docker-compose.yml"))) {
+      console.error(`The ${to} edge is not installed here. Seed it first: appbay init --ingress-provider ${to}`);
+      process.exit(1);
+    }
+
+    const renderFor = (p: IngressProvider) => join(rendersDir, p, "docker-compose.rendered.yml");
+
+    const result = await migrateEdge({
+      appbayHome, from, to,
+      validateCandidate: async () => {
+        const compiled = await compile({
+          appsDir, rendersDir, stateDir, apps: [to],
+          projectVars: await loadProjectVars(appbayHome),
+          runtimeFacts: detectRuntimeFacts({ stateDir }),
+        });
+        if (compiled.errors.length > 0) return compiled.errors.map((e) => `${e.stage}: ${e.message}`).join("; ");
+        const app = compiled.apps[0];
+        if (!app) return `${to} did not compile to an app`;
+        const render = await writeRenderedOutput(app, rendersDir, appbayHome);
+        if (to !== "caddy") return null; // ponytail: traefik has no offline validator; the health step is its check
+        const build = containerCompose(["build"], render, undefined, appbayHome);
+        if (build.exitCode !== 0) return `could not build the ${to} image: ${build.output.trim().split("\n").pop()}`;
+        const check = containerCompose(
+          ["run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+          render, undefined, appbayHome,
+        );
+        return check.exitCode === 0 ? null : check.output.trim();
+      },
+      stopStack: async (p) => {
+        const render = renderFor(p);
+        if (!existsSync(render)) return;
+        const down = containerCompose(["down"], render, undefined, appbayHome);
+        if (down.exitCode !== 0) throw new Error(`compose down ${p}: ${down.output.trim()}`);
+      },
+      startStack: async (p) => {
+        const r = await deploy({ appbayHome, targetApps: [p], dockerCompose: (a, c, e) => dockerCompose(a, c, e) });
+        const failed = r.apps.find((a) => a.status === "failed");
+        if (failed) throw new Error(failed.error ?? `${p} failed to deploy`);
+        if (r.apps.some((a) => a.convergeAction === "unknown")) throw new Error(`${p}: the runtime could not be read after start`);
+      },
+      checkHealth: async (p) => {
+        const deadline = Date.now() + 60_000;
+        let last = "not found";
+        while (Date.now() < deadline) {
+          const edge = findContainerByLabel(APP_LABEL, p, { appbayHome });
+          if (edge.kind === "unknown") return `could not ask the runtime: ${edge.reason}`;
+          if (edge.value?.running) return null;
+          last = edge.value ? `${edge.value.name} is ${edge.value.state}` : "no container carries the label";
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        return `${p} did not come up within 60 s (${last})`;
+      },
+    });
+
+    for (const step of result.steps) {
+      console.log(`  ${step.ok ? "✓" : "✗"} ${step.label}${step.detail ? ` — ${step.detail}` : ""}`);
+    }
+    if (result.migrated) {
+      await upsertIngressProvider(appbayHome, to);
+      console.log(`\nEdge is now ${to}. Re-run \`appbay up\` for apps with routes so their fragments target it.`);
+      process.exit(0);
+    }
+    console.error(result.restored === false ? "\n🚨 The host may have no edge. Check the steps above." : `\nNot migrated; ${from} is still serving.`);
+    process.exit(1);
+  });
+
 export const edgeCommand = new Command("edge")
   .description("Manage the edge: the proxy, and the users who sign in to your DEPLOYED APPS")
-  .addCommand(users);
+  .addCommand(users)
+  .addCommand(migrate);

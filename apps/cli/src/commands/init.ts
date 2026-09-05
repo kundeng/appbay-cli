@@ -1171,9 +1171,8 @@ export const initCommand = new Command("init")
               console.log(`      ${ingressProvider} cannot bind those ports while ${previous} holds them,`);
               console.log(`      and a bind failure looks like a successful deploy with a missing edge.`);
               console.log("");
-              console.log(`      Stop the old edge before deploying the new one:`);
-              console.log(`          appbay down ${previous}`);
-              console.log(`          appbay up ${ingressProvider}`);
+              console.log(`      Migrate with validation and rollback:`);
+              console.log(`          appbay edge migrate --to ${ingressProvider}`);
             }
           }
         }
