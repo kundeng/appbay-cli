@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-05):** 1 file read · open: 8 · next: `packages/core/src/services/deploy-service.ts`, Kun's annotations.
+**Position (2026-09-05):** 1 file read · open: 9 · next: `packages/core/src/services/deploy-service.ts`, Kun's annotations.
 
 ## Protocol
 
@@ -31,3 +31,4 @@ the next session resumes from.
 | 6 | `apps/cli/src/commands/ps.ts:64-110` | 2 | A second parser of `compose ps --format json`. No banner skip and reads `Name`, not `Names[]`, so `appbay ps` lists nothing on a Podman host. The fix in d56474f reached `deploy-service.ts` only. | reasoned from both sources; no Podman host here | open, raised by Kun's note on placement |
 | 7 | `deploy-service.ts:100-270` | S | The container-state readers (`composePs`, `parseComposePsJson`, `findCrashedServices`, `snapshotContainers`) have no deploy input and belong in `packages/core/src/runtime/`, which already claims `ps --format` at `container-runtime.ts:186`. `didConverge` can go either way. | verified, read | confirmed, Kun's note |
 | 8 | repo-wide | S | State is observed by parsing CLI output. The Engine API on the socket the CLI already resolves (`apps/cli/src/commands/server.ts:70-79`) returns typed `State`/`Status`; verified locally with `curl --unix-socket /var/run/docker.sock 'http://localhost/containers/json?all=1'`. Mutation stays with `compose up -d`, observation should move to the socket. The Go rewrite already draws that line (`stackbay/docs/design/lessons-paid-for.md:222-229`). Podman's compat API claim is from memory. | verified for Docker, reasoned for Podman | confirmed, Kun's note |
+| 9 | `deploy-service.ts:616`, `apps/cli/src/commands/up.ts:25-31` | S | RFC-001 §4 says a namespace absent from the manifest is "decided at deploy time". `compile()` accepts one (`compile.ts:104`, resolved at `:422`) but `deploy()` never passes it and no command has a `--namespace` flag, so a namespace is a manifest field only. The compose project name is the app directory (measured: `docker compose config` on `renders/whoami/` → `whoami`); the namespace never reaches it, by design via `install --as`. `instance.ts:92` calling `project` "the compose project prefix" is stale. | verified, read and run | open |
