@@ -1,8 +1,8 @@
 /**
  * `appbay ps [apps...]` command.
  *
- * Shows container runtime status by running `docker compose ps` against
- * rendered compose files. Requires Docker to be available for runtime status.
+ * Shows container status from `compose ps` against rendered compose files, parsed by
+ * the runtime adapter so Docker Compose and podman-compose output read the same.
  *
  * If no apps are specified, shows containers for all apps that have a
  * rendered compose file. Uses the rendered compose from rendersDir if
@@ -19,15 +19,12 @@
 
 import { Command } from "commander";
 import { join, basename } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { discoverApps, type DiscoveredApp } from "@appbay/core";
+import { discoverApps, composePs, type DiscoveredApp } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 import { resolveComposeFile } from "../utils/paths.js";
-import { cliContainerBin } from "../utils/docker.js";
+import { dockerCompose } from "../utils/docker.js";
 
-const execFileAsync = promisify(execFile);
 
 /** Container status returned from docker compose ps. */
 interface ContainerInfo {
@@ -39,106 +36,15 @@ interface ContainerInfo {
   ports: string;
 }
 
-/**
- * Run `docker compose ps --format json` for a given compose file
- * and return parsed container info.
- */
-async function getContainerStatus(
-  app: DiscoveredApp,
-  composeFile: string,
-): Promise<ContainerInfo[]> {
-  try {
-    const { stdout } = await execFileAsync(cliContainerBin(), [
-      "compose",
-      "-f",
-      composeFile,
-      "ps",
-      "--format",
-      "json",
-    ]);
-
-    if (!stdout.trim()) {
-      return [];
-    }
-
-    // docker compose ps --format json outputs one JSON object per line,
-    // or a JSON array depending on version.
-    const containers: ContainerInfo[] = [];
-    const trimmed = stdout.trim();
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      // Try parsing line-by-line (older docker compose format).
-      const lines = trimmed.split("\n").filter((l) => l.trim());
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line) as Record<string, unknown>;
-          containers.push({
-            app: app.name,
-            name: String(obj.Name ?? obj.name ?? ""),
-            service: String(obj.Service ?? obj.service ?? ""),
-            status: String(obj.Status ?? obj.status ?? ""),
-            state: String(obj.State ?? obj.state ?? ""),
-            ports: formatPorts(obj.Ports ?? obj.ports ?? obj.Publishers ?? obj.publishers),
-          });
-        } catch {
-          // Skip unparseable lines.
-        }
-      }
-      return containers;
-    }
-
-    // Handle array or single object.
-    const items = Array.isArray(parsed) ? parsed : [parsed];
-    for (const obj of items) {
-      if (obj && typeof obj === "object") {
-        const rec = obj as Record<string, unknown>;
-        containers.push({
-          app: app.name,
-          name: String(rec.Name ?? rec.name ?? ""),
-          service: String(rec.Service ?? rec.service ?? ""),
-          status: String(rec.Status ?? rec.status ?? ""),
-          state: String(rec.State ?? rec.state ?? ""),
-          ports: formatPorts(rec.Ports ?? rec.ports ?? rec.Publishers ?? rec.publishers),
-        });
-      }
-    }
-
-    return containers;
-  } catch {
-    // docker compose ps failed (no containers, compose not valid, etc.)
+/** Container rows for one app, through the runtime adapter's one compose-ps parser. */
+function getContainerStatus(app: DiscoveredApp, composeFile: string): ContainerInfo[] {
+  // Running containers only, as `ps` has always shown; `up` asks with `all` for its own reasons.
+  const rows = composePs((args, path, env) => dockerCompose(args, path, env), composeFile, {}, { all: false });
+  if (rows.kind === "unknown") {
+    console.error(`  ${app.name}: could not ask compose (${rows.reason})`);
     return [];
   }
-}
-
-/**
- * Format port information from docker compose ps JSON output.
- * Handles both string and array-of-objects formats.
- */
-export function formatPorts(ports: unknown): string {
-  if (typeof ports === "string") return ports;
-  if (Array.isArray(ports)) {
-    return ports
-      .map((p) => {
-        if (typeof p === "string") return p;
-        if (p && typeof p === "object") {
-          const pub = p as Record<string, unknown>;
-          const published = pub.PublishedPort ?? pub.published_port ?? "";
-          const target = pub.TargetPort ?? pub.target_port ?? "";
-          const protocol = pub.Protocol ?? pub.protocol ?? "tcp";
-          if (published && Number(published) > 0) {
-            return `${published}->${target}/${protocol}`;
-          }
-          return `${target}/${protocol}`;
-        }
-        return String(p);
-      })
-      .filter(Boolean)
-      .join(", ");
-  }
-  return "";
+  return rows.value.map((r) => ({ app: app.name, name: r.name, service: r.service, status: r.status, state: r.state, ports: r.ports }));
 }
 
 export const psCommand = new Command("ps")

@@ -29,7 +29,7 @@
 
 import { describe, it, expect } from "vitest";
 import { pad } from "../../utils/formatting.js";
-import { formatPorts } from "../ps.js";
+import { formatPorts } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // pad

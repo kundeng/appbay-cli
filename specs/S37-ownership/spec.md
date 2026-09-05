@@ -184,8 +184,8 @@ touched; a separate sweep re-reads everything twice.
     - **Depends**: — · **Requirements**: 1.1 · **Pillar**: Legible, Verified
 - [ ] 2. Moves, one commit each, in map order
   - [x] 2.1 `tryExec` → one in `runtime/container-runtime.ts`; `containerExec` already owns the runtime spawn · **Requirements**: 1.1
-  - [ ] 2.2 compose ps + parsers → `composePs()`; `cli/ps.ts` calls it · **Requirements**: 1.1
-  - [ ] 2.3 crash/snapshot/converge → `observe.ts` · **Requirements**: 1.1
+  - [x] 2.2 compose ps + parsers → `runtime/observe.ts: composePs()`; `cli/ps.ts` calls it with `all: false` (running only, as before); `formatPorts` moved with it · **Requirements**: 1.1
+  - [x] 2.3 crash/snapshot/converge → `observe.ts`; comments cut to the invariant · **Requirements**: 1.1
   - [ ] 2.4 `findContainer`, `isRunning`, `networkExists` · **Requirements**: 1.2
   - [ ] 2.5 versions and podman templates → profile · **Requirements**: 1.3
   - [ ] 2.6 `loadInstanceConfig`; regex readers deleted · **Requirements**: 2.1

@@ -22,7 +22,8 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { deploy, findCrashedServices, type DockerComposeRunner } from "../deploy-service.js";
+import { deploy } from "../deploy-service.js";
+import { findCrashedServices, type DockerComposeRunner } from "../../runtime/observe.js";
 
 let home: string;
 
