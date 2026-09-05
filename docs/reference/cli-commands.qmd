@@ -489,6 +489,23 @@ appbay secrets list
 appbay secrets list jellyfin
 ```
 
+### `appbay edge migrate`
+
+Switch the ingress provider without a window in which the host has no edge. The target
+edge must already be seeded (`appbay init --ingress-provider <target>`). The command
+validates the candidate while the current edge is still serving (compile, and for caddy a
+`caddy validate` in the edge image with the deploy environment), backs up the outgoing
+edge's configuration, stops it, starts the target, checks that the target is running by its
+label, and restores the outgoing edge on any failure.
+
+```bash
+appbay edge migrate --to caddy
+```
+
+Exit 0 when migrated; exit 1 when refused (a foreign process holds :80 or :443, the
+candidate did not validate, or the runtime could not be asked) or when the target did not
+come up and the outgoing edge was restored.
+
 ### `appbay edge users list`
 
 List Caddy Security local edge users.

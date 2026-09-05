@@ -123,6 +123,7 @@ appbay config <app>      Get/set appbay.yaml values
 appbay env <app>         Manage app environment variables
 appbay presets           Manage app selection presets
 appbay open <app>        Open app URL in browser
+appbay edge migrate      Switch the ingress provider with validation and rollback (--to caddy|traefik)
 appbay url <app>         Print app URL
 appbay size [app]        Show disk usage for apps
 appbay fixfs <app>       Fix filesystem permissions for volumes

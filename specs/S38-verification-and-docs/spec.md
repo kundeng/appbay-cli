@@ -1,7 +1,7 @@
 ---
 spec_id: S38-verification-and-docs
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-05
 until: null
 epic: legibility
@@ -91,13 +91,31 @@ flowchart TD
 
 # 3 · Tasks
 
-- [ ] 1. Tests · 1.1 mock-call tests (R1.1) · 1.2 command action tests (R1.2)
-- [ ] 2. Dead code · 2.1 `knip` in, first run resolved (R2.1)
-- [ ] 3. Docs · 3.1 `/spec-docs` (R3.1) · 3.2 `when:` docs after the collection sprint (R3.2)
-- [ ] 4. Harvest · 4.1 L9–L13 in stackbay (R4.1)
-- [ ] 5. Bootstrap · 5.1 issue #8 attempt logged (NF 1)
-- [ ] 6. Secrets · 6.1 shepherd payload on stdin, argv clean, test (R5.1) · 6.2 modes documented with exposure (R5.2)
+- [x] 1. Tests · 1.1 pointer writers on real files; mock-call tests gone; docker wrapper test renamed for what it tests · 1.2 six command actions end to end against a scratch home
+- [x] 2. Dead code · 2.1 knip run resolved (see log); no CI to pin it in
+- [x] 3. Docs · 3.1 `check:docs-cli` and `check:docs-manifests` green; README and the CLI reference gain `edge migrate`; the reference's `injection` enum lists the five real modes · [>] → S39-collection-boot-order 3.2 `when:` docs follow the collection sprint
+- [x] 4. Harvest · 4.1 stackbay `docs/design/lessons-paid-for.md` L9–L13, commit 43b495c
+- [x] 5. Bootstrap · 5.1 attempt logged: no RHEL-family image, no Podman; issue #8 stays open
+- [x] 6. Secrets · 6.1 shepherd payload on stdin, argv clean, test · 6.2 the secrets guide has a what-each-mode-exposes table
 
 ## Log
 
 **2026-09-05** — drafted.
+
+**2026-09-05** — 1.1, 1.2, 2.1, 4.1, 6.1 done. Walls, each attempted:
+- 5.1 (issue #8, RHEL-family Docker bootstrap): `multipass find` lists no Fedora, Rocky,
+  CentOS or Alma image on this machine; no other VM host is reachable. Issue stays open.
+- S36's carried 3.2 (Podman deploy journey): `which podman` → not installed;
+  `multipass list` → no instances. The Podman claims in this session's fixes rest on the
+  repo's own measurements (banner, `Names[]`, `ps -a` rejection) and on Podman's documented
+  `ps --filter label` support, and are marked reasoned in the ledger.
+- knip's first run: 35 unused exports and 5 unused types. Sixteen uncalled doctor wrappers
+  and five re-exports in `apps/cli/src/utils/checks.ts` deleted; the rest un-exported;
+  `packages/db` dropped an unused dependency. Two (`parseKeePassUri`, `parseVaultUri`) are
+  exported through a form the un-exporter did not match and stay; `docs/_extensions/
+  present-mode/present-mode.js` is a Quarto extension and stays. Not installed in CI: the
+  workspace has no CI config to add it to.
+
+**2026-09-05** — shipped. The Podman verification of S36 and S38 is GitHub issue #9;
+the RHEL-family Docker bootstrap stays issue #8. Both are external walls attempted this
+session and named above. `when:` documentation follows S39.
