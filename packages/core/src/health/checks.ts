@@ -18,26 +18,16 @@
 import { stat } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 import {
   containerBin,
   runtimeProfile,
   containerServerVersion,
   containerStoreRoot,
-  resolveIngressProvider,
+  resolveIngressProvider,  tryExec,
 } from "../runtime/container-runtime.js";
 import { podmanRootfulEnv } from "../runtime/podman-rootful.js";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
-
-/**
- * Try to execute a binary. Returns trimmed stdout on success, null on failure.
- */
-export function tryExec(binary: string, args: string[]): string | null {
-  const result = spawnSync(binary, args, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
-  if (result.status !== 0 || result.error) return null;
-  return (result.stdout as string).trim() || null;
-}
 
 /**
  * Compare two semver strings (e.g., "1.2.3" vs "v1.3.0").

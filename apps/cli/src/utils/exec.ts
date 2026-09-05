@@ -1,17 +1,6 @@
 /**
- * Shared CLI execution utilities.
+ * Shared CLI utilities. `tryExec` lives in @appbay/core's runtime adapter.
  */
-
-import { spawnSync } from "node:child_process";
-
-/**
- * Try to execute a binary. Returns trimmed stdout on success, null on failure.
- */
-export function tryExec(binary: string, args: string[]): string | null {
-  const result = spawnSync(binary, args, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
-  if (result.status !== 0 || result.error) return null;
-  return (result.stdout as string).trim() || null;
-}
 
 /**
  * Compare two semver strings (e.g., "1.2.3" vs "v1.3.0").

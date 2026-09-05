@@ -19,7 +19,7 @@ import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { tryExec } from "../utils/exec.js";
+import { tryExec } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";

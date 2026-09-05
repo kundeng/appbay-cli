@@ -183,7 +183,7 @@ touched; a separate sweep re-reads everything twice.
   - [x] 1.1 arch test written — allowlists name today's violators exactly, so it is green now and turns red the moment a list is wrong in either direction; `runtime/observe.ts` is created by the first move (2.2) rather than as an empty file
     - **Depends**: — · **Requirements**: 1.1 · **Pillar**: Legible, Verified
 - [ ] 2. Moves, one commit each, in map order
-  - [ ] 2.1 spawn + `tryExec` → `exec()` · **Requirements**: 1.1
+  - [x] 2.1 `tryExec` → one in `runtime/container-runtime.ts`; `containerExec` already owns the runtime spawn · **Requirements**: 1.1
   - [ ] 2.2 compose ps + parsers → `composePs()`; `cli/ps.ts` calls it · **Requirements**: 1.1
   - [ ] 2.3 crash/snapshot/converge → `observe.ts` · **Requirements**: 1.1
   - [ ] 2.4 `findContainer`, `isRunning`, `networkExists` · **Requirements**: 1.2

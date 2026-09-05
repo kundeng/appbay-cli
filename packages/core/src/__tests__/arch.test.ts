@@ -53,7 +53,6 @@ const RULES: Rule[] = [
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",
       "packages/core/src/compiler/compile.ts": "2.4 (ollama probe)",
-      "packages/core/src/health/checks.ts": "2.1",
       "packages/core/src/secrets/resolve-for-deploy.ts": "2.1 (volume create)",
       "packages/core/src/services/deploy-service.ts": "2.2/2.3",
       "packages/core/src/services/edge-identity-service.ts": "2.4",

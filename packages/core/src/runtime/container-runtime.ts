@@ -398,6 +398,21 @@ export function containerStoreRoot(appbayHome?: string): string | null {
   return root || null;
 }
 
+/**
+ * Run a binary and return its trimmed stdout, or null when it failed, timed out, or printed
+ * nothing. The three callers that had their own copy all read null as "not available";
+ * a check that must tell "empty" from "failed" uses `containerExec` instead.
+ */
+export function tryExec(binary: string, args: string[], options: { timeoutMs?: number } = {}): string | null {
+  const result = spawnSync(binary, args, {
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
+    ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+  });
+  if (result.status !== 0 || result.error) return null;
+  return (result.stdout as string).trim() || null;
+}
+
 // ---------------------------------------------------------------------------
 // Observation results
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@
  * - All probes use `execSync` with stdio: pipe to suppress output on failure.
  */
 
-import { spawnSync } from "node:child_process";
+import { tryExec as runtimeTryExec } from "./container-runtime.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statfsSync, readdirSync } from "node:fs";
 import { platform, arch, release } from "node:os";
 import { join } from "node:path";
@@ -23,18 +23,9 @@ import { containerBin } from "./container-runtime.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Run a command (binary + args) and return trimmed stdout, or null on failure.
- * Never throws — callers handle null as "not available".
- */
+/** Facts probes are bounded to 5 s: a hung `nvidia-smi` must not hang a compile. */
 function tryExec(binary: string, args: string[]): string | null {
-  const result = spawnSync(binary, args, {
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: 5000,
-  });
-  if (result.status !== 0 || result.error) return null;
-  return (result.stdout as string).trim() || null;
+  return runtimeTryExec(binary, args, { timeoutMs: 5000 });
 }
 
 /**
