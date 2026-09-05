@@ -149,7 +149,7 @@ describe("dockerCompose", () => {
     expect(result.output).toBe("Container myapp started");
   });
 
-  it("passes args after -f <composePath> to docker compose", () => {
+  it("builds the argv as compose -f <composePath> <args> (the spawn itself is mocked)", () => {
     mockSpawnSync.mockReturnValue(mockSpawn({ status: 0, stdout: "" }));
 
     dockerCompose(["pull", "--quiet"], "/srv/apps/myapp/compose.yml");

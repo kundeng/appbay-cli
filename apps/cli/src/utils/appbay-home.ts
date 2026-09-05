@@ -12,14 +12,14 @@
  *   4. `~/.appbay`  — silent fallback when nothing is configured
  */
 
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { readSystemConfig, SYSTEM_CONFIG_FILE } from "./system-config.js";
 import { explainHome, resolveHome, readUserPointer, type HomeTier } from "@appbay/core";
 
 /** Path to the persisted home-directory config (outside APPBAY_HOME itself). */
-export const CONFIG_DIR = join(homedir(), ".config", "appbay");
+const CONFIG_DIR = join(homedir(), ".config", "appbay");
 export const CONFIG_FILE = join(CONFIG_DIR, "home");
 
 /**
@@ -27,7 +27,7 @@ export const CONFIG_FILE = join(CONFIG_DIR, "home");
  *
  * Returns null if no config has been saved yet.
  */
-export function readSavedAppbayHome(): string | null {
+function readSavedAppbayHome(): string | null {
   return readUserPointer(CONFIG_FILE);
 }
 
@@ -55,11 +55,15 @@ export type SaveHomeResult =
  * When the host-level file already names this home, writing a shadowed per-operator copy would
  * only create something that can later disagree with it.
  */
-export function saveAppbayHome(homePath: string): SaveHomeResult {
-  if (readSystemConfig()?.home === homePath) return "unnecessary";
+export function saveAppbayHome(
+  homePath: string,
+  files: { pointer?: string; hostPointer?: string } = {},
+): SaveHomeResult {
+  const pointer = files.pointer ?? CONFIG_FILE;
+  if (readSystemConfig(files.hostPointer)?.home === homePath) return "unnecessary";
   try {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-    writeFileSync(CONFIG_FILE, homePath + "\n", "utf-8");
+    mkdirSync(dirname(pointer), { recursive: true });
+    writeFileSync(pointer, homePath + "\n", "utf-8");
     return "saved";
   } catch {
     return "failed";
@@ -73,9 +77,9 @@ export function saveAppbayHome(homePath: string): SaveHomeResult {
  * nothing to remove — the caller reports "cleared" vs "already unset" rather
  * than claiming a change that did not happen.
  */
-export function clearSavedAppbayHome(): boolean {
-  if (!existsSync(CONFIG_FILE)) return false;
-  rmSync(CONFIG_FILE);
+export function clearSavedAppbayHome(pointer: string = CONFIG_FILE): boolean {
+  if (!existsSync(pointer)) return false;
+  rmSync(pointer);
   return true;
 }
 
@@ -103,7 +107,6 @@ export function clearSavedAppbayHome(): boolean {
  * This module is imported by `index.ts`, so its top level runs BEFORE that assignment.
  */
 
-export type { HomeSource, HomeTier } from "@appbay/core";
 export type HomeExplanation = ReturnType<typeof explainHome>;
 
 /** Every tier and the winner, over this CLI's two pointer files. */

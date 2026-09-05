@@ -29,6 +29,7 @@
  */
 
 import { Command } from "commander";
+import { tmpdir } from "node:os";
 import { SYSTEM_CONFIG_FILE } from "../utils/system-config.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
@@ -89,7 +90,7 @@ function printExplanation(): void {
   // A saved pointer under a temp dir is the harness-leak signature: it survives
   // the run that wrote it and dies at the next reboot, taking every later
   // command's idea of "home" with it.
-  if (winner.source === "saved" && /^\/(tmp|var\/tmp)\//.test(winner.value as string)) {
+  if (winner.source === "saved" && isTempPath(winner.value as string)) {
     warnings.push("the saved pointer is under a temp directory and will not survive a reboot");
   }
   // RFC-001 §2.4: the tree records where it believes it lives. A disagreement means this home
@@ -185,6 +186,12 @@ const clearCommand = new Command("clear")
     );
     console.log(`Resolved home is now ${resolveAppbayHome()}`);
   });
+
+/** Linux keeps temp under /tmp and /var/tmp; macOS under /private/tmp and /var/folders, which os.tmpdir() names. */
+function isTempPath(p: string): boolean {
+  const roots = ["/tmp/", "/var/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/", tmpdir().replace(/\/+$/, "") + "/"];
+  return roots.some((r) => p.startsWith(r));
+}
 
 export const homeCommand = new Command("home")
   .description("Print, explain or repoint the APPBAY_HOME path")
