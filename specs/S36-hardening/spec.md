@@ -1,6 +1,6 @@
 ---
 spec_id: S36-hardening
-status: DRAFT
+status: ACTIVE
 closed_as: null
 since: 2026-09-05
 until: null
