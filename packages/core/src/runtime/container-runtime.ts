@@ -39,6 +39,7 @@ import {
   type InstanceConfig,
 } from "../schemas/instance.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
+import { podmanRootfulEnv } from "./podman-rootful.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
 // Both barrels (schemas/index.ts and this file) are pulled into the package root
@@ -236,6 +237,22 @@ export interface RuntimeProfile {
    * `DOCKER_HOST`/context, and telling a docker user to "try sudo" sends them nowhere.
    */
   otherStoreHint: string;
+  /** Matches the runtime's `--version` line and captures the version. */
+  versionPattern: RegExp;
+  /** Whether `compose` ships with the runtime, or is a separate provider to install. */
+  composeBundled: boolean;
+  /** The systemd unit that makes the API socket available on a service install. */
+  systemdUnit: string;
+  /** Environment a service account needs to reach this runtime's rootful store. Empty on Docker. */
+  serviceAccountEnv: (appbayHome: string) => Record<string, string>;
+  /**
+   * How a service account is granted the API socket: Docker has a unix group with that
+   * meaning; rootful Podman has none, so the group is created on the socket by a systemd
+   * drop-in plus a tmpfiles override for its directory (S34, probe-89).
+   */
+  serviceAccountGrant: "unix-group" | "socket-dropin";
+  /** RHEL-family install plan: dnf packages, and whether a vendor repo must be added first. */
+  rhel: { label: string; packages: string[]; needsVendorRepo: boolean; composePackages: string[] };
 }
 
 const PROFILES: Record<ContainerRuntime, RuntimeProfile> = {
@@ -248,6 +265,17 @@ const PROFILES: Record<ContainerRuntime, RuntimeProfile> = {
       "Start Docker: systemctl start docker (Linux) or open Docker Desktop / OrbStack (macOS)",
     otherStoreHint:
       "Check DOCKER_HOST and `docker context ls` — this shell is pointed at a different daemon",
+    versionPattern: /Docker version ([0-9]+\.[0-9]+\.[0-9]+)/,
+    composeBundled: true,
+    systemdUnit: "docker",
+    serviceAccountEnv: () => ({}),
+    serviceAccountGrant: "unix-group",
+    rhel: {
+      label: "Docker Engine",
+      packages: ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"],
+      needsVendorRepo: true,
+      composePackages: [],
+    },
   },
   podman: {
     displayName: "Podman",
@@ -258,6 +286,18 @@ const PROFILES: Record<ContainerRuntime, RuntimeProfile> = {
       "Start Podman: systemctl --user start podman.socket (Linux) or podman machine start (macOS)",
     otherStoreHint:
       "Rootful and rootless podman keep SEPARATE stores. Re-run with `sudo` for the rootful one, or without it for your own",
+    versionPattern: /podman version ([0-9]+\.[0-9]+\.[0-9]+)/,
+    composeBundled: false,
+    // Podman is daemonless; the rootful API socket unit is what a service install needs.
+    systemdUnit: "podman.socket",
+    serviceAccountEnv: podmanRootfulEnv,
+    serviceAccountGrant: "socket-dropin",
+    rhel: {
+      label: "Podman",
+      packages: ["podman", "podman-compose"],
+      needsVendorRepo: false,
+      composePackages: ["podman-compose"],
+    },
   },
 };
 
@@ -348,6 +388,16 @@ export function containerCompose(
     maxBuffer: 50 * 1024 * 1024,
     env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
   });
+}
+
+/** The raw version lines the runtime and its compose provider print; null where a command failed. */
+export function versions(appbayHome?: string): { runtime: string | null; compose: string | null; composeLong: string | null } {
+  const bin = containerBin(appbayHome);
+  return {
+    runtime: tryExec(bin, ["--version"]),
+    compose: tryExec(bin, ["compose", "version", "--short"]),
+    composeLong: tryExec(bin, ["compose", "version"]),
+  };
 }
 
 /**

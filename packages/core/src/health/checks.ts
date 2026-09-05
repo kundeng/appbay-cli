@@ -23,9 +23,8 @@ import {
   runtimeProfile,
   containerServerVersion,
   containerStoreRoot,
-  resolveIngressProvider,  tryExec,
+  resolveIngressProvider,  tryExec,  versions,
 } from "../runtime/container-runtime.js";
-import { podmanRootfulEnv } from "../runtime/podman-rootful.js";
 import { isRunning, networkExists } from "../runtime/observe.js";
 import { parseInstanceConfig } from "../schemas/instance.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
@@ -203,7 +202,7 @@ export function checkDocker(appbayHome: string): HealthCheckResult {
   // thing — and the name is the ONLY part that differs, so it comes from the profile
   // rather than from a second branch.
   const { displayName, installUrl } = runtimeProfile(appbayHome);
-  const version = tryExec(containerBin(appbayHome), ["--version"]);
+  const version = versions(appbayHome).runtime;
   if (version) {
     return { name: displayName, status: "ok", detail: version, required: true };
   }
@@ -300,7 +299,7 @@ export function checkComposeInstalled(appbayHome: string): HealthCheckResult {
   // So only the label changes; the check does not fork.
   const { displayName } = runtimeProfile(appbayHome);
   const label = `${displayName} Compose v2`;
-  const version = tryExec(containerBin(appbayHome), ["compose", "version", "--short"]);
+  const version = versions(appbayHome).compose;
   if (version) {
     return { name: label, status: "ok", detail: `v${version}`, required: true };
   }
@@ -318,8 +317,8 @@ export function checkComposeInstalled(appbayHome: string): HealthCheckResult {
  */
 export function checkComposeVersion(appbayHome: string): HealthCheckResult {
   // Prefer the LONG output: it names the provider, which is what decides the minimum.
-  const long = tryExec(containerBin(appbayHome), ["compose", "version"]);
-  const provider = long ? parseComposeProvider(long) : null;
+  const probed = versions(appbayHome);
+  const provider = probed.composeLong ? parseComposeProvider(probed.composeLong) : null;
   if (provider) {
     const label = `${provider.name} >= ${provider.minimum}`;
     const clean = provider.version.replace(/^v/, "");
@@ -335,7 +334,7 @@ export function checkComposeVersion(appbayHome: string): HealthCheckResult {
     };
   }
 
-  const version = tryExec(containerBin(appbayHome), ["compose", "version", "--short"]);
+  const version = probed.compose;
   if (!version) {
     return {
       name: `Compose >= ${MIN_COMPOSE_VERSION}`,
@@ -521,22 +520,14 @@ function defaultProbeAs(
  * with a bare environment is exactly what the daemon sees.
  */
 export function probeArgv(bin: string, appbayHome: string): string[] {
-  if (!bin.endsWith("podman")) {
-    return [bin, "info", "--format", "{{.ServerVersion}}"];
-  }
-  // 🚨 `{{.ServerVersion}}` IS A DOCKER FIELD. podman's report is `system.infoReport`, which
-  // has no such key, so the template ERRORS (exit 125) on every podman host no matter what
-  // access the account has. `tryExec` then returns null and this check reported `denied` on a
-  // correctly configured host — the exact inversion this function was written to prevent,
-  // shipped because unifying the ENVIRONMENT left the ARGV still docker-shaped. Caught only by
-  // running `appbay doctor` on a host whose ground truth was known independently.
-  const format = ["info", "--format", "{{.Version.Version}}"];
-  // `env` rather than relying on sudo's environment handling: `sudo -u` sets HOME from the
-  // target account's passwd entry, which is the nonexistent `/home/<user>` that blocks podman
-  // in the first place. The home the account really has is the appbay tree it owns — the value
-  // `init-system` writes with `usermod -d`.
-  const env = podmanRootfulEnv(appbayHome);
-  return ["env", ...Object.entries(env).map(([k, v]) => `${k}=${v}`), bin, ...format];
+  // Both the version template and the service account's environment are the profile's:
+  // podman's info report has no `.ServerVersion`, and a rootful podman probe needs HOME and
+  // CONTAINER_HOST set for the account, since `sudo -u` gives it a passwd HOME that does not exist.
+  const { serverVersionFormat, serviceAccountEnv } = runtimeProfile(appbayHome);
+  const env = serviceAccountEnv(appbayHome);
+  const argv = [bin, "info", "--format", serverVersionFormat];
+  const envPairs = Object.entries(env).map(([k, v]) => `${k}=${v}`);
+  return envPairs.length > 0 ? ["env", ...envPairs, ...argv] : argv;
 }
 
 /**
@@ -657,7 +648,7 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
   // The daemon did not answer the current user. Distinguish "down" from
   // "up but needs sudo": if `sudo -n <bin> info` succeeds, the daemon is fine
   // and the problem is the current user's access, not the daemon.
-  const sudoProbe = tryExec("sudo", ["-n", bin, "info", "--format", "{{.ServerVersion}}"]);
+  const sudoProbe = tryExec("sudo", ["-n", bin, "info", "--format", runtimeProfile(appbayHome).serverVersionFormat]);
   if (sudoProbe !== null) {
     return {
       name: label,

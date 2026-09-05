@@ -43,7 +43,8 @@ import { homedir } from "node:os";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { SYSTEM_CONFIG_FILE, SYSTEM_CONFIG_DIR } from "../utils/system-config.js";
 import { renderServerUnit, SERVER_UNIT_NAME, SERVER_UNIT_PATH } from "../utils/systemd-unit.js";
-import { cliContainerBin } from "../utils/docker.js";
+import { cliContainerBin, cliRuntimeProfile } from "../utils/docker.js";
+import { versions } from "@appbay/core";
 import {
   PODMAN_ROOTFUL_SOCKET_DIR,
   PODMAN_SOCKET_DROPIN,
@@ -273,87 +274,57 @@ export function planSystemBootstrap(opts?: {
   // Bootstrap therefore installs whatever runtime the install is configured for, exactly
   // like every other spawn site resolving through the runtime resolver.
   const runtime = cliContainerBin();
-  const runtimeIsPodman = runtime === "podman";
+  const profile = cliRuntimeProfile();
   let runtimeWillExist = commandExists(runtime);
 
   if (!runtimeWillExist) {
-    if (runtimeIsPodman) {
-      // Fedora/RHEL ship podman and a compose provider in their own repos — no third-party
-      // repo needed, which is the whole reason RHEL-family is the Podman target.
-      actions.push({
-        id: "install-runtime",
-        label: "Install Podman + compose provider (dnf)",
-        wouldChange: true,
-        command: ["dnf", "install", "-y", "podman", "podman-compose"],
-      });
-    } else {
-      // ⚠️ The repo step is NOT optional. Without it the install below fails outright on
-      // any RHEL-family host; see the measurement above.
+    if (profile.rhel.needsVendorRepo) {
       // Docker publishes a fedora repo and a centos repo; every other RHEL-family distro
-      // (rocky, alma, ol, amzn) is served by the centos one.
+      // (rocky, alma, ol, amzn) is served by the centos one. dnf5 (Fedora 41+) rejects the
+      // dnf4 `--add-repo` spelling outright, so the syntax follows the installed dnf.
       const repoUrl =
         `https://download.docker.com/linux/${detectDistro().id === "fedora" ? "fedora" : "centos"}/docker-ce.repo`;
       actions.push({
         id: "add-docker-repo",
-        label: "Add Docker CE repository (docker-ce is not in RHEL-family repos)",
+        label: `Add ${profile.rhel.label} repository (not in RHEL-family repos)`,
         wouldChange: true,
-        // 🚨 `--add-repo` IS DNF4 SYNTAX AND DNF5 REJECTS IT OUTRIGHT:
-        //   Unknown argument "--add-repo" for command "config-manager"
-        // Fedora has shipped dnf5 since 41, so on the newest release of appbay's own primary
-        // target distro the FIRST step of the Docker path failed, every subsequent package was
-        // "No match for argument: docker-ce", and `init-system` could not install Docker at
-        // all. Found by trying to run the Docker branch on appbay-rhel (Fedora 43, dnf5
-        // 5.2.17) — never by a test, because the command is only ever executed on a host.
-        // Docker does publish an fc43 build (3:29.7.2-1.fc43), so this was purely syntax.
         command: dnfMajorVersion() >= 5
           ? ["dnf", "config-manager", "addrepo", `--from-repofile=${repoUrl}`]
           : ["dnf", "config-manager", "--add-repo", repoUrl],
       });
-      actions.push({
-        id: "install-runtime",
-        label: "Install Docker Engine (dnf)",
-        wouldChange: true,
-        command: [
-          "dnf", "install", "-y", "docker-ce", "docker-ce-cli", "containerd.io",
-          "docker-buildx-plugin", "docker-compose-plugin",
-        ],
-      });
     }
+    actions.push({
+      id: "install-runtime",
+      label: `Install ${profile.rhel.label} (dnf)`,
+      wouldChange: true,
+      command: ["dnf", "install", "-y", ...profile.rhel.packages],
+    });
     runtimeWillExist = true;
   } else {
     actions.push({
       id: "install-runtime",
-      label: `${runtimeIsPodman ? "Podman" : "Docker Engine"} already installed`,
+      label: `${profile.rhel.label} already installed`,
       wouldChange: false,
       command: [],
     });
   }
-  dockerWillExist = runtimeWillExist && !runtimeIsPodman;
 
-  // 1b. Compose provider — SEPARATE from the runtime, because it is separately missing.
-  //
-  // 🚨 Fedora cloud images ship podman WITHOUT a compose provider. Folding this into the
-  // install step above meant that on the most common RHEL-family starting point the whole
-  // step was skipped ("Podman already installed") and the host was left with no way to run
-  // a compose project at all — while `appbay doctor` reported exactly that gap. Docker
-  // bundles its provider in docker-compose-plugin, so this only bites the Podman path.
-  //
-  // ⚠️ Probe the PROVIDER, not the runtime: `podman compose version` is what the deploy
-  // path actually calls, and it fails when no provider is installed even though podman is.
-  if (runtimeIsPodman) {
-    const composeWorks = spawnSync(runtime, ["compose", "version"], { stdio: "pipe" }).status === 0;
+  // Probe the PROVIDER, not the runtime: `<bin> compose version` is what the deploy path
+  // calls, and it fails when no provider is installed even though the runtime is.
+  if (!profile.composeBundled) {
+    const composeWorks = versions().composeLong !== null;
     actions.push(composeWorks
       ? { id: "install-compose", label: "Compose provider already present", wouldChange: false, command: [] }
       : {
           id: "install-compose",
-          label: "Install compose provider for Podman (dnf)",
+          label: `Install compose provider for ${profile.rhel.label} (dnf)`,
           wouldChange: true,
-          command: ["dnf", "install", "-y", "podman-compose"],
+          command: ["dnf", "install", "-y", ...profile.rhel.composePackages],
         });
   } else {
     actions.push({
       id: "install-compose",
-      label: "Compose provider ships with docker-compose-plugin",
+      label: "Compose provider ships with the runtime",
       wouldChange: false,
       command: [],
     });
@@ -364,7 +335,7 @@ export function planSystemBootstrap(opts?: {
   // Podman is daemonless; what the control plane needs is the ROOTFUL API socket, which is
   // `podman.socket` — not a `podman.service` that does not exist. Enabling the wrong unit
   // would report success and leave nothing listening.
-  const runtimeUnit = runtimeIsPodman ? "podman.socket" : "docker";
+  const runtimeUnit = profile.systemdUnit;
   if (runtimeWillExist && !serviceEnabled(runtimeUnit)) {
     actions.push({
       id: "enable-runtime",
@@ -465,7 +436,7 @@ export function planSystemBootstrap(opts?: {
     // finished — `srw-rw---- root appbay` — while podman, run by a non-root user, still goes
     // ROOTLESS and fails on absent subuid ranges exactly as before. Only `podman info`
     // returning a version distinguishes the two states.
-    if (runtimeIsPodman) {
+    if (profile.serviceAccountGrant === "socket-dropin") {
       // (a) The socket's group. A drop-in, not `setfacl`: systemd recreates the socket on every
       // start of podman.socket, which discards an ACL set on the old inode.
       actions.push({

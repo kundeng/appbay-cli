@@ -11,7 +11,7 @@
  * - All probes use `execSync` with stdio: pipe to suppress output on failure.
  */
 
-import { tryExec as runtimeTryExec } from "./container-runtime.js";
+import { tryExec as runtimeTryExec, versions, runtimeProfile } from "./container-runtime.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statfsSync, readdirSync } from "node:fs";
 import { platform, arch, release } from "node:os";
 import { join } from "node:path";
@@ -119,13 +119,11 @@ function detectGpu(): GpuFacts {
 // ---------------------------------------------------------------------------
 
 function detectDocker(): { version: string; composeVersion: string; socketPath: string } {
-  const dockerRaw = tryExec(containerBin(), ["--version"]);
-  // "Docker version 24.0.7, build afdd53b4e3" → "24.0.7"
-  const version = extractVersion(dockerRaw, /Docker version ([0-9]+\.[0-9]+\.[0-9]+)/);
-
-  const composeRaw = tryExec(containerBin(), ["compose", "version", "--short"]);
+  const probed = versions();
+  // "Docker version 24.0.7, build …" or "podman version 4.9.4" → "24.0.7"; the pattern is the profile's.
+  const version = extractVersion(probed.runtime, runtimeProfile().versionPattern);
   // "v2.23.3" or "2.23.3"
-  const composeVersion = composeRaw?.replace(/^v/, "") ?? "unknown";
+  const composeVersion = probed.compose?.replace(/^v/, "") ?? "unknown";
 
   // Prefer $DOCKER_HOST socket path, fall back to default
   const socketPath =

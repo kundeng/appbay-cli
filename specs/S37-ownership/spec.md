@@ -187,7 +187,7 @@ touched; a separate sweep re-reads everything twice.
   - [x] 2.2 compose ps + parsers → `runtime/observe.ts: composePs()`; `cli/ps.ts` calls it with `all: false` (running only, as before); `formatPorts` moved with it · **Requirements**: 1.1
   - [x] 2.3 crash/snapshot/converge → `observe.ts`; comments cut to the invariant · **Requirements**: 1.1
   - [x] 2.4 `isRunning`, `networkExists`, `runningContainerNames` in `observe.ts`; callers in checks, server, init, setup, stats, tunnel redirected; `findContainerByLabel` already owned the label lookup · **Requirements**: 1.2
-  - [ ] 2.5 versions and podman templates → profile · **Requirements**: 1.3
+  - [x] 2.5 `versions()` in the adapter; `versionPattern`, `composeBundled`, `systemdUnit`, `serviceAccountEnv`, `serviceAccountGrant`, `rhel` are profile fields; init-system, checks, facts, info branch on data, not on the binary name · **Requirements**: 1.3
   - [ ] 2.6 `loadInstanceConfig`; regex readers deleted · **Requirements**: 2.1
   - [ ] 2.7 `.env` parse and `appbay.yaml` parse · **Requirements**: 2.2, 2.3
   - [ ] 2.8 `resolveHome`; env publication removed · **Requirements**: 3.1

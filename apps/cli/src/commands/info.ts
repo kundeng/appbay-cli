@@ -19,7 +19,7 @@ import { readdir } from "node:fs/promises";
 import { platform, arch, release } from "node:os";
 import { VERSION } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { tryExec } from "@appbay/core";
+import { tryExec, versions } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 
 /** Try to execute a command, returning a fallback string on failure. */
@@ -46,8 +46,9 @@ export const infoCommand = new Command("info")
     const appsDir = join(appbayHome, "etc", "apps");
     const appCount = await countApps(appsDir);
 
-    const dockerVersion = tryExecOrFallback(cliContainerBin(), ["--version"]);
-    const composeVersion = tryExecOrFallback(cliContainerBin(), ["compose", "version", "--short"]);
+    const probed = versions(appbayHome);
+    const dockerVersion = probed.runtime ?? "not available";
+    const composeVersion = probed.compose ?? "not available";
     const gpuInfo = tryExecOrFallback(
       "nvidia-smi",
       ["--query-gpu=name", "--format=csv,noheader"],

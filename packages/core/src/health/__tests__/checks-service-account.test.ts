@@ -14,8 +14,9 @@
  * said). Driving it through spawnSync would test the plumbing and leave the decision implicit.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { checkServiceAccountRuntimeAccess, probeArgv } from "../checks.js";
+import { clearContainerRuntimeCache } from "../../runtime/container-runtime.js";
 import { podmanRootfulEnv } from "../../runtime/podman-rootful.js";
 
 const HOME = "/var/lib/appbay";
@@ -92,6 +93,15 @@ describe("🚨 when it cannot tell, it must not say pass", () => {
  * check was written to remove, pointing the other way.
  */
 describe("the probe argv", () => {
+  // The argv is the PROFILE's, not the binary string's: a docker-named binary driving a
+  // podman socket would otherwise get the wrong template. Select the podman profile here.
+  const saved = process.env.APPBAY_CONTAINER_RUNTIME;
+  beforeEach(() => { process.env.APPBAY_CONTAINER_RUNTIME = "podman"; clearContainerRuntimeCache(); });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.APPBAY_CONTAINER_RUNTIME; else process.env.APPBAY_CONTAINER_RUNTIME = saved;
+    clearContainerRuntimeCache();
+  });
+
   it("carries the rootful environment on podman", () => {
     const argv = probeArgv("/usr/bin/podman", HOME);
     expect(argv[0]).toBe("env");
@@ -109,6 +119,7 @@ describe("the probe argv", () => {
   });
 
   it("adds nothing on docker — group membership IS the mechanism there", () => {
+    process.env.APPBAY_CONTAINER_RUNTIME = "docker"; clearContainerRuntimeCache();
     // `docker info` with a bare environment is exactly what the daemon sees. Wrapping it in
     // `env HOME=…` would make the probe diverge from the runner in the other direction.
     const argv = probeArgv("/usr/bin/docker", HOME);
@@ -134,6 +145,7 @@ describe("the probe argv", () => {
   });
 
   it("still asks docker for the docker field", () => {
+    process.env.APPBAY_CONTAINER_RUNTIME = "docker"; clearContainerRuntimeCache();
     expect(probeArgv("/usr/bin/docker", HOME).join(" ")).toContain("{{.ServerVersion}}");
   });
 
