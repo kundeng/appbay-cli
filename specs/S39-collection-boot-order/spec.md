@@ -1,7 +1,7 @@
 ---
 spec_id: S39-collection-boot-order
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-01
 until: null
 epic: platform
@@ -216,7 +216,7 @@ To be written at activation, once §1.4 is decided. The shape is constrained alr
 
 <!-- [ ] pending | [x] done | [!] BLOCKED: reason | [-] DROPPED: <reason> | [>] → <spec_id> -->
 
-- [ ] 1. Decide the granularity
+- [x] 1. Decide the granularity
   - [x] 1.1 C. Collections expand to app-level edges; cycles and unknown names fail before anything starts. Kun's frame: a collection is a stack, and `when:` is membership in a shared one (implemented first: overlay peers = installed apps sharing a collection; no collection = `default`).
   - [x] 2.1 Ready = every container running and every healthcheck healthy; a service with no healthcheck is ready when it runs, and the docs say so (`isReady` in runtime/observe.ts)
     - **Requirements**: 2.1, 2.2 · **Pillar**: Design
@@ -225,7 +225,7 @@ To be written at activation, once §1.4 is decided. The shape is constrained alr
     - **Depends**: 2.1 · **Requirements**: 2.1, 2.3 · **Pillar**: MVP, Test
   - [x] 2.3 Corrected `boot-order.ts` comments
     - **Depends**: 2.2 · **Requirements**: 4.1 · **Pillar**: Docs
-- [ ] 3. The graph
+- [x] 3. The graph
   - [x] 3.1 `schemas/collections.ts`; absent file is a no-op
     - **Depends**: 1.1 · **Requirements**: 1.1 · **Pillar**: MVP
   - [x] 3.2 `deployOrder` (Kahn, system apps first); cycles and
@@ -233,11 +233,13 @@ To be written at activation, once §1.4 is decided. The shape is constrained alr
     - **Depends**: 3.1 · **Requirements**: 1.1, 1.2, 1.3 · **Pillar**: MVP, Test
   - [x] 3.3 `down` reverses the same graph
     - **Depends**: 3.2 · **Requirements**: 3.1 · **Pillar**: MVP, Test
-- [ ] 4. Prove it on a host where the order matters
-  - [ ] 4.1 A dependency with a slow start (initdb, or an image that loads on boot), verifying
+- [x] 4. Prove it on a host where the order matters
+  - [x] 4.1 Proved on the local Docker: a busybox `slowdb` whose healthcheck passes after 6 s in `data`, a `client` in `app` after `data`; `up` took 9 s and started client only once slowdb was healthy; `down` stopped client first; with `timeout_seconds: 4` slowdb failed as "not ready within 4s: running (unhealthy)" and client was skipped with the reason. Verifying
         the dependent does not start until the dependency SERVES — the case `up -d` ordering
         gets wrong and the whole sprint exists to fix
     - **Depends**: 2.2, 3.2 · **Requirements**: 1.1, 2.1 · **Pillar**: Test
   - [x] 4.2 Documented in `docs/guide/concepts.qmd` (collections, `collections.yaml`, readiness); `overlays.qmd` carries the `when:` definition
         currently says collections are "purely a selection mechanism" — this changes that)
     - **Depends**: 3.2 · **Requirements**: 2.2 · **Pillar**: Docs
+
+**2026-09-05** — shipped. `when:` is collection membership (part 1), `collections.yaml` orders stacks and readiness is observed and bounded (parts 2–3), proved live on Docker (4.1). The Podman run is on issue #9's list.

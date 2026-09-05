@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-05):** 1 file read · open: 11 · next: S39 collection boot order and the when: definition; then a namespace-values sprint (row 21).
+**Position (2026-09-05):** 1 file read · open: 11 · next: S40 namespace values, app scope, default host (rows 10, 21); then S41 socket observation (row 8).
 
 ## Protocol
 
