@@ -24,6 +24,10 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { z } from "zod";
+
+/** A YAML document that must be a mapping; anything else is a parse error, not `{}`. */
+const YamlMapping = z.record(z.unknown());
 import type { RuntimeFacts } from "../schemas/runtime-facts.js";
 import type { AppbayYaml } from "../schemas/appbay-yaml.js";
 import { TraitRegistry } from "../traits/registry.js";
@@ -824,8 +828,9 @@ function mergeTraefikAuxFiles(
 
     // Merge: parse both YAML configs, combine middlewares, inject into routers
     try {
-      const ingressConfig = parseYaml(ingressFile.content) as Record<string, unknown>;
-      const authConfig = parseYaml(authFile.content) as Record<string, unknown>;
+      // Generated traefik fragments: validated as YAML mappings, then merged key by key.
+      const ingressConfig = YamlMapping.parse(parseYaml(ingressFile.content));
+      const authConfig = YamlMapping.parse(parseYaml(authFile.content));
 
       const ingressHttp = (ingressConfig.http ?? {}) as Record<string, unknown>;
       const authHttp = (authConfig.http ?? {}) as Record<string, unknown>;

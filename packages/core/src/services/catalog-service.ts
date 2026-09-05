@@ -3,6 +3,11 @@ import { readdir, readFile, stat, mkdir, cp, rm, writeFile, chmod } from "node:f
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { z } from "zod";
+import { VarDefinitionSchema } from "../schemas/appbay-yaml.js";
+
+/** The part of a manifest the installer reads before the compiler sees the whole. */
+const ManifestVars = z.object({ vars: z.record(VarDefinitionSchema).optional() }).passthrough();
 import { discoverCatalog, type DiscoveredCatalogEntry } from "../catalog/discover.js";
 import type { CatalogEntry, RequiredInput } from "../schemas/catalog.js";
 import { loadProjectVars, resolveScopedVars } from "./instance-vars.js";
@@ -173,15 +178,15 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
   let varDefs: Array<{ name: string; type: string; default?: string | number | boolean; auto_generate?: boolean }> = [];
 
   try {
-    const appbayContent = await readFile(appbayYamlPath, "utf-8");
-    const parsed = parseYaml(appbayContent) as Record<string, unknown>;
-    const vars = parsed.vars as Record<string, Record<string, unknown>> | undefined;
-    if (vars && typeof vars === "object") {
-      varDefs = Object.entries(vars).map(([varName, def]) => ({
+    // Only `vars` is read here, so only `vars` is validated: the whole manifest is the
+    // compiler's to judge, and an unrelated field must not hide the inputs to prompt for.
+    const parsed = ManifestVars.safeParse(parseYaml(await readFile(appbayYamlPath, "utf-8")));
+    if (parsed.success && parsed.data.vars) {
+      varDefs = Object.entries(parsed.data.vars).map(([varName, def]) => ({
         name: varName,
-        type: String(def.type ?? "string"),
-        default: def.default as string | number | boolean | undefined,
-        auto_generate: def.auto_generate as boolean | undefined,
+        type: def.type,
+        default: def.default,
+        auto_generate: def.auto_generate,
       }));
     }
   } catch { /* no appbay.yaml or no vars */ }

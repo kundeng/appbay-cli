@@ -87,12 +87,11 @@ const RULES: Rule[] = [
     name: "a YAML document is parsed through its schema, not cast",
     pattern: /parseYaml\([^)]*\)[^;\n]*as Record<string, unknown>/,
     owners: ["packages/core/src/schemas/"],
-    exempt: {},
-    allowed: {
-      "packages/core/src/compiler/compile.ts": "2.7",
-      "packages/core/src/services/catalog-service.ts": "2.7",
-      "packages/core/src/services/config-service.ts": "2.7",
+    exempt: {
+      "packages/core/src/services/config-service.ts": "round-trip editor of appbay.yaml (appbay config): must preserve keys it does not know; the compiler validates on the next compile",
+      "packages/core/src/services/catalog-service.ts": "addSecretsTrait round-trips appbay.yaml the same way; the vars it READS go through the schema",
     },
+    allowed: {},
   },
   {
     name: "APPBAY_HOME is resolved in one place",
