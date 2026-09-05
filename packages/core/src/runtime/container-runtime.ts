@@ -397,3 +397,66 @@ export function containerStoreRoot(appbayHome?: string): string | null {
   const root = result.output.trim();
   return root || null;
 }
+
+// ---------------------------------------------------------------------------
+// Observation results
+// ---------------------------------------------------------------------------
+
+/**
+ * The answer to a question asked of the runtime: a value, or the reason none could be
+ * obtained. `unknown` is not a negative verdict and a caller may not treat it as one.
+ */
+export type Inspection<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "unknown"; reason: string };
+
+export function ok<T>(value: T): Inspection<T> {
+  return { kind: "ok", value };
+}
+
+export function unknown<T = never>(reason: string): Inspection<T> {
+  return { kind: "unknown", reason };
+}
+
+/** One container the runtime reported for a label query. */
+export interface ContainerMatch {
+  name: string;
+  /** The runtime's own state word, lower-cased: running, exited, created, restarting, … */
+  state: string;
+  running: boolean;
+}
+
+/** Runs the container binary with the given arguments. Injectable so parsing is testable. */
+export type ContainerRunner = (args: string[]) => ContainerResult;
+
+/**
+ * Find the container carrying `label=value`, on either runtime.
+ *
+ * Asks `ps -a --filter label=<label>=<value>` so a stopped container is still found, and
+ * reports it as not running. Two running matches is an ambiguity, returned as `unknown`
+ * naming both, never a silent pick.
+ */
+export function findContainerByLabel(
+  label: string,
+  value: string,
+  options: { appbayHome?: string; run?: ContainerRunner } = {},
+): Inspection<ContainerMatch | null> {
+  const run = options.run ?? ((args) => containerExec(args, { appbayHome: options.appbayHome, label: "ps" }));
+  const result = run(["ps", "-a", "--filter", `label=${label}=${value}`, "--format", "{{.Names}}\t{{.State}}"]);
+  if (result.exitCode !== 0) return unknown(result.output.trim() || `ps exited with code ${String(result.exitCode)}`);
+
+  const matches: ContainerMatch[] = [];
+  for (const line of result.output.split("\n")) {
+    const [name, state = ""] = line.trim().split("\t");
+    if (!name) continue;
+    const s = state.trim().toLowerCase();
+    matches.push({ name, state: s, running: s === "running" });
+  }
+  if (matches.length === 0) return ok(null);
+
+  const running = matches.filter((m) => m.running);
+  if (running.length > 1) {
+    return unknown(`${running.length} running containers carry ${label}=${value}: ${running.map((m) => m.name).join(", ")}`);
+  }
+  return ok(running[0] ?? matches[0]);
+}
