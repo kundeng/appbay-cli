@@ -1,4 +1,6 @@
 import { Command } from "commander";
+import { cliContainerBin } from "../utils/docker.js";
+import { resolveRuntimeSocket } from "./server.js";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
@@ -35,10 +37,10 @@ export const diveCommand = new Command("dive")
     console.log(`Inspecting: ${image}\n`);
 
     const result = spawnSync(
-      "docker",
+      cliContainerBin(),
       [
         "run", "--rm", "-it",
-        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-v", `${resolveRuntimeSocket()}:/var/run/docker.sock`,
         "wagoodman/dive:latest",
         image,
       ],

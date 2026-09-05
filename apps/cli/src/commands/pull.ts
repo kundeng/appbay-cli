@@ -6,6 +6,7 @@
  * Ollama API. Otherwise it pulls Docker images for the named apps.
  */
 import { Command } from "commander";
+import { cliContainerBin, requireRunningApp } from "../utils/docker.js";
 import { spawnSync } from "node:child_process";
 import { discoverApps } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
@@ -29,28 +30,12 @@ function looksLikeModel(name: string): boolean {
   return knownFamilies.some((f) => name === f || name.startsWith(`${f}:`));
 }
 
-function findOllamaContainer(): string | null {
-  const ps = spawnSync(
-    "docker",
-    ["ps", "--format", "{{.Names}}", "--filter", "name=ollama"],
-    { encoding: "utf-8", timeout: 5_000 },
-  );
-  if (ps.status !== 0) return null;
-  const names = (ps.stdout as string).trim().split("\n").filter(Boolean);
-  return names.find((n) => n.includes("ollama")) ?? null;
-}
-
 async function pullModel(name: string): Promise<void> {
-  const container = findOllamaContainer();
-
-  if (!container) {
-    console.error("Ollama container is not running. Start it with: appbay up ollama");
-    process.exit(1);
-  }
+  const container = requireRunningApp("ollama");
 
   console.log(`Pulling model: ${name}`);
   const result = spawnSync(
-    "docker",
+    cliContainerBin(),
     ["exec", container, "ollama", "pull", name],
     { stdio: "inherit", timeout: 600_000 },
   );

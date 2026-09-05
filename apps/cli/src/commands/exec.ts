@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { cliContainerBin } from "../utils/docker.js";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -19,7 +20,7 @@ export const execCommand = new Command("exec")
 
     const cmd = command.length > 0 ? command : ["/bin/sh"];
     const result = spawnSync(
-      "docker",
+      cliContainerBin(),
       ["compose", "-f", composePath, "exec", app, ...cmd],
       { stdio: "inherit" },
     );
@@ -40,7 +41,7 @@ export const shellCommand = new Command("shell")
     }
 
     const result = spawnSync(
-      "docker",
+      cliContainerBin(),
       ["compose", "-f", composePath, "exec", app, "/bin/sh"],
       { stdio: "inherit" },
     );
@@ -64,7 +65,7 @@ export const runCommand = new Command("run")
 
     const cmd = command.length > 0 ? command : ["/bin/sh"];
     const result = spawnSync(
-      "docker",
+      cliContainerBin(),
       ["compose", "-f", composePath, "run", "--rm", app, ...cmd],
       { stdio: "inherit" },
     );

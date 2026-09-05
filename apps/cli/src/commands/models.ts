@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { cliContainerBin, runningAppContainer } from "../utils/docker.js";
 import { spawnSync } from "node:child_process";
 import { pad } from "../utils/formatting.js";
 
@@ -16,27 +17,17 @@ interface OllamaModel {
   };
 }
 
-function findOllamaContainer(): string | null {
-  const result = spawnSync(
-    "docker",
-    ["ps", "--format", "{{.Names}}", "--filter", "name=ollama"],
-    { encoding: "utf-8", timeout: 5_000 },
-  );
-  if (result.status !== 0) return null;
-  const names = (result.stdout as string).trim().split("\n").filter(Boolean);
-  return names.find((n) => n.includes("ollama")) ?? null;
-}
-
 function getOllamaUrl(): string {
   const envUrl = process.env.OLLAMA_HOST ?? process.env.APPBAY_OLLAMA_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
 
-  const container = findOllamaContainer();
+  const found = runningAppContainer("ollama");
+  const container = found.kind === "ok" && found.value?.running ? found.value.name : null;
   if (!container) return "http://localhost:11434";
 
   // Try host port mapping first
   const port = spawnSync(
-    "docker",
+    cliContainerBin(),
     ["port", container, "11434"],
     { encoding: "utf-8", timeout: 5_000 },
   );
@@ -47,7 +38,7 @@ function getOllamaUrl(): string {
 
   // Fall back to container IP on the appbay_shared network
   const ip = spawnSync(
-    "docker",
+    cliContainerBin(),
     ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", container],
     { encoding: "utf-8", timeout: 5_000 },
   );

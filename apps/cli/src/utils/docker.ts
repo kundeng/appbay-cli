@@ -19,7 +19,11 @@ import {
   containerBin,
   containerCompose,
   runtimeProfile,
+  findContainerByLabel,
+  APP_LABEL,
   type RuntimeProfile,
+  type Inspection,
+  type ContainerMatch,
 } from "@appbay/core";
 import { resolveAppbayHome } from "./appbay-home.js";
 
@@ -81,4 +85,27 @@ export function dockerCompose(
  */
 export function cliRuntimeProfile(): RuntimeProfile {
   return runtimeProfile(resolveAppbayHome());
+}
+
+/** The container running an installed app, found by its label; unknown when the runtime could not be asked. */
+export function runningAppContainer(app: string): Inspection<ContainerMatch | null> {
+  return findContainerByLabel(APP_LABEL, app, { appbayHome: resolveAppbayHome() });
+}
+
+/**
+ * The name of the running container for `app`, or exit 1 with the reason. "Not running"
+ * and "could not ask the runtime" are different messages because they call for different
+ * actions.
+ */
+export function requireRunningApp(app: string): string {
+  const found = runningAppContainer(app);
+  if (found.kind === "unknown") {
+    console.error(`Cannot reach the container runtime: ${found.reason}`);
+    process.exit(1);
+  }
+  if (!found.value?.running) {
+    console.error(`${app} container is not running. Start it with: appbay up ${app}`);
+    process.exit(1);
+  }
+  return found.value.name;
 }

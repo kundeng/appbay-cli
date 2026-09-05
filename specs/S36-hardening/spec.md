@@ -271,11 +271,11 @@ identity module, and the lookup keeps working if the namespace changes again.
     - **Depends**: 2.2 · **Requirements**: 3.1
   - [x] 2.4 doctor three-valued; `ok` false on unknown; doctor tests updated
     - **Depends**: — · **Requirements**: 2.3
-  - [ ] 2.5 `inspectEdgePorts` returns unknown on `ps` failure; migration refuses
+  - [x] 2.5 `inspectEdgePorts` returns unknown on `ps` failure; migration refuses
     - **Depends**: 1.1 · **Requirements**: 2.4
-  - [ ] 2.6 `apply.ts` delegates to `deploy()`
+  - [x] 2.6 `apply.ts` delegates to `deploy()`
     - **Depends**: 2.1 · **Requirements**: 4.1
-  - [ ] 2.7 twelve literal `docker` sites → `cliContainerBin()`; one `findOllamaContainer` in core; `dive` socket from `resolveRuntimeSocket`
+  - [x] 2.7 twelve literal `docker` sites → `cliContainerBin()`; one `findOllamaContainer` in core; `dive` socket from `resolveRuntimeSocket`
     - **Depends**: — · **Requirements**: 5.1, 5.2
   - [ ] 2.8 `install` exits 1 on validation failure; `update` reads `status`
     - **Depends**: — · **Requirements**: 6.1, 6.2
