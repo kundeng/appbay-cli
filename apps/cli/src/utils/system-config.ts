@@ -27,6 +27,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { parse as parseYaml } from "yaml";
 
 /** System-level config directory (outside any user's home). */
 export const SYSTEM_CONFIG_DIR = "/etc/appbay";
@@ -54,10 +55,12 @@ export interface SystemConfig {
 export function readSystemConfig(filePath: string = SYSTEM_CONFIG_FILE): SystemConfig | null {
   if (!existsSync(filePath)) return null;
   try {
-    const text = readFileSync(filePath, "utf-8");
-    const home = text.match(/^home:\s*(.+)$/m)?.[1]?.trim();
-    if (!home) return null;
-    return { home };
+    // Only `home` is read; other keys an older appbay wrote are ignored, not rejected.
+    const parsed: unknown = parseYaml(readFileSync(filePath, "utf-8"));
+    const home = parsed && typeof parsed === "object" && typeof (parsed as { home?: unknown }).home === "string"
+      ? (parsed as { home: string }).home.trim()
+      : "";
+    return home ? { home } : null;
   } catch {
     return null;
   }

@@ -23,11 +23,10 @@
  */
 
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
-  parseInstanceConfig,
+  loadInstanceConfig,
   ContainerRuntimeSchema,
   DEFAULT_CONTAINER_RUNTIME,
   IngressProviderSchema,
@@ -38,7 +37,6 @@ import {
   type IngressProvider,
   type InstanceConfig,
 } from "../schemas/instance.js";
-import { readInstanceConfigText } from "../schemas/instance.js";
 import { podmanRootfulEnv } from "./podman-rootful.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
@@ -68,16 +66,9 @@ function instanceConfig(appbayHome?: string): InstanceConfig {
   const cached = cache.get(home);
   if (cached) return cached;
 
-  let config: InstanceConfig = {};
-  try {
-    config = parseInstanceConfig(
-      readInstanceConfigText(home, (p) => readFileSync(p, "utf-8")) ?? "",
-    );
-  } catch {
-    // No project.yaml — an uninitialised install, or a command that runs before init.
-    // Default rather than fail: `appbay doctor` must still be able to say what is missing.
-  }
-
+  // Absent and unreadable both default here: `appbay doctor` must run before init and say
+  // what is missing. The loader keeps the two apart for callers that need to know.
+  const config = loadInstanceConfig(home).config;
   cache.set(home, config);
   return config;
 }

@@ -26,8 +26,7 @@ import {
   resolveIngressProvider,  tryExec,  versions,
 } from "../runtime/container-runtime.js";
 import { isRunning, networkExists } from "../runtime/observe.js";
-import { parseInstanceConfig } from "../schemas/instance.js";
-import { readInstanceConfigText } from "../schemas/instance.js";
+import { loadInstanceConfig } from "../schemas/instance.js";
 
 /**
  * Compare two semver strings (e.g., "1.2.3" vs "v1.3.0").
@@ -245,14 +244,11 @@ export function checkStoreBinding(appbayHome: string): HealthCheckResult {
   const name = "store binding";
   const { displayName, otherStoreHint } = runtimeProfile(appbayHome);
 
-  let recorded: string | undefined;
-  try {
-    recorded = parseInstanceConfig(
-      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "",
-    ).container_store;
-  } catch {
-    // No project.yaml at all — an uninitialised install. `appbay-home` reports that.
+  const loaded = loadInstanceConfig(appbayHome);
+  if (loaded.source === "unreadable") {
+    return { name, status: "unknown", detail: `the instance config could not be read (${loaded.error})`, required: true };
   }
+  const recorded = loaded.config.container_store;
 
   if (!recorded) {
     return {

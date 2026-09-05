@@ -139,6 +139,8 @@ export {
   checkHomeAssertion,
   type HomeMismatch,
   readInstanceConfigText,
+  loadInstanceConfig,
+  type LoadedInstanceConfig,
   SYSTEM_CONFIG_REL,
   LEGACY_INSTANCE_CONFIG_REL,
 } from "./instance.js";

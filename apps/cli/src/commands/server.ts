@@ -26,8 +26,8 @@ import { dirname, join } from "node:path";
 import {
   controlPlaneEdgeFragments,
   controlPlaneHost,
-  parseInstanceConfig,
-  readInstanceConfigText,
+  loadInstanceConfig,
+  
 } from "@appbay/core";
 
 /** Container name used by the server compose stack. */
@@ -180,8 +180,7 @@ function writeControlPlaneEdgeRoute(appbayHome: string): string | null {
   const caddyDir = join(appbayHome, "etc", "apps", "caddy");
   if (!existsSync(caddyDir)) return null; // Traefik installs and pre-edge installs have no target.
 
-  const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
-  const cfg = parseInstanceConfig(raw);
+  const cfg = loadInstanceConfig(appbayHome).config;
   if (cfg.ingress_provider === "traefik") return null; // The auth portal is Caddy Security only.
 
   const host = controlPlaneHost(cfg.domain, cfg.server_host);

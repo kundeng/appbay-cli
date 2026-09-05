@@ -1,32 +1,13 @@
 /**
- * The `${{project.KEY}}` variable store — RFC-001 §4, decision 1.2b.
+ * The `${{project.KEY}}` variable store: the per-host values a manifest may reference.
  *
- * ONE reader for the installation config's variables, because there were two and they
- * disagreed:
- *
- *   - `deploy-service.ts` regex-matched `^domain:` and produced `{ DOMAIN }` — the compile
- *     path, and the behaviour `docs/reference/scope-model.qmd` documents.
- *   - `catalog-service.ts` YAML-parsed the same file and uppercased EVERY top-level string
- *     key — the catalog-install path, undocumented and untested.
- *
- * So `${{project.CONTAINER_RUNTIME}}` resolved when a catalog app was installed and failed
- * to compile a moment later. §2.1 made it worse by adding `home:` to that file: on the
- * catalog path `${{project.HOME}}` had started interpolating an absolute filesystem path
- * into a manifest's `.env.local`.
- *
- * This module keeps the DOCUMENTED, narrow behaviour. Measured across both catalogs, the
- * UOM fixtures and `system-apps/`, the only reference that resolves anywhere is
- * `${{project.DOMAIN}}` — every other key is zero uses — so narrowing the wide path costs
- * nothing real and closes the path leak.
- *
- * 🚦 NOT renamed to `${{namespace.KEY}}`, deliberately. `namespace:` is a per-app LABEL that
- * disambiguates container names, network aliases and state keys; it has no variable store
- * and never had one. `${{project.KEY}}` reads the per-HOST installation config. They shared
- * a word, not a concept — the rename would aim 234 references at a scope holding nothing.
+ * One reader, over the one instance-config loader, exposing an allow-list of keys. Two
+ * readers with different rules once made `${{project.CONTAINER_RUNTIME}}` resolve on one
+ * path and fail on the next (RFC-001 §4, decision 1.2b; docs/history has the account).
+ * `${{namespace.KEY}}` is a separate, per-deployment store (docs/steering/product.md).
  */
 
-import { readFileSync } from "node:fs";
-import { readInstanceConfigText } from "../schemas/instance.js";
+import { loadInstanceConfig } from "../schemas/instance.js";
 
 /**
  * Keys of the installation config that are exposed as `${{project.KEY}}` variables.
@@ -46,18 +27,13 @@ const EXPOSED_KEYS = ["domain"] as const;
  * compile, where it names the app and the reference.
  */
 export async function loadProjectVars(appbayHome: string): Promise<Record<string, string>> {
-  try {
-    const text = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
-    const vars: Record<string, string> = {};
-    for (const key of EXPOSED_KEYS) {
-      const match = text.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
-      const value = match?.[1]?.trim();
-      if (value) vars[key.toUpperCase()] = value;
-    }
-    return vars;
-  } catch {
-    return {};
+  const config = loadInstanceConfig(appbayHome).config;
+  const vars: Record<string, string> = {};
+  for (const key of EXPOSED_KEYS) {
+    const value = config[key];
+    if (typeof value === "string" && value.trim()) vars[key.toUpperCase()] = value.trim();
   }
+  return vars;
 }
 
 /**

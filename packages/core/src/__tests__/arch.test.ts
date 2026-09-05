@@ -81,15 +81,7 @@ const RULES: Rule[] = [
     pattern: /readInstanceConfigText\(|\^(project|domain|home):/,
     owners: ["packages/core/src/schemas/instance.ts", "packages/core/src/runtime/container-runtime.ts"],
     exempt: {},
-    allowed: {
-      "apps/cli/src/commands/home.ts": "2.6",
-      "apps/cli/src/commands/init.ts": "2.6",
-      "apps/cli/src/commands/server.ts": "2.6",
-      "apps/cli/src/utils/system-config.ts": "2.6",
-      "packages/core/src/compiler/compile.ts": "2.6",
-      "packages/core/src/health/checks.ts": "2.6",
-      "packages/core/src/services/instance-vars.ts": "2.6",
-    },
+    allowed: {},
   },
   {
     name: "a YAML document is parsed through its schema, not cast",

@@ -26,6 +26,7 @@
 
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
+import { readFileSync } from "node:fs";
 import { EdgeIdentityConfigSchema } from "./edge-identity-providers.js";
 
 /**
@@ -255,15 +256,10 @@ export interface HomeMismatch {
  */
 export function checkHomeAssertion(
   resolvedHome: string,
-  configText: string | null,
+  source: string | null | Pick<InstanceConfig, "home">,
 ): HomeMismatch | null {
-  if (!configText) return null;
-  let recorded: string | undefined;
-  try {
-    recorded = parseInstanceConfig(configText).home;
-  } catch {
-    return null;
-  }
+  if (!source) return null;
+  const recorded = typeof source === "string" ? parseInstanceConfig(source).home : source.home;
   if (!recorded) return null;
   // Compare with trailing separators normalised; /home/x and /home/x/ are the same tree.
   const norm = (p: string) => p.replace(/\/+$/, "");
@@ -308,4 +304,30 @@ export function readInstanceConfigText(
     }
   }
   return null;
+}
+
+/** Where a loaded instance config came from. `absent` is a fresh install; `unreadable` is not. */
+export interface LoadedInstanceConfig {
+  config: InstanceConfig;
+  source: "system" | "legacy" | "absent" | "unreadable";
+  /** The read error, when `source` is `unreadable`. */
+  error?: string;
+}
+
+/**
+ * The one loader for the instance config. Prefers `etc/system.yaml`, falls back to the
+ * legacy `project.yaml`, and keeps a missing file apart from one that could not be read:
+ * seven callers used to turn both into `{}`, so an EACCES looked like a fresh install.
+ */
+export function loadInstanceConfig(appbayHome: string): LoadedInstanceConfig {
+  for (const [rel, source] of [[SYSTEM_CONFIG_REL, "system"], [LEGACY_INSTANCE_CONFIG_REL, "legacy"]] as const) {
+    try {
+      return { config: parseInstanceConfig(readFileSync(`${appbayHome}/${rel}`, "utf-8")), source };
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") continue;
+      return { config: {}, source: "unreadable", error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  return { config: {}, source: "absent" };
 }

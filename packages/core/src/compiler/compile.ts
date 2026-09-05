@@ -41,7 +41,7 @@ import type { DiscoveredApp } from "./types.js";
 import type { Plan } from "./plan.js";
 import { containerBin, resolveIngressProvider } from "../runtime/container-runtime.js";
 import { readFileSync } from "node:fs";
-import { parseInstanceConfig } from "../schemas/instance.js";
+import { loadInstanceConfig, } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
 
@@ -1031,11 +1031,5 @@ async function resolveMagicVars(
  * thing to do, and a gated build simply does not apply when there is no config to match.
  */
 function instanceConfigFor(appbayHome: string): Record<string, unknown> {
-  try {
-    return parseInstanceConfig(
-      readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "",
-    ) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+  return loadInstanceConfig(appbayHome).config as Record<string, unknown>;
 }

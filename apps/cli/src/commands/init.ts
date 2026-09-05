@@ -29,14 +29,13 @@ import {
   type IngressProvider,
   AcmeDnsProviderSchema,
   type AcmeDnsProvider,
-  parseInstanceConfig,
+  loadInstanceConfig,
   clearContainerRuntimeCache,
   containerStoreRoot,
   resolveIngressProvider,
   type ContainerRuntime,
   inspectEdgePorts,
   catalogAddSource,
-  readInstanceConfigText,
   importControlPlaneAccounts,
   LEGACY_CONTROL_PLANE_REL,
   applyEdgeIdentity,
@@ -49,6 +48,7 @@ import {
   MASTER_PASSWORD_REL,
   networkExists,
   containerExec,
+  parseInstanceConfig,
 } from "@appbay/core";
 import {
   resolveAppbayHome,
@@ -136,8 +136,7 @@ function resolveRuntimeSocketGid(): number | null {
  */
 function resolveControlPlaneSelinux(appbayHome: string): "confined" | "unconfined" {
   try {
-    const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
-    const cfg = parseInstanceConfig(raw);
+    const cfg = loadInstanceConfig(appbayHome).config;
     return cfg.control_plane_selinux === "unconfined" ? "unconfined" : "confined";
   } catch {
     return "confined";
@@ -357,8 +356,7 @@ function reportHomePersistence(result: SaveHomeResult, home: string): void {
  * would meet "wrong username or password" for every user with nothing naming the cause.
  */
 function resolveEdgeIdentity(appbayHome: string): EdgeIdentityConfig {
-  const raw = readInstanceConfigText(appbayHome, (p) => readFileSync(p, "utf-8")) ?? "";
-  const declared = parseInstanceConfig(raw).edge_identity;
+  const declared = loadInstanceConfig(appbayHome).config.edge_identity;
   return declared ?? EdgeIdentityConfigSchema.parse({});
 }
 
@@ -743,22 +741,12 @@ async function upsertInstanceKey(
   return current === undefined ? "created" : "updated";
 }
 
-/** Read existing project.yaml to get project/domain for re-init. */
+/** The recorded project and domain, for re-init. Reads etc/system.yaml, then the legacy file. */
 async function readProjectConfig(
   appbayHome: string,
 ): Promise<{ project?: string; domain?: string }> {
-  const configPath = join(appbayHome, "project.yaml");
-  try {
-    const text = await readFile(configPath, "utf-8");
-    const projectMatch = text.match(/^project:\s*(.+)$/m);
-    const domainMatch = text.match(/^domain:\s*(.+)$/m);
-    return {
-      project: projectMatch?.[1]?.trim(),
-      domain: domainMatch?.[1]?.trim(),
-    };
-  } catch {
-    return {};
-  }
+  const { project, domain } = loadInstanceConfig(appbayHome).config;
+  return { project, domain };
 }
 
 export const initCommand = new Command("init")
