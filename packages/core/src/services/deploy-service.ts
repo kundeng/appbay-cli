@@ -28,8 +28,8 @@ import {
 import { deployOrder, dependentsOf, isSystemApp } from "../boot-order.js";
 import { loadCollections } from "../schemas/collections.js";
 import { spawnSync } from "node:child_process";
-import { containerBin, findContainerByLabel, resolveIngressProvider } from "../runtime/container-runtime.js";
-import { composePs, findCrashedServices, snapshotContainers, didConverge, isReady, type DockerComposeRunner } from "../runtime/observe.js";
+import { containerBin, resolveIngressProvider } from "../runtime/container-runtime.js";
+import { findCrashedServices, snapshotContainers, didConverge, isReady, findContainerByLabel, engineObserver, type DockerComposeRunner, type Observer } from "../runtime/observe.js";
 import { APP_LABEL, shepherdTarget } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 import { compileInstall } from "./compile-install.js";
@@ -107,6 +107,8 @@ export interface DeployOptions {
   readinessTimeoutMs?: number;
   /** Test seam for the readiness poll's pause. */
   sleep?: (ms: number) => Promise<void>;
+  /** How the deploy observes the runtime; defaults to the API over the socket. */
+  observer?: Observer;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,15 +190,16 @@ export function isCaddyConfigPath(path: string): boolean {
  */
 type CaddyCommandStatus = "ok" | "rejected" | "unavailable";
 
-function runCaddyCommand(
+async function runCaddyCommand(
   appbayHome: string,
   args: string[],
-): { status: CaddyCommandStatus; detail: string } {
+  observer?: Observer,
+): Promise<{ status: CaddyCommandStatus; detail: string }> {
   // The edge is found by its label, never by a literal name: the namespace enters every
   // generated name (identity.ts), and a literal went stale the day the system apps were
   // namespaced. A stopped edge is found and reported as not running; a lookup that could
   // not be made is `unavailable` with the runtime's reason, not a verdict about the config.
-  const edge = findContainerByLabel(APP_LABEL, "caddy", { appbayHome });
+  const edge = await findContainerByLabel(APP_LABEL, "caddy", { appbayHome, observer });
   if (edge.kind === "unknown") {
     return { status: "unavailable", detail: `could not ask the runtime for the edge (${edge.reason})` };
   }
@@ -227,6 +230,7 @@ function runCaddyCommand(
 export async function installCaddyConfig(
   app: Pick<AppCompileResult, "auxiliaryFiles">,
   appbayHome: string,
+  observer?: Observer,
 ): Promise<{ ok: boolean; reason?: "rejected" | "unavailable"; detail?: string }> {
   const files = app.auxiliaryFiles.filter((aux) => isCaddyConfigPath(aux.path));
   if (files.length === 0) return { ok: true };
@@ -239,13 +243,13 @@ export async function installCaddyConfig(
     await writeFile(path, aux.content, "utf-8");
   }
 
-  let activation = runCaddyCommand(appbayHome, [
+  let activation = await runCaddyCommand(appbayHome, [
     "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
-  ]);
+  ], observer);
   if (activation.status === "ok") {
-    activation = runCaddyCommand(appbayHome, [
+    activation = await runCaddyCommand(appbayHome, [
       "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
-    ]);
+    ], observer);
     if (activation.status === "ok") return { ok: true };
   }
 
@@ -256,9 +260,9 @@ export async function installCaddyConfig(
   // Only worth attempting when there is a Caddy to reload; on `unavailable` this is a
   // second no-op against a container that does not exist.
   if (activation.status === "rejected") {
-    runCaddyCommand(appbayHome, [
+    await runCaddyCommand(appbayHome, [
       "reload", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile",
-    ]);
+    ], observer);
   }
   return {
     ok: false,
@@ -279,15 +283,15 @@ export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavai
 export async function installRoute(
   app: Pick<AppCompileResult, "auxiliaryFiles">,
   appbayHome: string,
-  deps: { findEdge: typeof findContainerByLabel } = { findEdge: findContainerByLabel },
+  observer: Observer = engineObserver(appbayHome),
 ): Promise<RouteInstallResult> {
   const provider = resolveIngressProvider(appbayHome);
-  if (provider === "caddy") return installCaddyConfig(app, appbayHome);
+  if (provider === "caddy") return installCaddyConfig(app, appbayHome, observer);
 
   const files = app.auxiliaryFiles.filter((aux) => aux.path.startsWith(`etc/apps/${provider}/config/dynamic/`));
   if (files.length === 0) return { ok: true };
 
-  const edge = deps.findEdge(APP_LABEL, provider, { appbayHome });
+  const edge = await observer.findByLabel(APP_LABEL, provider);
   if (edge.kind === "unknown") {
     return { ok: false, reason: "unavailable", detail: `could not ask the runtime for the edge (${edge.reason})` };
   }
@@ -426,6 +430,7 @@ export async function resolveDeployEnv(
 
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const { appbayHome, dockerCompose: runDockerCompose } = options;
+  const observer = options.observer ?? engineObserver(appbayHome);
   const appsDir = join(appbayHome, "etc", "apps");
   const rendersDir = join(appbayHome, "var", "lib", "renders");
   const stateDir = join(appbayHome, "var", "lib", "state");
@@ -660,7 +665,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         continue;
       }
       // `up -d` succeeding means "started", not "still running" — see findCrashedServices.
-      const crashed = findCrashedServices(runDockerCompose, composePath, secretEnv);
+      const crashed = await findCrashedServices(observer, app.appName);
       if (crashed.kind === "unknown") {
         // Compose could not be asked what it did. Not a deployment, not a failure: say so.
         appResult.status = "unchanged";
@@ -679,7 +684,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         continue;
       }
 
-      const caddyInstall = await installRoute(app, appbayHome);
+      const caddyInstall = await installRoute(app, appbayHome, observer);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
         appResult.error = describeRouteFailure(app.appName, caddyInstall, resolveIngressProvider(appbayHome));
@@ -748,7 +753,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
       if (existsSync(existingComposePath)) {
         // Snapshot BEFORE the converge. An unchanged artifact says nothing about whether
         // the container it describes still exists (appbay-cli#4).
-        const before = snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv);
+        const before = await snapshotContainers(observer, app.appName);
         const dcResult = runDockerCompose(["up", "-d"], existingComposePath, unchangedSecretEnv);
         if (dcResult.exitCode !== 0) {
           appResult.status = "failed";
@@ -757,7 +762,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
           result.failed++;
           continue;
         }
-        const after = snapshotContainers(runDockerCompose, existingComposePath, unchangedSecretEnv);
+        const after = await snapshotContainers(observer, app.appName);
         const converged = didConverge(before, after);
         if (converged.kind === "unknown") {
           appResult.convergeAction = "unknown";
@@ -765,7 +770,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         } else {
           appResult.convergeAction = converged.value ? "started" : "already-running";
         }
-        const crashedUnchanged = findCrashedServices(runDockerCompose, existingComposePath, unchangedSecretEnv);
+        const crashedUnchanged = await findCrashedServices(observer, app.appName);
         if (crashedUnchanged.kind === "unknown") {
           appResult.convergeAction = "unknown";
           appResult.unknownReason ??= crashedUnchanged.reason;
@@ -782,7 +787,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         }
       }
 
-      const caddyInstall = await installRoute(app, appbayHome);
+      const caddyInstall = await installRoute(app, appbayHome, observer);
       if (!caddyInstall.ok) {
         appResult.status = "failed";
         appResult.error = describeRouteFailure(app.appName, caddyInstall, resolveIngressProvider(appbayHome));
@@ -813,13 +818,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
     // Something starts after this app: wait until it is ready, bounded, and observed.
     if (dependentsOf(app.appName, graph.dependsOn).size > 0) {
-      const composePath = join(rendersDir, app.appName, "docker-compose.rendered.yml");
-      const env = (await resolveDeployEnv(app, appsDir)).env;
       const deadline = Date.now() + readinessTimeoutMs;
       let last = "";
       let ready = false;
       for (;;) {
-        const probe = isReady(runDockerCompose, composePath, env);
+        const probe = await isReady(observer, app.appName);
         if (probe.kind === "unknown") { last = `could not ask compose (${probe.reason})`; break; }
         if (probe.value.ready) { ready = true; break; }
         last = probe.value.detail;

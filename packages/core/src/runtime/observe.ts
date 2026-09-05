@@ -1,14 +1,20 @@
 /**
- * What compose reports about a project's containers, on either provider, as values.
+ * What the runtime reports about containers, as values, read over its API socket.
  *
- * Every function here answers a question about the runtime with an `Inspection`: a value,
- * or the reason none could be obtained. None of them decides what a deploy should do with
- * the answer; that is the caller's job. This is the one place `compose ps` output is parsed.
+ * Observation never parses CLI text: Docker Compose and podman-compose disagree on flags,
+ * field names and banners, and every parser of theirs existed twice. The Engine API, which
+ * Podman serves as its compat API, has one shape. Mutation (`compose up`, `down`) stays with
+ * the compose binary, which owns project naming and recreate semantics.
+ *
+ * Every function answers with an `Inspection`: a value, or the reason the runtime could not
+ * be asked. `unknown` is never a verdict, and there is no fallback to text parsing: a host
+ * without a reachable socket reports exactly that.
  */
 
-import { containerExec, type Inspection } from "./container-runtime.js";
+import type { Inspection } from "./container-runtime.js";
+import { apiInspectContainer, apiListContainers, apiNetworkExists, type ContainerSummary, type EngineOptions } from "./engine-api.js";
 
-/** Result of one compose invocation. */
+/** Result of one compose invocation (mutation). */
 export interface DockerComposeResult {
   exitCode: number;
   output: string;
@@ -21,14 +27,14 @@ export type DockerComposeRunner = (
   env?: Record<string, string>,
 ) => DockerComposeResult;
 
-/** One container row, normalised across Docker Compose and podman-compose. */
+/** One container of a compose project. */
 export interface ComposePsRow {
   name: string;
   id: string;
   service: string;
   /** Lower-cased state word: running, exited, created, restarting, … */
   state: string;
-  /** The provider's human status line, e.g. "Up 3 seconds". */
+  /** The runtime's human status line, e.g. "Up 3 seconds (healthy)". */
   status: string;
   /** Published ports, rendered `host->container/proto`, comma-joined. */
   ports: string;
@@ -37,119 +43,135 @@ export interface ComposePsRow {
   exitCode: number;
 }
 
-/**
- * List a project's containers. `all` includes stopped ones, which the crash check and the
- * converge snapshot both need. Docker needs `-a` for that; podman-compose rejects `-a` and
- * lists stopped containers anyway, so the plain form is the fallback.
- */
-export function composePs(
-  run: DockerComposeRunner,
-  composePath: string,
-  env: Record<string, string>,
-  options: { all?: boolean } = { all: true },
-): Inspection<ComposePsRow[]> {
-  let ps = options.all !== false
-    ? run(["ps", "-a", "--format", "json"], composePath, env)
-    : run(["ps", "--format", "json"], composePath, env);
-  if (ps.exitCode !== 0 && options.all !== false) {
-    ps = run(["ps", "--format", "json"], composePath, env);
-  }
-  if (ps.exitCode !== 0) {
-    return { kind: "unknown", reason: ps.output.trim() || `compose ps exited with code ${String(ps.exitCode)}` };
-  }
+/** One container matched by label. */
+export interface ContainerMatch {
+  name: string;
+  /** The runtime's own state word, lower-cased. */
+  state: string;
+  running: boolean;
+}
 
+/**
+ * The questions a deploy asks about the world. The default implementation is the API over
+ * the socket; a test hands in rows directly. This is the seam stackbay's `Runtime.Inspect`
+ * names (lessons L5, L10).
+ */
+export interface Observer {
+  /** The containers of one compose project (the app directory's name). */
+  project(project: string): Promise<Inspection<ComposePsRow[]>>;
+  /** The container carrying `label=value` (and every extra label); running preferred; two running is unknown. */
+  findByLabel(label: string, value: string, labels?: Record<string, string>): Promise<Inspection<ContainerMatch | null>>;
+  networkExists(name: string): Promise<Inspection<boolean>>;
+}
+
+const COMPOSE_PROJECT = "com.docker.compose.project";
+const COMPOSE_SERVICE = "com.docker.compose.service";
+
+/** Ports as `host->container/proto`, comma-joined, from the API's port list. */
+export function formatPorts(ports: ContainerSummary["Ports"]): string {
+  return (ports ?? [])
+    .map((p) => (p.PublicPort ? `${String(p.PublicPort)}->${String(p.PrivatePort)}/${p.Type}` : `${String(p.PrivatePort)}/${p.Type}`))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .join(", ");
+}
+
+/** The health word inside a status line, e.g. "Up 3 seconds (healthy)" → "healthy". */
+function healthFromStatus(status: string): string {
+  const m = /\((healthy|unhealthy|health: starting)\)/.exec(status);
+  return m ? m[1]!.replace("health: ", "") : "";
+}
+
+async function rowsFrom(summaries: ContainerSummary[], options: EngineOptions): Promise<Inspection<ComposePsRow[]>> {
   const rows: ComposePsRow[] = [];
-  for (const row of parseComposePsJson(ps.output)) {
-    const r = row as {
-      ID?: string; Id?: string;
-      Name?: string; Names?: string[];
-      Service?: string; State?: string; Status?: string; ExitCode?: number; Health?: string;
-      Ports?: unknown; Publishers?: unknown;
-      Labels?: Record<string, string>;
-    };
-    const name = r.Name ?? (Array.isArray(r.Names) ? r.Names[0] : undefined) ?? r.Service;
-    if (!name) continue;
+  for (const c of summaries) {
+    const name = (c.Names[0] ?? "").replace(/^\//, "");
+    const state = c.State.toLowerCase();
+    let exitCode = 0;
+    if (state === "exited") {
+      // The list does not carry the exit code; only an exited container is worth the extra ask.
+      const detail = await apiInspectContainer(c.Id, options);
+      if (detail.kind === "unknown") return detail;
+      exitCode = detail.value?.State.ExitCode ?? 0;
+    }
     rows.push({
       name,
-      id: r.ID ?? r.Id ?? "",
-      service: r.Service ?? r.Labels?.["com.docker.compose.service"] ?? name,
-      state: (r.State ?? "").toLowerCase(),
-      status: r.Status ?? "",
-      ports: formatPorts(r.Publishers ?? r.Ports),
-      health: (r.Health ?? "").toLowerCase(),
-      exitCode: typeof r.ExitCode === "number" ? r.ExitCode : 0,
+      id: c.Id,
+      service: c.Labels?.[COMPOSE_SERVICE] ?? name,
+      state,
+      status: c.Status,
+      ports: formatPorts(c.Ports),
+      health: healthFromStatus(c.Status),
+      exitCode,
     });
   }
   return { kind: "ok", value: rows };
 }
 
-/**
- * Docker Compose emits NDJSON; podman-compose pretty-prints one array behind a provider
- * banner. Whole-document from the first structural character first, then line by line.
- */
-export function parseComposePsJson(output: string): unknown[] {
-  const start = output.search(/[[{]/);
-  if (start >= 0) {
-    try {
-      const parsed: unknown = JSON.parse(output.slice(start));
-      return Array.isArray(parsed) ? parsed : [parsed];
-    } catch {
-      // Not one document — fall through to NDJSON.
-    }
-  }
-  const rows: unknown[] = [];
-  for (const line of output.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      for (const row of Array.isArray(parsed) ? parsed : [parsed]) rows.push(row);
-    } catch {
-      continue;
-    }
-  }
-  return rows;
+/** The API-backed observer for one install. */
+export function engineObserver(appbayHome?: string, socketPath?: string): Observer {
+  const options: EngineOptions = { appbayHome, socketPath };
+  return {
+    async project(project) {
+      const list = await apiListContainers({ labels: { [COMPOSE_PROJECT]: project } }, options);
+      if (list.kind === "unknown") return list;
+      return rowsFrom(list.value, options);
+    },
+    async findByLabel(label, value, labels = {}) {
+      const list = await apiListContainers({ labels: { [label]: value, ...labels } }, options);
+      if (list.kind === "unknown") return list;
+      const matches: ContainerMatch[] = list.value.map((c) => {
+        const state = c.State.toLowerCase();
+        return { name: (c.Names[0] ?? "").replace(/^\//, ""), state, running: state === "running" };
+      });
+      if (matches.length === 0) return { kind: "ok", value: null };
+      const running = matches.filter((m) => m.running);
+      if (running.length > 1) {
+        return { kind: "unknown", reason: `${String(running.length)} running containers carry ${label}=${value}: ${running.map((m) => m.name).join(", ")}` };
+      }
+      return { kind: "ok", value: running[0] ?? matches[0]! };
+    },
+    networkExists(name) {
+      return apiNetworkExists(name, options);
+    },
+  };
 }
 
-/** Ports as a string, from either a string or the `Publishers` array of objects. */
-export function formatPorts(ports: unknown): string {
-  if (typeof ports === "string") return ports;
-  if (Array.isArray(ports)) {
-    return ports
-      .map((p) => {
-        if (typeof p === "string") return p;
-        if (p && typeof p === "object") {
-          const pub = p as Record<string, unknown>;
-          const published = pub.PublishedPort ?? pub.published_port ?? "";
-          const target = pub.TargetPort ?? pub.target_port ?? "";
-          const protocol = pub.Protocol ?? pub.protocol ?? "tcp";
-          if (published && Number(published) > 0) return `${published}->${target}/${protocol}`;
-          return `${target}/${protocol}`;
-        }
-        return String(p);
-      })
-      .filter(Boolean)
-      .join(", ");
-  }
-  return "";
+/** Module-level convenience over `engineObserver`, for callers with a home and no observer in hand. */
+export function findContainerByLabel(
+  label: string,
+  value: string,
+  options: { appbayHome?: string; labels?: Record<string, string>; observer?: Observer } = {},
+): Promise<Inspection<ContainerMatch | null>> {
+  return (options.observer ?? engineObserver(options.appbayHome)).findByLabel(label, value, options.labels);
+}
+
+/** Whether a container exists and is running. */
+export async function isRunning(container: string, appbayHome?: string): Promise<Inspection<boolean>> {
+  const r = await apiInspectContainer(container, { appbayHome });
+  if (r.kind === "unknown") return r;
+  return { kind: "ok", value: r.value?.State.Running === true };
+}
+
+/** Whether a network exists. */
+export function networkExists(network: string, appbayHome?: string): Promise<Inspection<boolean>> {
+  return apiNetworkExists(network, { appbayHome });
+}
+
+/** Names of running containers whose name contains `namePart`. */
+export async function runningContainerNames(namePart: string, appbayHome?: string): Promise<Inspection<string[]>> {
+  const list = await apiListContainers({ name: namePart }, { appbayHome });
+  if (list.kind === "unknown") return list;
+  return { kind: "ok", value: list.value.filter((c) => c.State.toLowerCase() === "running").map((c) => (c.Names[0] ?? "").replace(/^\//, "")) };
 }
 
 /**
  * Services that exited non-zero. `up -d` exiting 0 means started, not still running; a
  * zero exit is a completed one-shot, not a crash. `ok([])` is "nothing crashed".
  */
-export function findCrashedServices(
-  run: DockerComposeRunner,
-  composePath: string,
-  env: Record<string, string>,
-): Inspection<string[]> {
-  const rows = composePs(run, composePath, env);
+export async function findCrashedServices(observer: Observer, project: string): Promise<Inspection<string[]>> {
+  const rows = await observer.project(project);
   if (rows.kind === "unknown") return rows;
-  const dead: string[] = [];
-  for (const r of rows.value) {
-    if (r.state === "exited" && r.exitCode !== 0) dead.push(`${r.service} exited ${String(r.exitCode)}`);
-  }
-  return { kind: "ok", value: dead };
+  return { kind: "ok", value: rows.value.filter((r) => r.state === "exited" && r.exitCode !== 0).map((r) => `${r.service} exited ${String(r.exitCode)}`) };
 }
 
 /** One container's identity and run state. */
@@ -159,12 +181,8 @@ export interface ContainerState {
 }
 
 /** The project's containers keyed by name, stopped ones included. */
-export function snapshotContainers(
-  run: DockerComposeRunner,
-  composePath: string,
-  env: Record<string, string>,
-): Inspection<Map<string, ContainerState>> {
-  const rows = composePs(run, composePath, env);
+export async function snapshotContainers(observer: Observer, project: string): Promise<Inspection<Map<string, ContainerState>>> {
+  const rows = await observer.project(project);
   if (rows.kind === "unknown") return rows;
   const snapshot = new Map<string, ContainerState>();
   for (const r of rows.value) snapshot.set(r.name, { id: r.id, running: r.state === "running" });
@@ -193,47 +211,14 @@ export function didConverge(
 
 /**
  * Is a project ready: every container running, and every one with a healthcheck healthy.
- * A service with no healthcheck is ready when it runs; that is what "ready" means for it,
- * and the operator docs say so. `detail` names what is still in the way.
+ * A service with no healthcheck is ready when it runs; the operator docs say so.
  */
-export function isReady(
-  run: DockerComposeRunner,
-  composePath: string,
-  env: Record<string, string>,
-): Inspection<{ ready: boolean; detail: string }> {
-  const rows = composePs(run, composePath, env);
+export async function isReady(observer: Observer, project: string): Promise<Inspection<{ ready: boolean; detail: string }>> {
+  const rows = await observer.project(project);
   if (rows.kind === "unknown") return rows;
+  if (rows.value.length === 0) return { kind: "ok", value: { ready: false, detail: "no containers yet" } };
   const waiting = rows.value
     .filter((r) => r.state !== "running" || (r.health !== "" && r.health !== "healthy"))
     .map((r) => `${r.service} is ${r.state}${r.health ? ` (${r.health})` : ""}`);
-  if (rows.value.length === 0) return { kind: "ok", value: { ready: false, detail: "no containers yet" } };
   return { kind: "ok", value: { ready: waiting.length === 0, detail: waiting.join(", ") } };
-}
-
-// ---------------------------------------------------------------------------
-// Probes against the runtime binary itself (not compose)
-// ---------------------------------------------------------------------------
-
-/** Whether a container exists and is running. `unknown` when the runtime could not be asked. */
-export function isRunning(container: string, appbayHome?: string): Inspection<boolean> {
-  const r = containerExec(["inspect", "--format", "{{.State.Running}}", container], { appbayHome, label: "inspect" });
-  if (r.exitCode === 0) return { kind: "ok", value: r.output.trim() === "true" };
-  // Both runtimes say "no such object" for an absent container; anything else is a failed ask.
-  if (/no such (object|container)/i.test(r.output)) return { kind: "ok", value: false };
-  return { kind: "unknown", reason: r.output.trim() || `inspect exited with code ${String(r.exitCode)}` };
-}
-
-/** Whether a network exists. `unknown` when the runtime could not be asked. */
-export function networkExists(network: string, appbayHome?: string): Inspection<boolean> {
-  const r = containerExec(["network", "inspect", network], { appbayHome, label: "network inspect" });
-  if (r.exitCode === 0) return { kind: "ok", value: true };
-  if (/no such network|not found/i.test(r.output)) return { kind: "ok", value: false };
-  return { kind: "unknown", reason: r.output.trim() || `network inspect exited with code ${String(r.exitCode)}` };
-}
-
-/** Names of running containers whose name contains `namePart`. Stopped ones are excluded. */
-export function runningContainerNames(namePart: string, appbayHome?: string): Inspection<string[]> {
-  const r = containerExec(["ps", "--format", "{{.Names}}", "--filter", `name=${namePart}`], { appbayHome, label: "ps" });
-  if (r.exitCode !== 0) return { kind: "unknown", reason: r.output.trim() || `ps exited with code ${String(r.exitCode)}` };
-  return { kind: "ok", value: r.output.split("\n").map((l) => l.trim()).filter(Boolean) };
 }

@@ -19,11 +19,10 @@
 
 import { Command } from "commander";
 import { join, basename } from "node:path";
-import { discoverApps, composePs, type DiscoveredApp } from "@appbay/core";
+import { discoverApps, engineObserver, type DiscoveredApp } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 import { resolveComposeFile } from "../utils/paths.js";
-import { dockerCompose } from "../utils/docker.js";
 
 
 /** Container status returned from docker compose ps. */
@@ -37,14 +36,14 @@ interface ContainerInfo {
 }
 
 /** Container rows for one app, through the runtime adapter's one compose-ps parser. */
-function getContainerStatus(app: DiscoveredApp, composeFile: string): ContainerInfo[] {
-  // Running containers only, as `ps` has always shown; `up` asks with `all` for its own reasons.
-  const rows = composePs((args, path, env) => dockerCompose(args, path, env), composeFile, {}, { all: false });
+async function getContainerStatus(app: DiscoveredApp, appbayHome: string): Promise<ContainerInfo[]> {
+  // Running containers only, as `ps` has always shown. The project is the app directory's name.
+  const rows = await engineObserver(appbayHome).project(app.name);
   if (rows.kind === "unknown") {
-    console.error(`  ${app.name}: could not ask compose (${rows.reason})`);
+    console.error(`  ${app.name}: could not ask the runtime (${rows.reason})`);
     return [];
   }
-  return rows.value.map((r) => ({ app: app.name, name: r.name, service: r.service, status: r.status, state: r.state, ports: r.ports }));
+  return rows.value.filter((r) => r.state === "running").map((r) => ({ app: app.name, name: r.name, service: r.service, status: r.status, state: r.state, ports: r.ports }));
 }
 
 export const psCommand = new Command("ps")
@@ -102,7 +101,7 @@ export const psCommand = new Command("ps")
 
     for (const app of targets) {
       const composeFile = await resolveComposeFile(app.name, app.composePath, rendersDir);
-      const containers = await getContainerStatus(app, composeFile);
+      const containers = await getContainerStatus(app, appbayHome);
       allContainers.push(...containers);
     }
 

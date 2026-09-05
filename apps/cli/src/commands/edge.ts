@@ -66,7 +66,7 @@ const createUser = new Command("create")
     });
     console.log(`Created edge user: ${user.username}`);
     if (generated && options.reveal) console.log(`  Password: ${password}`);
-    console.log(restartEdgeForIdentityChange() ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
+    console.log((await restartEdgeForIdentityChange()) ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
   });
 
 const resetPassword = new Command("reset-password")
@@ -81,7 +81,7 @@ const resetPassword = new Command("reset-password")
     await new EdgeIdentityStore(resolveAppbayHome()).resetPassword(username, password);
     console.log(`Reset edge-user password: ${username}`);
     if (generated && options.reveal) console.log(`  Password: ${password}`);
-    console.log(restartEdgeForIdentityChange() ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
+    console.log((await restartEdgeForIdentityChange()) ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
   });
 
 const users = new Command("users").description("Manage users who sign in to your DEPLOYED APPS (not to AppBay itself)")
@@ -157,7 +157,7 @@ const migrate = new Command("migrate")
         const deadline = Date.now() + 60_000;
         let last = "not found";
         while (Date.now() < deadline) {
-          const edge = findContainerByLabel(APP_LABEL, p, { appbayHome });
+          const edge = await findContainerByLabel(APP_LABEL, p, { appbayHome });
           if (edge.kind === "unknown") return `could not ask the runtime: ${edge.reason}`;
           if (edge.value?.running) return null;
           last = edge.value ? `${edge.value.name} is ${edge.value.state}` : "no container carries the label";

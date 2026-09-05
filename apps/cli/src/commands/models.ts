@@ -17,11 +17,11 @@ interface OllamaModel {
   };
 }
 
-function getOllamaUrl(): string {
+async function getOllamaUrl(): Promise<string> {
   const envUrl = process.env.OLLAMA_HOST ?? process.env.APPBAY_OLLAMA_URL;
   if (envUrl) return envUrl.replace(/\/$/, "");
 
-  const found = runningAppContainer("ollama");
+  const found = await runningAppContainer("ollama");
   const container = found.kind === "ok" && found.value?.running ? found.value.name : null;
   if (!container) return "http://localhost:11434";
 
@@ -67,7 +67,7 @@ function timeAgo(iso: string): string {
 }
 
 async function listModels(options: { json?: boolean }): Promise<void> {
-  const url = getOllamaUrl();
+  const url = await getOllamaUrl();
 
   let resp: Response;
   try {
@@ -117,7 +117,7 @@ async function listModels(options: { json?: boolean }): Promise<void> {
 }
 
 async function removeModel(name: string): Promise<void> {
-  const url = getOllamaUrl();
+  const url = await getOllamaUrl();
 
   let resp: Response;
   try {

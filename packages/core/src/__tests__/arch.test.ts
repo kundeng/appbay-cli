@@ -70,7 +70,6 @@ const RULES: Rule[] = [
     owners: ["packages/core/src/runtime/"],
     exempt: {},
     allowed: {
-      "apps/cli/src/commands/server.ts": "2.4",
       "apps/cli/src/commands/setup.ts": "2.4",
       "apps/cli/src/commands/size.ts": "2.4",
       "apps/cli/src/commands/stats.ts": "2.4",

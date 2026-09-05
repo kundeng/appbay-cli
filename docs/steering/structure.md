@@ -36,7 +36,7 @@ The rule each layer owes:
 |---|---|---|
 | `schemas` | every parse of a file or an env var into a typed value | be bypassed by a regex or an `as` cast on the same file |
 | `compiler`, `traits`, `identity` | what a manifest means and every name the system generates | spawn a process |
-| `runtime` | every `docker` or `podman` invocation, and the parse of its output | know what an app is |
+| `runtime` | every `docker` or `podman` invocation for mutation, and every observation, which goes over the runtime's API socket and never parses CLI text | know what an app is |
 | `services`, `health` | a use case end to end, reporting what it observed | parse runtime output or resolve the home directory itself |
 | `apps/cli` | argv in, text out | hold a deploy, a doctor, or a parser of its own |
 

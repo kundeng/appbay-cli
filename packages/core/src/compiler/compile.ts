@@ -48,7 +48,8 @@ import { renderCompose } from "./renderer.js";
 import { generatePlan } from "./plan.js";
 import type { DiscoveredApp } from "./types.js";
 import type { Plan } from "./plan.js";
-import { containerBin, resolveIngressProvider, findContainerByLabel, containerExec } from "../runtime/container-runtime.js";
+import { containerBin, resolveIngressProvider,  containerExec } from "../runtime/container-runtime.js";
+import { findContainerByLabel } from "../runtime/observe.js";
 import { readFileSync } from "node:fs";
 import { loadInstanceConfig, } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
@@ -678,7 +679,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       timeoutMs: 600_000,
       run: async (ctx) => {
         // The app's container, by the label the compiler stamped; a name would carry the namespace.
-        const found = findContainerByLabel(APP_LABEL, ctx.appName);
+        const found = await findContainerByLabel(APP_LABEL, ctx.appName);
         if (found.kind === "unknown") throw new Error(`could not find the ${ctx.appName} container: ${found.reason}`);
         if (!found.value?.running) throw new Error(`${ctx.appName} is not running; models were not pulled`);
         const container = found.value.name;

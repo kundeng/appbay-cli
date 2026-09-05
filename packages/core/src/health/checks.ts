@@ -529,8 +529,8 @@ export function probeArgv(bin: string, appbayHome: string): string[] {
 /**
  * Check if the appbay_shared Docker network exists.
  */
-export function checkNetwork(appbayHome: string): HealthCheckResult {
-  const net = networkExists(SHARED_NETWORK, appbayHome);
+export async function checkNetwork(appbayHome: string): Promise<HealthCheckResult> {
+  const net = await networkExists(SHARED_NETWORK, appbayHome);
   if (net.kind === "unknown") {
     return { name: `${SHARED_NETWORK} network`, status: "unknown", detail: `could not ask the runtime (${net.reason})`, required: true };
   }
@@ -549,8 +549,8 @@ export function checkNetwork(appbayHome: string): HealthCheckResult {
 /**
  * Check if the Appbay server container is running.
  */
-export function checkServer(appbayHome: string): HealthCheckResult {
-  const state = isRunning(SERVER_CONTAINER, appbayHome);
+export async function checkServer(appbayHome: string): Promise<HealthCheckResult> {
+  const state = await isRunning(SERVER_CONTAINER, appbayHome);
   if (state.kind === "unknown") {
     return { name: "Appbay server", status: "unknown", detail: `could not ask the runtime (${state.reason})`, required: false };
   }
@@ -864,12 +864,12 @@ export function checkSops(appbayHome: string): HealthCheckResult {
  * network is absent, the check reports the underlying cause rather than a
  * generic "DNS failed".
  */
-export function checkSharedNetworkDns(appbayHome: string): HealthCheckResult {
+export async function checkSharedNetworkDns(appbayHome: string): Promise<HealthCheckResult> {
   const { displayName } = runtimeProfile(appbayHome);
   const bin = containerBin(appbayHome);
 
   // The network must exist before we can attach a probe to it.
-  const netExists = networkExists(SHARED_NETWORK, appbayHome);
+  const netExists = await networkExists(SHARED_NETWORK, appbayHome);
   if (netExists.kind === "unknown") {
     return { name: "Shared network DNS", status: "unknown", detail: `could not ask the runtime (${netExists.reason})`, required: true };
   }
@@ -1020,15 +1020,15 @@ export async function runChecks(appbayHome: string): Promise<IdentifiedHealthChe
     tag("compose", checkComposeInstalled(appbayHome)),
     tag("compose-version", checkComposeVersion(appbayHome)),
     tag("appbay-home", await checkAppbayHome(appbayHome)),
-    tag("network", checkNetwork(appbayHome)),
-    tag("network-dns", checkSharedNetworkDns(appbayHome)),
+    tag("network", await checkNetwork(appbayHome)),
+    tag("network-dns", await checkSharedNetworkDns(appbayHome)),
     tag("healthcheck-start-period", checkHealthcheckStartPeriod(appbayHome)),
     tag("traefik-config", checkTraefikConfig(appbayHome)),
     tag("caddy-security-config", checkCaddySecurityConfig(appbayHome)),
     tag("vault", checkVault(appbayHome)),
     tag("keepass-db", checkKeePassDb(appbayHome)),
     tag("keepass-cli", checkKeePassCli(appbayHome)),
-    tag("server", checkServer(appbayHome)),
+    tag("server", await checkServer(appbayHome)),
     tag("gpu", checkGpu(appbayHome)),
     tag("sops", checkSops(appbayHome)),
   ];

@@ -19,7 +19,7 @@ import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK } from "@appbay/core";
+import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK, apiInspectContainer, resolveRuntimeSocket, runtimeSocketFor } from "@appbay/core";
 import { cliContainerBin } from "../utils/docker.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -35,6 +35,8 @@ import {
 /** Docker network shared across all appbay apps. */
 
 /** URL the server listens on. */
+export { resolveRuntimeSocket, runtimeSocketFor };
+
 const SERVER_URL = "http://localhost:3000";
 
 /** Health check endpoint. */
@@ -47,87 +49,27 @@ const HEALTH_MAX_RETRIES = 30;
 const HEALTH_RETRY_DELAY_MS = 1000;
 
 /**
- * Pure runtime-socket policy, exported so both rootful and rootless paths stay tested.
- *
- * 🚨 `uid === 0` ANSWERS "AM I ROOT", AND THE QUESTION IS "WHICH SOCKET DOES THIS INSTALL USE".
- * Those were the same question until S34, which put the D-6 service account — uid 950 — on the
- * ROOTFUL socket via `CONTAINER_HOST`. The uid test then computed
- * `/run/user/950/podman/podman.sock`, a rootless socket that does not exist, and the control
- * plane died with `statfs /run/user/950/podman/podman.sock: no such file or directory` on a
- * host where every access grant was correct. `CONTAINER_HOST` is consulted first because it is
- * the direct statement of which socket this process talks to; the uid is a proxy for it.
- */
-export function runtimeSocketFor(
-  runtime: string,
-  uid: number,
-  xdgRuntimeDir?: string,
-  override?: string,
-  containerHost?: string,
-): string {
-  if (override) return override;
-  if (runtime !== "podman") return "/var/run/docker.sock";
-  // Only `unix://` says anything about a local path. A tcp:// or ssh:// CONTAINER_HOST means
-  // the socket is not on this host at all, and mounting a guessed local path would be worse
-  // than falling through.
-  if (containerHost?.startsWith("unix://")) {
-    return containerHost.slice("unix://".length);
-  }
-  return uid === 0
-    ? "/run/podman/podman.sock"
-    : `${xdgRuntimeDir ?? `/run/user/${uid}`}/podman/podman.sock`;
-}
-
-/** Resolve the host socket mounted for the server image's Docker-compatible client. */
-export function resolveRuntimeSocket(): string {
-  return runtimeSocketFor(
-    cliContainerBin(),
-    process.getuid?.() ?? 0,
-    process.env.XDG_RUNTIME_DIR,
-    process.env.APPBAY_RUNTIME_SOCKET,
-    process.env.CONTAINER_HOST,
-  );
-}
-
-/**
  * Check whether the server container is currently running.
  */
-function isServerRunning(): boolean {
-  const state = isRunning(SERVER_CONTAINER, resolveAppbayHome());
+async function isServerRunning(): Promise<boolean> {
+  const state = await isRunning(SERVER_CONTAINER, resolveAppbayHome());
   return state.kind === "ok" && state.value;
 }
 
 /**
  * Get basic info about the running server container.
  */
-function getServerInfo(): {
-  running: boolean;
-  uptime?: string;
-  image?: string;
-} {
-  if (!isServerRunning()) {
-    return { running: false };
-  }
-
-  const uptime = tryExec(cliContainerBin(), [
-    "inspect", "--format", "{{.State.StartedAt}}", SERVER_CONTAINER,
-  ]);
-
-  const image = tryExec(cliContainerBin(), [
-    "inspect", "--format", "{{.Config.Image}}", SERVER_CONTAINER,
-  ]);
-
-  return {
-    running: true,
-    uptime: uptime ?? undefined,
-    image: image ?? undefined,
-  };
+async function getServerInfo(): Promise<{ running: boolean; uptime?: string; image?: string }> {
+  const detail = await apiInspectContainer(SERVER_CONTAINER, { appbayHome: resolveAppbayHome() });
+  if (detail.kind !== "ok" || !detail.value?.State.Running) return { running: false };
+  return { running: true, uptime: detail.value.State.StartedAt, image: detail.value.Config?.Image ?? detail.value.Image };
 }
 
 /**
  * Ensure the appbay_shared Docker network exists. Creates it if missing.
  */
-function ensureNetwork(): void {
-  const exists = networkExists(SHARED_NETWORK, resolveAppbayHome());
+async function ensureNetwork(): Promise<void> {
+  const exists = await networkExists(SHARED_NETWORK, resolveAppbayHome());
   if (exists.kind === "ok" && !exists.value) {
     const created = containerExec(["network", "create", SHARED_NETWORK], { appbayHome: resolveAppbayHome(), label: "network create" });
     if (created.exitCode !== 0) console.error(`Could not create ${SHARED_NETWORK}: ${created.output.trim()}`);
@@ -223,7 +165,7 @@ const startCommand = new Command("start")
   .option("--open", "open the web UI in a browser after start")
   .action(async (options: { open?: boolean }) => {
     // 1. Check if already running.
-    if (isServerRunning()) {
+    if (await isServerRunning()) {
       console.log(`Appbay server is already running at ${SERVER_URL}`);
       process.exit(0);
     }
@@ -237,7 +179,7 @@ const startCommand = new Command("start")
     }
 
     // 3. Ensure shared network exists.
-    ensureNetwork();
+    await ensureNetwork();
 
     // 3b. Give the edge a route to the control plane (RFC-001 §1, task 5.1c).
     const edgeHost = writeControlPlaneEdgeRoute(resolveAppbayHome());
@@ -326,8 +268,8 @@ const stopCommand = new Command("stop")
 
 const statusCommand = new Command("status")
   .description("Check Appbay server status")
-  .action(() => {
-    const info = getServerInfo();
+  .action(async () => {
+    const info = await getServerInfo();
 
     if (info.running) {
       console.log(`Appbay server is running at ${SERVER_URL}`);

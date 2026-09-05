@@ -27,7 +27,8 @@
 import { spawnSync } from "node:child_process";
 import type { BuildSpec } from "../schemas/appbay-yaml.js";
 import type { ShepherdAction } from "../traits/types.js";
-import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { containerBin } from "../runtime/container-runtime.js";
+import { findContainerByLabel } from "../runtime/observe.js";
 import { APP_LABEL } from "./identity.js";
 
 // ---------------------------------------------------------------------------
@@ -215,7 +216,7 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
             stdio: ["pipe", "pipe", "pipe"],
           });
           verifyOrThrow(bin, build);
-          evictStaleContainer(bin, build, ctx.appName);
+          await evictStaleContainer(bin, build, ctx.appName);
           return { built: false, reason: `pulled ${build.pullIfPresent}` };
         }
         // Pull failed — fall through and build. Recorded rather than fatal: the escape
@@ -241,7 +242,7 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
       }
 
       verifyOrThrow(bin, build);
-      evictStaleContainer(bin, build, ctx.appName);
+      await evictStaleContainer(bin, build, ctx.appName);
       return { built: true, image: build.image };
     },
   };
@@ -273,7 +274,7 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
  * disagrees about naming all leave `up -d` to do what it would have done anyway. The
  * failure mode of doing nothing here is the pre-existing bug, not a worse one.
  */
-function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string): void {
+async function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string): Promise<void> {
   const inspectId = (ref: string, format: string): string => {
     const r = spawnSync(bin, ["inspect", "--format", format, ref], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -284,7 +285,7 @@ function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string)
 
   // The container is found by the labels the compiler stamps, not by rebuilding its name:
   // the namespace is part of the name and this function does not know it.
-  const found = findContainerByLabel(APP_LABEL, appName, { labels: { "com.docker.compose.service": build.service } });
+  const found = await findContainerByLabel(APP_LABEL, appName, { labels: { "com.docker.compose.service": build.service } });
   if (found.kind !== "ok" || found.value === null) return; // no container yet, or cannot tell — `up -d` decides
   const container = found.value.name;
   const running = inspectId(container, "{{.Image}}");

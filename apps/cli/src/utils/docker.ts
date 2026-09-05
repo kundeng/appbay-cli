@@ -88,7 +88,7 @@ export function cliRuntimeProfile(): RuntimeProfile {
 }
 
 /** The container running an installed app, found by its label; unknown when the runtime could not be asked. */
-export function runningAppContainer(app: string): Inspection<ContainerMatch | null> {
+export function runningAppContainer(app: string): Promise<Inspection<ContainerMatch | null>> {
   return findContainerByLabel(APP_LABEL, app, { appbayHome: resolveAppbayHome() });
 }
 
@@ -97,8 +97,8 @@ export function runningAppContainer(app: string): Inspection<ContainerMatch | nu
  * and "could not ask the runtime" are different messages because they call for different
  * actions.
  */
-export function requireRunningApp(app: string): string {
-  const found = runningAppContainer(app);
+export async function requireRunningApp(app: string): Promise<string> {
+  const found = await runningAppContainer(app);
   if (found.kind === "unknown") {
     console.error(`Cannot reach the container runtime: ${found.reason}`);
     process.exit(1);

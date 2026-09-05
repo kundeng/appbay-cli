@@ -318,8 +318,8 @@ async function fileExists(path: string): Promise<boolean> {
  *
  * @returns true if the network was created, false if it already existed.
  */
-function ensureDockerNetwork(): boolean {
-  const exists = networkExists(SHARED_NETWORK);
+async function ensureDockerNetwork(): Promise<boolean> {
+  const exists = await networkExists(SHARED_NETWORK);
   if (exists.kind === "ok" && exists.value) return false;
 
   // Absent, or could not tell: try to create it and let the runtime say.
@@ -975,7 +975,7 @@ export const initCommand = new Command("init")
 
       // Stage 2: Docker network.
       step(2, 7, `Ensuring shared ${cliRuntimeProfile().displayName} network`);
-      const networkCreated = ensureDockerNetwork();
+      const networkCreated = await ensureDockerNetwork();
       if (networkCreated) {
         console.log(`  Created ${cliRuntimeProfile().displayName} network: ${SHARED_NETWORK}`);
       } else {

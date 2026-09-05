@@ -147,8 +147,8 @@ export const tunnelCommand = new Command("tunnel")
 
 export const tunnelDownCommand = new Command("tunnel-down")
   .description("Stop all running Cloudflare tunnels")
-  .action(() => {
-    const named = runningContainerNames("appbay.tunnel.", resolveAppbayHome());
+  .action(async () => {
+    const named = await runningContainerNames("appbay.tunnel.", resolveAppbayHome());
     if (named.kind === "unknown") {
       console.error(`Could not list tunnels: ${named.reason}`);
       process.exit(1);

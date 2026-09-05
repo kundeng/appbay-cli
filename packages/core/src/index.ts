@@ -49,6 +49,8 @@ export * from "./runtime/home.js";
 export * from "./runtime/container-runtime.js";
 // What compose reports about a project's containers, as values — the one compose-ps parser.
 export * from "./runtime/observe.js";
+export * from "./runtime/socket.js";
+export * from "./runtime/engine-api.js";
 
 // Re-export the rootful-podman environment. One definition shared by the systemd unit that
 // runs the control plane and the doctor check that predicts whether it can — see S34.

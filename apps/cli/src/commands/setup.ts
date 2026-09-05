@@ -258,20 +258,20 @@ function waitForHealth(url: string, timeoutMs: number): boolean {
   return false;
 }
 
-function waitForEdge(provider: string, timeoutMs: number): boolean {
+async function waitForEdge(provider: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     // Caddy's admin endpoint is container-local, so the contract here is process
     // availability: the edge, found by its label, reports state "running".
-    if (edgeIsRunning(provider)) return true;
-    spawnSync("sleep", ["3"]);
+    if (await edgeIsRunning(provider)) return true;
+    await new Promise((r) => setTimeout(r, 3000));
   }
   return false;
 }
 
 /** The edge is found by label, not by name: the system namespace is in the name. */
-function edgeIsRunning(provider: string): boolean {
-  const edge = findContainerByLabel(APP_LABEL, provider);
+async function edgeIsRunning(provider: string): Promise<boolean> {
+  const edge = await findContainerByLabel(APP_LABEL, provider);
   return edge.kind === "ok" && edge.value?.running === true;
 }
 
@@ -279,7 +279,7 @@ function edgeIsRunning(provider: string): boolean {
 // Status subcommand
 // ---------------------------------------------------------------------------
 
-function showSetupStatus(): void {
+async function showSetupStatus(): Promise<void> {
   let appbayHome: string;
   try {
     appbayHome = resolveAppbayHome();
@@ -296,9 +296,9 @@ function showSetupStatus(): void {
 
   const checks = [
     { name: "APPBAY_HOME", ok: existsSync(appbayHome), detail: appbayHome },
-    { name: "Docker network", ok: checkNetwork(appbayHome).status === "ok", detail: SHARED_NETWORK },
+    { name: "Docker network", ok: (await checkNetwork(appbayHome)).status === "ok", detail: SHARED_NETWORK },
     { name: "Selected edge seeded", ok: existsSync(edgeApp), detail: ingressProvider },
-    { name: "Selected edge running", ok: edgeIsRunning(ingressProvider), detail: ingressProvider },
+    { name: "Selected edge running", ok: await edgeIsRunning(ingressProvider), detail: ingressProvider },
     ...(ingressProvider === "caddy" ? [{
       name: "Caddy Security identities",
       ok: existsSync(join(edgeApp, "config", "security", "users.json")),
@@ -416,7 +416,7 @@ export const setupCommand = new Command("setup")
     yes?: boolean;
   }) => {
     if (options.status) {
-      showSetupStatus();
+      await showSetupStatus();
       return;
     }
 
@@ -606,7 +606,7 @@ export const setupCommand = new Command("setup")
         // state is the available signal — and it is the honest one, since "the process is up"
         // is exactly what this gate is for.
         console.log("    Waiting for Caddy health...");
-        const healthy = waitForEdge("caddy", 60_000);
+        const healthy = await waitForEdge("caddy", 60_000);
         if (!healthy) {
           console.error("    Caddy health check failed.");
           process.exit(1);

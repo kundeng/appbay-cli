@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { cliContainerBin } from "../utils/docker.js";
-import { resolveRuntimeSocket } from "./server.js";
+import { resolveRuntimeSocket } from "@appbay/core";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";

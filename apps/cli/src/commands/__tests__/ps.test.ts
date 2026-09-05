@@ -92,118 +92,25 @@ describe("pad", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatPorts", () => {
-  // ── String input ──────────────────────────────────────────────────────────
-
-  it("returns a string port as-is", () => {
-    expect(formatPorts("0.0.0.0:80->80/tcp")).toBe("0.0.0.0:80->80/tcp");
-  });
-
-  it("returns an empty string as-is", () => {
-    expect(formatPorts("")).toBe("");
-  });
-
-  // ── Non-array / non-string input → empty string ───────────────────────────
-
-  it("returns '' for undefined", () => {
+  // The Engine API's port list: {PrivatePort, PublicPort?, Type}. No string forms exist any more.
+  it("returns '' for no ports", () => {
     expect(formatPorts(undefined)).toBe("");
-  });
-
-  it("returns '' for null", () => {
-    expect(formatPorts(null)).toBe("");
-  });
-
-  it("returns '' for a number", () => {
-    expect(formatPorts(42)).toBe("");
-  });
-
-  it("returns '' for a plain object (not an array)", () => {
-    expect(formatPorts({ port: 80 })).toBe("");
-  });
-
-  // ── Empty array ───────────────────────────────────────────────────────────
-
-  it("returns '' for an empty array", () => {
     expect(formatPorts([])).toBe("");
   });
 
-  // ── Array of strings ──────────────────────────────────────────────────────
-
-  it("joins an array of string ports with ', '", () => {
-    expect(formatPorts(["80/tcp", "443/tcp"])).toBe("80/tcp, 443/tcp");
+  it("formats a published port as 'host->container/proto'", () => {
+    expect(formatPorts([{ PrivatePort: 80, PublicPort: 8080, Type: "tcp" }])).toBe("8080->80/tcp");
   });
 
-  it("filters out empty string entries from a string array", () => {
-    expect(formatPorts(["80/tcp", "", "443/tcp"])).toBe("80/tcp, 443/tcp");
+  it("formats an unpublished port as 'container/proto'", () => {
+    expect(formatPorts([{ PrivatePort: 80, Type: "tcp" }])).toBe("80/tcp");
   });
 
-  it("returns a single string entry without a trailing comma", () => {
-    expect(formatPorts(["8080/tcp"])).toBe("8080/tcp");
-  });
-
-  // ── Array of publisher objects (PascalCase keys) ──────────────────────────
-
-  it("formats a bound port (PublishedPort > 0) as 'published->target/protocol'", () => {
-    const publishers = [
-      { PublishedPort: 8080, TargetPort: 80, Protocol: "tcp" },
-    ];
-    expect(formatPorts(publishers)).toBe("8080->80/tcp");
-  });
-
-  it("formats an unbound port (PublishedPort = 0) as 'target/protocol' without host", () => {
-    const publishers = [
-      { PublishedPort: 0, TargetPort: 80, Protocol: "tcp" },
-    ];
-    expect(formatPorts(publishers)).toBe("80/tcp");
-  });
-
-  it("formats a publisher with no PublishedPort key as 'target/protocol'", () => {
-    const publishers = [{ TargetPort: 443, Protocol: "tcp" }];
-    expect(formatPorts(publishers)).toBe("443/tcp");
-  });
-
-  it("defaults protocol to 'tcp' when Protocol key is absent", () => {
-    const publishers = [{ PublishedPort: 3000, TargetPort: 3000 }];
-    expect(formatPorts(publishers)).toBe("3000->3000/tcp");
-  });
-
-  it("joins multiple publisher objects with ', '", () => {
-    const publishers = [
-      { PublishedPort: 80, TargetPort: 80, Protocol: "tcp" },
-      { PublishedPort: 443, TargetPort: 443, Protocol: "tcp" },
-    ];
-    expect(formatPorts(publishers)).toBe("80->80/tcp, 443->443/tcp");
-  });
-
-  // ── snake_case key aliases (newer docker compose versions) ────────────────
-
-  it("accepts snake_case aliases (published_port / target_port / protocol)", () => {
-    const publishers = [
-      { published_port: 9090, target_port: 9090, protocol: "tcp" },
-    ];
-    expect(formatPorts(publishers)).toBe("9090->9090/tcp");
-  });
-
-  it("snake_case with published_port = 0 shows target only", () => {
-    const publishers = [{ published_port: 0, target_port: 3000, protocol: "tcp" }];
-    expect(formatPorts(publishers)).toBe("3000/tcp");
-  });
-
-  // ── UDP protocol ──────────────────────────────────────────────────────────
-
-  it("preserves udp protocol", () => {
-    const publishers = [
-      { PublishedPort: 5353, TargetPort: 5353, Protocol: "udp" },
-    ];
-    expect(formatPorts(publishers)).toBe("5353->5353/udp");
-  });
-
-  // ── Mixed array ───────────────────────────────────────────────────────────
-
-  it("handles a mixed array of strings and objects", () => {
-    const ports = [
-      "80/tcp",
-      { PublishedPort: 443, TargetPort: 443, Protocol: "tcp" },
-    ];
-    expect(formatPorts(ports)).toBe("80/tcp, 443->443/tcp");
+  it("joins several and drops the IPv4/IPv6 duplicate the API lists twice", () => {
+    expect(formatPorts([
+      { IP: "0.0.0.0", PrivatePort: 80, PublicPort: 80, Type: "tcp" },
+      { IP: "::", PrivatePort: 80, PublicPort: 80, Type: "tcp" },
+      { PrivatePort: 443, PublicPort: 443, Type: "tcp" },
+    ])).toBe("80->80/tcp, 443->443/tcp");
   });
 });

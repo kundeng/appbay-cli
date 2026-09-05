@@ -7,7 +7,7 @@ import { cliContainerBin } from "../utils/docker.js";
 export const statsCommand = new Command("stats")
   .description("Show resource usage statistics for running containers")
   .option("--no-stream", "disable streaming (show snapshot)")
-  .action((options: { stream?: boolean }) => {
+  .action(async (options: { stream?: boolean }) => {
     const args = ["stats", "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"];
 
     if (options.stream === false) {
@@ -15,7 +15,7 @@ export const statsCommand = new Command("stats")
     }
 
     // Filter to appbay-managed containers
-    const named = runningContainerNames("appbay.", resolveAppbayHome());
+    const named = await runningContainerNames("appbay.", resolveAppbayHome());
     if (named.kind === "unknown") {
       console.error(`Could not list containers: ${named.reason}`);
       process.exit(1);

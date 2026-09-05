@@ -31,7 +31,7 @@ function looksLikeModel(name: string): boolean {
 }
 
 async function pullModel(name: string): Promise<void> {
-  const container = requireRunningApp("ollama");
+  const container = await requireRunningApp("ollama");
 
   console.log(`Pulling model: ${name}`);
   const result = spawnSync(

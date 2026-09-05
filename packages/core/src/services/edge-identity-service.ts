@@ -4,7 +4,8 @@ import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { EdgeIdentityDocumentSchema, type EdgeIdentityDocument, type EdgeUser } from "../schemas/edge-identities.js";
-import { containerBin, findContainerByLabel } from "../runtime/container-runtime.js";
+import { containerBin } from "../runtime/container-runtime.js";
+import { findContainerByLabel } from "../runtime/observe.js";
 import { APP_LABEL } from "../compiler/identity.js";
 
 export const EDGE_USERS_RELATIVE_PATH = join("etc", "apps", "caddy", "config", "security", "users.json");
@@ -136,8 +137,8 @@ export class EdgeIdentityStore {
  * Returns false when the edge is not running, which is not an error: the store is read at
  * startup, so an edge that is down will load the change when it next starts.
  */
-export function restartEdgeForIdentityChange(): boolean {
-  const edge = runningEdge();
+export async function restartEdgeForIdentityChange(): Promise<boolean> {
+  const edge = await runningEdge();
   if (!edge) return false;
   const result = spawnSync(containerBin(), ["restart", edge], {
     stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8",
@@ -146,8 +147,8 @@ export function restartEdgeForIdentityChange(): boolean {
 }
 
 /** The running Caddy edge, by label — a literal name went stale when the system apps were namespaced. */
-function runningEdge(): string | null {
-  const edge = findContainerByLabel(APP_LABEL, "caddy");
+async function runningEdge(): Promise<string | null> {
+  const edge = await findContainerByLabel(APP_LABEL, "caddy");
   return edge.kind === "ok" && edge.value?.running ? edge.value.name : null;
 }
 
@@ -156,11 +157,11 @@ function runningEdge(): string | null {
  * invoking AppBay operator; Caddy continues to read it as container root. No recursive chown
  * is used, so unrelated edge configuration ownership is untouched.
  */
-function claimIdentityStoreOwnership(): boolean {
+async function claimIdentityStoreOwnership(): Promise<boolean> {
   const uid = process.getuid?.();
   const gid = process.getgid?.();
   if (uid === undefined || gid === undefined) return false;
-  const edge = runningEdge();
+  const edge = await runningEdge();
   if (!edge) return false;
   const result = spawnSync(containerBin(), [
     "exec", "--user", "0", edge, "sh", "-c",
