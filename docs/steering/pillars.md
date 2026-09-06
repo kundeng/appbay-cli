@@ -13,16 +13,17 @@ so this page does not depend on a review date.
 
 ## Current state
 
-After the hardening, ownership, verification, collection, namespace-values, socket and crash
-sprints that followed the first seam review:
+After the hardening, ownership, verification, boot-order, socket, crash, one-scope and
+identity sprints that followed the first seam review:
 
 - **Correct:** the deploy path finds the edge by label, observes the runtime over its API
-  socket, waits for readiness where something depends on it, and reports unknown when it
-  could not look. Verified on Docker; Podman verification is an open issue.
+  socket, waits for readiness in project order, and reports unknown when it could not look.
+  Every app carries its identity, with or without an upstream block. Verified on Docker;
+  Podman verification is an open issue.
 - **Legible:** one loader per file, one home resolver, one observer, one compile entry; the
   arch test enforces the rules with lists that only shrink. Fix-narrative comments are down
   by a third and the moved functions carry invariants.
 - **Verified:** command actions run end to end against a scratch home; observation tests run
   against a real unix-socket server; a system app is compiled and its edge target pinned.
-- **Documented:** the docs map, the scope model, the collections file and the injection
+- **Documented:** the docs map, the one-scope model, the projects file and the injection
   modes describe the code as it is; the docs checks are green.
