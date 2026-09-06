@@ -13,6 +13,7 @@ import { discoverApps, type CompileResult } from "../compiler/index.js";
 import { deployOrder, dependentsOf } from "../boot-order.js";
 import { loadProjects } from "../schemas/projects.js";
 import { engineObserver, type DockerComposeRunner, type Observer } from "../runtime/observe.js";
+import { composeProject } from "../compiler/identity.js";
 import { loadProjectVars } from "./instance-vars.js";
 import { compileInstall } from "./compile-install.js";
 import { runConverges, type DeployContext } from "./deploy/converge.js";
@@ -135,6 +136,15 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   if (projectsFile.error) {
     return emptyDeployResult([...compileErrors, { stage: "projects", message: projectsFile.error }], warnings);
   }
+  // Two directories that normalize to one compose project would share containers' rows in
+  // every observation; the run is refused before anything starts, like an order it cannot honour.
+  const byProject = new Map<string, string[]>();
+  for (const a of installed) byProject.set(composeProject(a.name), [...(byProject.get(composeProject(a.name)) ?? []), a.name]);
+  const clashes = [...byProject.entries()].filter(([, names]) => names.length > 1);
+  if (clashes.length > 0) {
+    return emptyDeployResult([...compileErrors, ...clashes.map(([project, names]) => ({ stage: "projects", message: `apps ${names.join(" and ")} would share the compose project "${project}"; rename one` }))], warnings);
+  }
+
   const graph = deployOrder(
     compileResult.apps,
     projectsFile.config.projects,

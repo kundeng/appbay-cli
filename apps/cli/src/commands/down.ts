@@ -8,7 +8,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { discoverApps, deployOrder, loadProjects, composeProject, containerExec } from "@appbay/core";
+import { discoverApps, deployOrder, loadProjects, composeProject, engineObserver } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -38,6 +38,7 @@ interface StopResult {
 export async function stopApps(appbayHome: string, names: string[]): Promise<StopResult> {
   const appsDir = join(appbayHome, "etc", "apps");
   const rendersDir = join(appbayHome, "var", "lib", "renders");
+  const observer = engineObserver(appbayHome);
   const discovered = await discoverApps({ appsDir });
   const requested = new Set(names);
   const targets = names.length > 0 ? discovered.filter((app) => requested.has(app.name)) : discovered;
@@ -57,12 +58,31 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
   for (const { app } of [...graph.order].reverse()) {
     const composePath = join(rendersDir, app.name, "docker-compose.rendered.yml");
     const project = composeProject(app.name);
-    console.log(`  Stopping ${app.name}...`);
-    // With the project stated, the render is not needed to reach the containers: a project
-    // whose render is gone is stopped by name rather than skipped with its containers up.
-    const result = (await renderedComposeExists(composePath))
-      ? dockerCompose(["-p", project, "down"], composePath)
-      : containerExec(["compose", "-p", project, "down"], { appbayHome, timeout: 600_000, label: "compose down" });
+    let result;
+    if (await renderedComposeExists(composePath)) {
+      console.log(`  Stopping ${app.name}...`);
+      result = dockerCompose(["-p", project, "down"], composePath);
+    } else {
+      // No render. The runtime says whether anything runs under the project: nothing means
+      // not deployed. Something does NOT get stopped from here: a container carries its app
+      // and namespace labels but not the install it came from, and two homes on one host
+      // share project names, so a `down` by name from this home would reach the other's
+      // containers (it did, on the Podman guest, 2026-09-06). Re-rendering with `up` and
+      // then `down` acts on this install's own render.
+      const rows = await observer.project(app.name);
+      if (rows.kind === "unknown") {
+        console.error(`  Failed to stop ${app.name}: could not ask the runtime (${rows.reason})`);
+        failed++;
+        continue;
+      }
+      if (rows.value.length === 0) {
+        console.log(`  - ${pad(app.name, 14)} (not deployed)`);
+        continue;
+      }
+      console.error(`  Failed to stop ${app.name}: no render here, but ${String(rows.value.length)} container(s) run under project "${project}" (this install's, or another home's on this host). Run: appbay up ${app.name}, then appbay down ${app.name}.`);
+      failed++;
+      continue;
+    }
     if (result.exitCode !== 0) {
       console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
       console.error(`    ${result.output}`);

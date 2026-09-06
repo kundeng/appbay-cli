@@ -122,7 +122,8 @@ round n:
 - [x] 2.5 review round 5, fixes
 - [x] 2.6 review round 6, fixes
 - [x] 2.7 review round 7, fixes
-- [x] 2.8 review round 8, fixes (round 9 pending)
+- [x] 2.8 review round 8, fixes
+- [x] 2.9 review round 9, fixes (round 10 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -291,3 +292,23 @@ apart from one site; the diff reviewer found a HIGH in round 7's own fix.
 | R8.7 | LOW | several | `pull` on a never-deployed app handed the source compose to the predicate; the reset's abort text and `--reset` help said "edge apps"; the `applyIdentity` `name:` drop untested (now tested); an `instance.ts` comment described the derived project | fixed |
 | R8.8 | LOW | `size.ts` | the Podman name-prefix fallback splits an app name containing `_` at the wrong place | recorded: names are the directory names; `composeProject` keeps `_`, so the split is the ceiling |
 | R8.9 | LOW | `converges.ts` readiness | one `unknown` mid-wait is unobservable at once, no retry to the deadline | recorded (R6.7) |
+
+**2026-09-06 — round 9.** The core region confirmed passing. The CLI reviewer measured a
+HIGH in round 8's render-less `down` on Podman; the fix's first form did something worse
+during verification and was replaced.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R9.1 | S1 HIGH | `down.ts` render-less branch | round 8 ran `compose -p <x> down` with no `-f`; podman-compose refuses a `down` without a file (exit 255), so on Podman `appbay down` with no arguments stopped nothing and `setup --reset` aborted on any home with an undeployed app | fixed, twice. The first fix stopped the project by name through the upstream compose; run from a scratch home on the Podman guest it stopped the real install's `whoami` and `traefik`, because a container carries its app and namespace labels but not the home it came from, and two homes on one host share project names. The install was restored (`appbay up traefik whoami`). The second fix asks the runtime: nothing under the project is "not deployed"; something is refused with the project named and `appbay up <x>` then `down` as the way, since the render is what scopes a `down` to this install |
+| R9.2 | Q1/S1 MED | `delete.ts` | with no render, `delete` skipped the stop and printed "Deleted" and "Volumes removed" over containers that may be up | fixed: refused when the project has containers; the volume sentence says only what ran |
+| R9.3 | LOW | `discover.ts` | the backup-skip pattern matched any `*.pre-<word>` directory | fixed: the two edge names only |
+| R9.4 | LOW | `deploy-service.ts` | two directories that normalize to one compose project shared every observation | fixed: refused before anything runs; test |
+| R9.5 | LOW | `edge-migration-service.ts` | an EACCES on the outgoing directory read as "nothing to back up" | fixed: ENOENT only |
+| R9.6 | LOW | `engine-observer.test.ts` | the observer's normalized label query had no test | fixed |
+| R9.7 | LOW | `size.ts` | the Podman name-prefix fallback and an app name with `_` (R8.8) | recorded |
+
+Verification of the round-9 CLI fixes on both guests, scratch home beside the real install:
+Podman: `appbay down` → the nine undeployed apps "(not deployed)", `whoami` and `traefik`
+refused with the project named, exit 1, the real install's containers still up; `delete
+whoami --force` refused. Rocky: `appbay down` → all "(not deployed)", exit 0; `delete whoami
+--force` → deleted, "Nothing was running, so no volumes were touched."

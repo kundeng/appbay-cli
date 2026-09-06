@@ -54,9 +54,9 @@ export async function discoverApps(
   const apps: DiscoveredApp[] = [];
 
   for (const entry of entries) {
-    // Older builds backed the outgoing edge up as `etc/apps/<edge>.pre-<edge>`; those are not
-    // apps, and the backups live under var/lib/backups now.
-    if (/\.pre-[a-z0-9-]+$/.test(entry)) continue;
+    // Older builds backed the outgoing edge up as `etc/apps/<edge>.pre-<edge>`; those two
+    // names are not apps, and the backups live under var/lib/backups now.
+    if (/^(caddy|traefik)\.pre-(caddy|traefik)$/.test(entry)) continue;
     const appDir = join(appsDir, entry);
 
     // Only consider directories.

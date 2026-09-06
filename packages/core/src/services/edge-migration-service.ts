@@ -169,7 +169,10 @@ export async function migrateEdge(opts: {
   const outgoingDir = join(opts.appbayHome, "etc", "apps", opts.from);
   const backupDir = join(opts.appbayHome, "var", "lib", "backups", `${opts.from}.pre-${opts.to}`);
   let backedUp = false;
-  const hasOutgoing = await stat(outgoingDir).then(() => true, () => false);
+  const hasOutgoing = await stat(outgoingDir).then(() => true, (err: NodeJS.ErrnoException) => {
+    if (err.code === "ENOENT") return false;
+    throw err;
+  });
   if (!hasOutgoing) {
     // No outgoing config is legitimate — a host may never have deployed the old edge.
     record("backup", `Backed up ${opts.from} configuration`, true, "nothing to back up");

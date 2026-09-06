@@ -107,6 +107,16 @@ describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
     expect(result.apps[0]?.error).toContain("started nothing");
   });
 
+  it("two apps that would share a compose project are refused before anything runs (S48 round 9)", async () => {
+    const twin = join(home, "etc", "apps", "who.ami");
+    await mkdir(twin, { recursive: true });
+    await writeFile(join(twin, "docker-compose.yml"), "services:\n  x:\n    image: traefik/whoami\n");
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+    expect(result.apps).toEqual([]);
+    expect(result.compileErrors.map((e) => e.message).join("\n")).toContain('share the compose project "whoami"');
+    await rm(twin, { recursive: true, force: true });
+  });
+
   it("an empty target list deploys nothing, not everything", async () => {
     const result = await deploy({ appbayHome: home, targetApps: [], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
     expect(result.apps).toEqual([]);

@@ -135,6 +135,12 @@ describe("engine observer", () => {
     expect(await findCrashedServices(obs(), "v")).toEqual({ kind: "ok", value: ["job exited 1"] });
   });
 
+  it("asks for the project by compose's normalization of the app name (S48 round 8)", async () => {
+    containers = [c("myapp-web-1", "running", { "com.docker.compose.project": "myapp", "com.docker.compose.service": "web" }, { Status: "Up 1 second (healthy)" })];
+    const rows = await obs().project("MyApp");
+    expect(rows.kind === "ok" ? rows.value.map((r) => r.service) : rows).toEqual(["web"]);
+  });
+
   it("answers running-state and network existence", async () => {
     containers = [c("appbay.server", "running", {})]; networks = new Set(["appbay_shared"]);
     const o = obs();

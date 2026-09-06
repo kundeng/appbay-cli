@@ -349,7 +349,8 @@ async function resetSetup(): Promise<void> {
     console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; nothing was removed.`);
     process.exit(1);
   }
-  // A render that is already gone is skipped by stopApps; the edge itself may still run.
+  // stopApps refuses a render-less app whose project has containers (it cannot tell whose
+  // they are); the abort above covers that. This asks once more about the two edges.
   for (const provider of ["caddy", "traefik"]) {
     const state = await edgeState(provider, appbayHome);
     if (state === "not-running") continue;

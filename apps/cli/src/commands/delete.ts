@@ -2,7 +2,7 @@
  * `appbay delete <app>` — remove an app definition.
  */
 import { Command } from "commander";
-import { composeProject } from "@appbay/core";
+import { composeProject, engineObserver } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
 import { rm, stat } from "node:fs/promises";
@@ -38,6 +38,7 @@ export const deleteCommand = new Command("delete")
     }
 
     // Stop containers if running
+    let stopped = false;
     const renderCompose = join(rendersDir, "docker-compose.rendered.yml");
     try {
       await stat(renderCompose);
@@ -50,8 +51,19 @@ export const deleteCommand = new Command("delete")
         console.error(`Could not stop ${app}; nothing was deleted. ${down.output.trim()}`);
         process.exit(1);
       }
+      stopped = true;
     } catch {
-      // No rendered compose — app wasn't deployed
+      // No render. If the project still has containers, deleting the definition would leave
+      // them with nothing that reaches them; `appbay down <app>` stops them by name first.
+      const rows = await engineObserver(resolveAppbayHome()).project(app);
+      if (rows.kind === "unknown") {
+        console.error(`Could not ask the runtime whether ${app} runs (${rows.reason}); nothing was deleted.`);
+        process.exit(1);
+      }
+      if (rows.value.length > 0) {
+        console.error(`${app} has running containers and no render; run: appbay down ${app}, then delete it.`);
+        process.exit(1);
+      }
     }
 
     // Remove rendered output
@@ -65,9 +77,11 @@ export const deleteCommand = new Command("delete")
     await rm(appDir, { recursive: true, force: true });
     console.log(`Deleted app "${app}"`);
 
-    if (!options.keepVolumes) {
-      console.log("Volumes removed with docker compose down -v");
+    if (!stopped) {
+      console.log("Nothing was running, so no volumes were touched.");
+    } else if (!options.keepVolumes) {
+      console.log("Volumes removed with compose down -v");
     } else {
-      console.log("Volumes kept (use docker volume prune to clean up)");
+      console.log("Volumes kept (remove them by hand when no longer needed)");
     }
   });
