@@ -179,6 +179,9 @@ export function describeRouteFailure(
   install: RouteInstallResult,
   provider: string,
 ): string {
+  if (install.reason === "unavailable" && /running containers carry/.test(install.detail ?? "")) {
+    return `edge routes NOT installed — more than one ${provider} edge is running (${install.detail}); the route was not installed because it cannot be told which edge to ask. Remove the extra container, then \`appbay up ${appName}\`.`;
+  }
   if (install.reason === "unavailable") {
     return (
       `edge routes NOT installed — the ${provider} edge is not running, so ${appName}'s route ` +

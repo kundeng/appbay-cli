@@ -87,11 +87,19 @@ async function rowsFrom(summaries: ContainerSummary[], options: EngineOptions): 
     const name = (c.Names[0] ?? "").replace(/^\//, "");
     const state = c.State.toLowerCase();
     let exitCode = 0;
+    let health = healthFromStatus(c.Status);
     if (state === "exited") {
       // The list does not carry the exit code; only an exited container is worth the extra ask.
       const detail = await apiInspectContainer(c.Id, options);
       if (detail.kind === "unknown") return detail;
       exitCode = detail.value?.State.ExitCode ?? 0;
+    } else if (state === "running" && health === "") {
+      // Docker writes the health word into the list's status line; Podman's compat list does
+      // not, and read that way every Podman service looked healthcheck-less and "ready when
+      // running". Inspect carries it on both (S48 round 5, measured on Podman 5.8).
+      const detail = await apiInspectContainer(c.Id, options);
+      if (detail.kind === "unknown") return detail;
+      health = detail.value?.State.Health?.Status ?? "";
     }
     rows.push({
       name,
@@ -100,7 +108,7 @@ async function rowsFrom(summaries: ContainerSummary[], options: EngineOptions): 
       state,
       status: c.Status,
       ports: formatPorts(c.Ports),
-      health: healthFromStatus(c.Status),
+      health,
       exitCode,
     });
   }

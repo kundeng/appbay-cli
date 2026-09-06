@@ -8,7 +8,8 @@
  */
 
 import { Command } from "commander";
-import { deploy, loadProjectVars } from "@appbay/core";
+import { deploy, loadProjectVars, discoverApps } from "@appbay/core";
+import { join } from "node:path";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { printDeployReport } from "../utils/deploy-report.js";
@@ -21,11 +22,19 @@ export const restartCommand = new Command("restart")
   .action(async (apps: string[]) => {
     const appbayHome = resolveAppbayHome();
 
+    // A name nothing matches is refused before anything stops: the stop half would tolerate
+    // it and the start half (deploy()) would refuse the run, leaving the named apps down.
+    const installed = await discoverApps({ appsDir: join(appbayHome, "etc", "apps") });
+    const unknown = apps.filter((name) => !installed.some((a) => a.name === name));
+    if (unknown.length > 0) {
+      for (const name of unknown) console.error(`  [${name}] target: no installed app named "${name}"`);
+      process.exit(1);
+    }
+
     console.log("Stopping apps...\n");
     let stopFailed = 0;
     try {
       const stop = await stopApps(appbayHome, apps);
-      for (const name of stop.unknown) console.warn(`  Warning: app "${name}" not found`);
       stopFailed = stop.failed;
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));

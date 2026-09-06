@@ -69,6 +69,10 @@ describe("commands against a scratch home", () => {
     const apply = appbay(["apply", "typo", "--dry-run"]);
     expect(apply.status).toBe(1);
     expect(apply.stderr).toContain('no installed app named "typo"');
+    const restart = appbay(["restart", "whoami", "typo"]);
+    expect(restart.status).toBe(1);
+    expect(restart.stderr).toContain('no installed app named "typo"');
+    expect(restart.stdout).not.toContain("Stopping");
     const pull = appbay(["pull", "whoami", "typo"]);
     expect(pull.status).toBe(1);
     expect(pull.stderr).toContain('app "typo" not found');

@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { engineObserver, findCrashedServices, isReady } from "../observe.js";
 import { apiPing, apiInspectContainer } from "../engine-api.js";
 
-interface Fake { Id: string; Names: string[]; State: string; Status: string; Labels: Record<string, string>; ExitCode?: number }
+interface Fake { Id: string; Names: string[]; State: string; Status: string; Labels: Record<string, string>; ExitCode?: number; Health?: string }
 let containers: Fake[] = [];
 let networks = new Set<string>();
 let dir: string; let sock: string; let server: Server;
@@ -28,7 +28,7 @@ beforeAll(async () => {
       const out = containers.filter((c) =>
         (f.label ?? []).every((kv) => { const [k, v] = kv.split("="); return c.Labels[k!] === v; }) &&
         (f.name ?? []).every((n) => c.Names.some((x) => x.includes(n))));
-      json(200, out.map(({ ExitCode: _e, ...c }) => c)); return;
+      json(200, out.map(({ ExitCode: _e, Health: _h, ...c }) => c)); return;
     }
     const m = /^\/containers\/([^/]+)\/json$/.exec(url.pathname);
     if (m && decodeURIComponent(m[1]!) === "truncated") {
@@ -41,7 +41,7 @@ beforeAll(async () => {
     if (m) {
       const c = containers.find((x) => x.Id === decodeURIComponent(m[1]!) || x.Names.includes(`/${decodeURIComponent(m[1]!)}`));
       if (!c) { json(404, { message: "no such container" }); return; }
-      json(200, { Id: c.Id, Name: c.Names[0], Image: "img", State: { Running: c.State === "running", Status: c.State, ExitCode: c.ExitCode ?? 0 }, Config: { Image: "img" } }); return;
+      json(200, { Id: c.Id, Name: c.Names[0], Image: "img", State: { Running: c.State === "running", Status: c.State, ExitCode: c.ExitCode ?? 0, ...(c.Health ? { Health: { Status: c.Health } } : {}) }, Config: { Image: "img" } }); return;
     }
     const n = /^\/networks\/([^/]+)$/.exec(url.pathname);
     if (n) { networks.has(decodeURIComponent(n[1]!)) ? json(200, { Name: n[1] }) : json(404, { message: "no such network" }); return; }
@@ -91,6 +91,18 @@ describe("engine observer", () => {
     expect(await findCrashedServices(obs(), "app")).toEqual({ kind: "ok", value: ["job exited 137"] });
     const ready = await isReady(obs(), "app");
     expect(ready).toMatchObject({ kind: "ok", value: { ready: false } });
+  });
+
+  it("Podman's list carries no health word: a starting or unhealthy service is read from inspect (S48 round 5)", async () => {
+    containers = [
+      c("pv-db-1", "running", { "com.docker.compose.project": "pv", "com.docker.compose.service": "db" }, { Status: "Up 4 seconds", Health: "starting" }),
+      c("pv-web-1", "running", { "com.docker.compose.project": "pv", "com.docker.compose.service": "web" }, { Status: "Up 4 seconds" }),
+    ];
+    const rows = await obs().project("pv");
+    expect(rows.kind === "ok" ? rows.value.map((r) => [r.service, r.health]) : rows).toEqual([["db", "starting"], ["web", ""]]);
+    expect(await isReady(obs(), "pv")).toMatchObject({ kind: "ok", value: { ready: false } });
+    containers[0]!.Health = "healthy";
+    expect(await isReady(obs(), "pv")).toMatchObject({ kind: "ok", value: { ready: true } });
   });
 
   it("answers running-state and network existence", async () => {

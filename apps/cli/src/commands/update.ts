@@ -8,13 +8,13 @@
  */
 import { Command } from "commander";
 import { spawnSync } from "node:child_process";
-import { createWriteStream, renameSync, chmodSync, existsSync, unlinkSync, readFileSync, copyFileSync } from "node:fs";
+import { createWriteStream, renameSync, chmodSync, existsSync, unlinkSync, copyFileSync } from "node:fs";
 import { selfInvocation } from "../utils/self.js";
+import { pullableServices } from "../utils/pullable.js";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { VERSION, compareSemver, containerCompose, discoverApps, isSystemApp } from "@appbay/core";
-import { parse as parseYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 const REPO = "kundeng/appbay-cli";
@@ -82,6 +82,7 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
   const resp = await fetch(url, {
     headers: { "User-Agent": `appbay-cli/${VERSION}` },
     redirect: "follow",
+    signal: AbortSignal.timeout(300_000),
   });
 
   if (!resp.ok) throw new Error(`Download failed (${resp.status}): ${url}`);
@@ -219,7 +220,7 @@ async function pullSystemImages(): Promise<number> {
   const appbayHome = resolveAppbayHome();
   const rendered = (await discoverApps({ appsDir: join(appbayHome, "etc", "apps") }))
     .filter((a) => isSystemApp(a.name))
-    .map((a) => ({ name: a.name, render: join(appbayHome, "var", "lib", "renders", a.name, "docker-compose.rendered.yml") }))
+    .map((a) => ({ name: a.name, render: join(appbayHome, "var", "lib", "renders", a.name, "docker-compose.rendered.yml"), upstream: a.composePath, builds: a.appbayConfig?.builds }))
     .filter((a) => existsSync(a.render));
   if (rendered.length === 0) {
     console.log("No deployed system apps to pull for.");
@@ -228,10 +229,7 @@ async function pullSystemImages(): Promise<number> {
   console.log("Pulling system app images...\n");
   let failed = 0;
   for (const app of rendered) {
-    // A service with `build:` (the caddy edge) is built here, never pulled: compose asks the
-    // registry for its local tag and fails. Only the pullable services are named.
-    const services = (parseYaml(readFileSync(app.render, "utf-8")) as { services?: Record<string, { build?: unknown }> }).services ?? {};
-    const pullable = Object.entries(services).filter(([, svc]) => svc.build === undefined).map(([name]) => name);
+    const pullable = pullableServices(app.render, app.upstream, app.builds);
     if (pullable.length === 0) { console.log(`  ${app.name}... nothing to pull (built locally)`); continue; }
     process.stdout.write(`  ${app.name}...`);
     const pull = containerCompose(["pull", ...pullable], app.render, undefined, appbayHome);

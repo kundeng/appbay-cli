@@ -12,6 +12,7 @@ import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { pullableServices } from "../utils/pullable.js";
 
 function looksLikeModel(name: string): boolean {
   if (name.includes("/")) return false;
@@ -85,8 +86,14 @@ export const pullCommand = new Command("pull")
       const renderPath = join(rendersDir, app.name, "docker-compose.rendered.yml");
       const target = existsSync(renderPath) ? renderPath : app.composePath;
 
+      const pullable = pullableServices(target, app.composePath, app.appbayConfig?.builds);
+      if (pullable.length === 0) {
+        console.log(`  ${app.name}... nothing to pull (built locally)`);
+        pulled++;
+        continue;
+      }
       console.log(`  ${app.name}...`);
-      const result = dockerCompose(["pull"], target);
+      const result = dockerCompose(["pull", ...pullable], target);
       if (result.exitCode === 0) {
         console.log(`    pulled`);
         pulled++;

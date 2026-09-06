@@ -31,7 +31,7 @@ export { loadProjectVars };
 /** Options for the deploy pipeline. */
 export interface DeployOptions {
   appbayHome: string;
-  /** Specific apps to deploy. undefined = all. */
+  /** Specific apps to deploy. `undefined` is every installed app; `[]` is nothing (a caller that filtered its list down to none asked for none). */
   targetApps?: string[];
   /** Deploy only apps in this collection. */
   collection?: string;

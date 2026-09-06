@@ -651,7 +651,7 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
   // The daemon did not answer the current user. Distinguish "down" from
   // "up but needs sudo": if `sudo -n <bin> info` succeeds, the daemon is fine
   // and the problem is the current user's access, not the daemon.
-  const sudoProbe = tryExec("sudo", ["-n", bin, "info", "--format", runtimeProfile(appbayHome).serverVersionFormat]);
+  const sudoProbe = tryExec("sudo", ["-n", bin, "info", "--format", runtimeProfile(appbayHome).serverVersionFormat], { timeoutMs: 10_000 });
   if (sudoProbe !== null) {
     return {
       name: label,

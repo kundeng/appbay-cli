@@ -118,7 +118,8 @@ round n:
 - [x] 2.1 review round 1, fixes
 - [x] 2.2 review round 2, fixes
 - [x] 2.3 review round 3, fixes
-- [x] 2.4 review round 4, fixes (round 5 pending)
+- [x] 2.4 review round 4, fixes
+- [x] 2.5 review round 5, fixes (round 6 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -223,3 +224,17 @@ consequences of round-3 fixes, one was a latent hang in the engine client.
 | R4.9 | LOW | several | `edgeIsRunning` folded `unknown` into "not running" in the reset guard; `update`'s sudo branch could leave no binary and its restore could mask the original error; a duplicate doc block; thrown user errors surfaced as stacks (`parseAsync` with a handler); a refused app's row could show a skip instead of its refusal; a signal-killed child read "exited with code null"; `execFile` outside the arch rules; a dead `.catch`; stale test header and imports; stale "Docker" in two headers; an unused loop variable | fixed |
 | R4.10 | LOW | `edge-identity-service.ts`, `run-shepherd.ts`, `resolve-for-deploy.ts`, `secrets.ts` | the binary is resolved from the default home at five sites the deploy could hand a home to | recorded: a single-home CLI cannot observe it; S49 1.5 with the config loader |
 | R4.11 | LOW | `observe.ts:94` | an exited container that vanishes between list and inspect reads as a completed one-shot | recorded: the row is gone on the next read; no operator-visible verdict rests on one pass |
+
+**2026-09-06 — round 5.** The diff reviewer returned nothing above LOW, the first region to
+pass. The other two returned two HIGH and two MEDIUM, one of each a measured runtime fact.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R5.1 | S1/Q1 HIGH | `observe.ts` | Podman's compat list API carries no health word in the status line (measured on the 5.8 guest), so every service read as healthcheck-less and the readiness gate never waited on Podman | fixed: a running container with no health word is inspected; a Podman-shaped fixture in the socket-server test |
+| R5.2 | S1 HIGH | `update.ts`, `pull.ts` | round 2's pull filter read `build:` from the render, which the compiler strips; `update --system-only` still failed on every Caddy install, and `pull` had no filter | fixed: `utils/pullable.ts` decides from the manifest's `builds` and the upstream compose, used by both; unit test |
+| R5.3 | S8/Q5 MED | `restart.ts` | `restart whoami typo` stopped whoami, then `deploy()` refused the run on the typo: the app stayed down (reproduced) | fixed: unknown names refused before anything stops; scratch-home test |
+| R5.4 | LOW | several | `deploy-report` had no test (added, three cases); `DeployOptions.targetApps` did not say `[]` is nothing; two running edges read as "edge not running"; the sudo probe in doctor had no timeout; `apply` collects discovery errors for unrelated apps (recorded); an empty collection prints under "Compile errors" (cosmetic) | fixed, or recorded where marked |
+
+Not pinned by a test after this round: the tunnel's `--add-host` and pull check, the DNS
+probe's exit-125 branch, setup's stdout-before-status and `edgeState`, `update`'s restore
+paths, `exec`'s service choice, the edge restart's three answers. Recorded, not claimed.

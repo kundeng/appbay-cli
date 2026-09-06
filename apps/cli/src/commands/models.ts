@@ -47,7 +47,7 @@ async function listModels(options: { json?: boolean }): Promise<void> {
 
   let resp: Response;
   try {
-    resp = await fetch(`${url}/api/tags`);
+    resp = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(30_000) });
   } catch {
     console.error(`Cannot reach Ollama at ${url}. Is it running?`);
     console.error(`  Try: appbay up ollama`);
@@ -131,6 +131,4 @@ export const modelsCommand = new Command("models")
       .action(removeModel),
   );
 
-modelsCommand.action(() => {
-  listModels({ json: false });
-});
+modelsCommand.action(() => listModels({ json: false }));
