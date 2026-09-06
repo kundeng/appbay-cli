@@ -84,9 +84,8 @@ export const upCommand = new Command("up")
     const { hasFailures } = printDeployReport(result);
 
     if (!hasFailures && options.open && apps.length === 1) {
-      const { exec } = await import("node:child_process");
-      const appName = apps[0];
-      exec(`appbay open ${appName}`);
+      const appName = apps[0]!;
+      spawnSync("appbay", ["open", appName], { stdio: "inherit" });
     }
 
     if (!hasFailures && options.tail && apps.length > 0) {

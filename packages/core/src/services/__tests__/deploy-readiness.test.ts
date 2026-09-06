@@ -29,7 +29,7 @@ const row = (name: string, state: string, health = ""): ComposePsRow =>
   ({ name: `appbay.${name}.${name}`, id: "id", service: name, state, status: state, ports: "", health, exitCode: 0 });
 
 /** A compose runner that records mutations, and an observer whose answers per project depend on how often it was asked. */
-function runner(answers: Record<string, (n: number) => ComposePsRow>): { run: DockerComposeRunner; observer: Observer; log: string[] } {
+function runner(answers: Record<string, (n: number) => ComposePsRow | ComposePsRow[]>): { run: DockerComposeRunner; observer: Observer; log: string[] } {
   const asked: Record<string, number> = {};
   const log: string[] = [];
   const run: DockerComposeRunner = (subArgs, composePath) => {
@@ -38,7 +38,7 @@ function runner(answers: Record<string, (n: number) => ComposePsRow>): { run: Do
     return { exitCode: 0, output: "" };
   };
   const observer: Observer = {
-    project: async (app) => { log.push(`${app}:ps`); asked[app] = (asked[app] ?? 0) + 1; return { kind: "ok", value: [answers[app]!(asked[app]!)] }; },
+    project: async (app) => { log.push(`${app}:ps`); asked[app] = (asked[app] ?? 0) + 1; return { kind: "ok", value: [answers[app]!(asked[app]!)].flat() }; },
     findByLabel: async () => ({ kind: "ok", value: null }),
     networkExists: async () => ({ kind: "ok", value: true }),
   };
@@ -85,5 +85,30 @@ describe("readiness gating", () => {
     expect(r.compileErrors.map((e) => e.stage)).toContain("projects");
     expect(r.compileErrors.map((e) => e.message).join("\n")).toMatch(/cycle/);
     expect(log.filter((l) => l.endsWith(":up"))).toEqual([]);
+  });
+});
+
+describe("readiness after the 2026-09-06 review", () => {
+  it("a one-shot init service that exited 0 does not hold its app back (F4)", async () => {
+    const { run, observer, log } = runner({
+      db: () => [row("db", "running"), { ...row("db-init", "exited"), exitCode: 0 }],
+      web: () => row("web", "running"),
+    });
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 10_000, sleep: noSleep, crashGraceMs: 0 });
+    expect(r.failed).toBe(0);
+    expect(r.deployed).toBe(2);
+    expect(log).toContain("web:up");
+  });
+
+  it("a dependency that did not compile blocks its dependent, like one that did not become ready (F2)", async () => {
+    // An ingress trait with no host and no domain is a compile error that keeps db in the app
+    // set (a manifest that fails to parse drops out of the graph and refuses the whole run).
+    await writeFile(join(home, "etc", "apps", "db", "appbay.yaml"), "project: data\ntraits:\n  - type: ingress\n    port: 80\n    service: db\n");
+    const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 10_000, sleep: noSleep, crashGraceMs: 0 });
+    const web = r.apps.find((a) => a.appName === "web");
+    expect(web?.status).toBe("failed");
+    expect(web?.error).toContain("depends on db");
+    expect(log).not.toContain("web:up");
   });
 });

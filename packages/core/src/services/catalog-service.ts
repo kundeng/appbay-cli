@@ -108,7 +108,8 @@ export async function catalogGet(
 export async function catalogInstall(options: InstallOptions): Promise<InstallResult> {
   const { appbayHome, name, values = {}, force = false } = options;
   // The catalog name and the installed name are separate: `name` looks the entry up, `as`
-  // decides where it lands. Defaulting to `name` keeps every existing caller identical.
+  // decides where it lands and names the vault keys, so two installs of one entry do not
+  // share secrets (review 2026-09-06, F5). Defaulting to `name` keeps every existing caller identical.
   const installAs = options.as?.trim() || name;
   const appsDir = join(appbayHome, "etc", "apps");
   const targetDir = join(appsDir, installAs);
@@ -215,17 +216,17 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
 
     for (const input of secretInputs) {
       if (input.auto_generate) {
-        refs[input.name] = `vault://${name}/${input.name}?gen=password:32`;
+        refs[input.name] = `vault://${installAs}/${input.name}?gen=password:32`;
         secretsWired.push(`${input.name} (auto-generate on first deploy)`);
       } else if (input.name in values) {
         try {
           const { setSecret } = await import("./vault-service.js");
-          await setSecret(appbayHome, `${name}/${input.name}`, values[input.name]);
+          await setSecret(appbayHome, `${installAs}/${input.name}`, values[input.name]);
           // 🚨 ONLY on success. This assignment used to happen BEFORE the try, so a vault
           // failure left `vault://<app>/<name>` in the manifest pointing at a value the
           // vault never took — and `appbay up` died with "Vault password required" on an
           // app the installer had just called ready to deploy.
-          refs[input.name] = `vault://${name}/${input.name}`;
+          refs[input.name] = `vault://${installAs}/${input.name}`;
           secretsWired.push(`${input.name} (stored in vault)`);
         } catch {
           // 🚨 THE FALLBACK IS NOW PERFORMED, NOT MERELY ANNOUNCED (issue #47).
@@ -242,7 +243,7 @@ export async function catalogInstall(options: InstallOptions): Promise<InstallRe
           fallbackSecrets.push(`${input.name}=${values[input.name]}`);
           secretsWired.push(
             `${input.name} (VAULT UNAVAILABLE — written to .env.local in PLAINTEXT; ` +
-              `run \`appbay secrets init\` then \`appbay secrets set ${name}/${input.name}\` ` +
+              `run \`appbay secrets init\` then \`appbay secrets set ${installAs}/${input.name}\` ` +
               `to move it into the vault)`,
           );
         }

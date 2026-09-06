@@ -493,4 +493,3 @@ export class VaultSecretProvider implements SecretProvider {
   }
 }
 
-export { parseVaultUri };

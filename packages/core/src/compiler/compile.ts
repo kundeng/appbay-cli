@@ -28,7 +28,7 @@ import { APP_LABEL, SHARED_NETWORK } from "./identity.js";
 import { loadNamespaceValues } from "../schemas/namespace-values.js";
 
 /** The project an app is in when it declares none: a home that declares no projects is one. */
-export const DEFAULT_PROJECT = "default";
+const DEFAULT_PROJECT = "default";
 import { z } from "zod";
 
 /** A YAML document that must be a mapping; anything else is a parse error, not `{}`. */
@@ -40,6 +40,7 @@ import { registerCoreTraits } from "../traits/definitions/index.js";
 import { GeneratedValueStore, parseMagicVar } from "../state/generated-values.js";
 import { discoverApps } from "./discover.js";
 import { transformUpstream, applyIdentity } from "./upstream-transform.js";
+import { mergeServiceFragment } from "./renderer.js";
 import { ScopeResolver } from "./scope-resolver.js";
 import { selectActiveOverlays } from "./overlay-engine.js";
 import type { ActiveOverlay } from "./overlay-engine.js";
@@ -531,15 +532,12 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     if (overlayResult.activeOverlays.length > 0) {
       for (const overlay of overlayResult.activeOverlays) {
         for (const [svcName, fragment] of Object.entries(overlay.services)) {
-          if (overlayServices[svcName]) {
-            // Merge multiple overlay fragments targeting the same service.
-            overlayServices[svcName] = {
-              ...overlayServices[svcName],
-              ...fragment,
-            };
-          } else {
-            overlayServices[svcName] = { ...fragment };
-          }
+          // The same merge the renderer applies: arrays append, label maps merge. A shallow
+          // spread here dropped the first overlay's environment when two overlays hit one
+          // service (review 2026-09-06, F3).
+          overlayServices[svcName] = overlayServices[svcName]
+            ? mergeServiceFragment(overlayServices[svcName], fragment)
+            : { ...fragment };
         }
       }
     }

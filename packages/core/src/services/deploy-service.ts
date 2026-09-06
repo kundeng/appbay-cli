@@ -542,6 +542,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   const orderedApps = graph.order;
   const readinessTimeoutMs = options.readinessTimeoutMs ?? projectsFile.config.readiness.timeout_seconds * 1000;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  // Every failed app goes in here, whatever failed: a dependent must not start over it
+  // (review 2026-09-06, F2). The readiness wait below is the only other writer.
   const notReady = new Set<string>();
   const crashGraceMs = options.crashGraceMs ?? 3000;
   // Read once at once and once after the grace: `up -d` returns before a bad config kills the
@@ -600,6 +602,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
         "Deploying it would start a container that cannot serve its declared routes.";
       result.failed += 1;
       result.apps.push(appResult);
+      notReady.add(app.appName);
       continue;
     }
 
@@ -653,6 +656,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
             .join("; ");
           result.apps.push(appResult);
           result.failed++;
+          notReady.add(app.appName);
           continue;
         }
       }
@@ -666,6 +670,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
           appResult.error = `Pre-deploy shepherd failed: ${preResult.errors.join("; ")}`;
           result.apps.push(appResult);
           result.failed++;
+          notReady.add(app.appName);
           continue;
         }
       }
@@ -760,6 +765,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
           appResult.error = `Pre-deploy shepherd failed: ${preResult.errors.join("; ")}`;
           result.apps.push(appResult);
           result.failed++;
+          notReady.add(app.appName);
           continue;
         }
       }
@@ -776,6 +782,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
           appResult.error = dcResult.output;
           result.apps.push(appResult);
           result.failed++;
+          notReady.add(app.appName);
           continue;
         }
         const after = await snapshotContainers(observer, app.appName);
@@ -799,6 +806,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
           appResult.error = `container(s) exited immediately after start: ${crashedUnchanged.value.join(", ")}`;
           result.apps.push(appResult);
           result.failed++;
+          notReady.add(app.appName);
           continue;
         }
       }

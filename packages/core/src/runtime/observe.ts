@@ -224,8 +224,11 @@ export async function isReady(observer: Observer, project: string): Promise<Insp
   const rows = await observer.project(project);
   if (rows.kind === "unknown") return rows;
   if (rows.value.length === 0) return { kind: "ok", value: { ready: false, detail: "no containers yet" } };
+  // A one-shot service (a hooks init container, `restart: no`) that exited 0 is done, not
+  // pending; findCrashedServices already reads exit 0 the same way (review 2026-09-06, F4).
+  const done = (r: ComposePsRow) => r.state === "exited" && r.exitCode === 0;
   const waiting = rows.value
-    .filter((r) => r.state !== "running" || (r.health !== "" && r.health !== "healthy"))
+    .filter((r) => !done(r) && (r.state !== "running" || (r.health !== "" && r.health !== "healthy")))
     .map((r) => `${r.service} is ${r.state}${r.health ? ` (${r.health})` : ""}`);
   return { kind: "ok", value: { ready: waiting.length === 0, detail: waiting.join(", ") } };
 }

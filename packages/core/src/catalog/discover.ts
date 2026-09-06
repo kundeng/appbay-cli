@@ -222,7 +222,7 @@ async function scanCatalogSource(
       if (!result.success) {
         errors.push({
           dir: appDir,
-          message: `Invalid ${CATALOG_YAML}: ${result.error.issues.map((i) => i.message).join(", ")}`,
+          message: `Invalid ${CATALOG_YAML}: ${result.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`,
           details: result.error.issues,
         });
         continue;

@@ -285,7 +285,9 @@ export const SecretsTraitSchema = z.object({
   ),
   /** Ref keys allowed to be absent. They are omitted from the deploy environment. */
   optional: z.array(z.string()).optional(),
-  injection: z.enum(["none", "runtime-env", "wrapper-file", "entrypoint-wrapper", "wrapper-live"]).default("runtime-env"),
+  // The three implemented modes and `none`. `wrapper-live` was in this enum with no branch
+  // behind it, so a manifest asking for it deployed with the secret silently absent.
+  injection: z.enum(["none", "runtime-env", "wrapper-file", "entrypoint-wrapper"]).default("runtime-env"),
 });
 
 export type SecretsTrait = z.infer<typeof SecretsTraitSchema>;

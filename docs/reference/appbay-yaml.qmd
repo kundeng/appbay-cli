@@ -185,7 +185,7 @@ services:
 | `type` | `"secrets"` | (required) | Trait discriminator |
 | `provider` | `"vault" \| "keepass" \| "file" \| "env" \| "sops"` | `"vault"` | Secret provider |
 | `refs` | `Record<string, string>` | (required) | Map of env var name to secret URI |
-| `injection` | `"none" \| "runtime-env" \| "wrapper-file" \| "entrypoint-wrapper" \| "wrapper-live"` | `"runtime-env"` | How secrets reach the container; the secrets guide lists what each mode exposes |
+| `injection` | `"none" \| "runtime-env" \| "wrapper-file" \| "entrypoint-wrapper"` | `"runtime-env"` | How secrets reach the container; the secrets guide lists what each mode exposes |
 
 ### backup
 

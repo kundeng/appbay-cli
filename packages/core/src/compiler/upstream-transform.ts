@@ -100,7 +100,7 @@ interface ServiceDef {
  * an `upstream:` block deployed as `<app>-<svc>-1` with no labels and no by-label observer
  * could see it (appbay-cli#10).
  */
-export function withIdentity(
+function withIdentity(
   service: ServiceDef,
   namespace: string | undefined,
   appName: string,

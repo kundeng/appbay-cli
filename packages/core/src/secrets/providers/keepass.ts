@@ -187,4 +187,3 @@ export class KeePassSecretProvider implements SecretProvider {
   }
 }
 
-export { parseKeePassUri };

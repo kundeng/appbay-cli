@@ -51,17 +51,20 @@ const HEALTH_RETRY_DELAY_MS = 1000;
 /**
  * Check whether the server container is currently running.
  */
-async function isServerRunning(): Promise<boolean> {
+/** Running, not running, or the reason the runtime could not be asked (never folded into "no"). */
+async function serverRunning(): Promise<{ running: boolean; unknown?: string }> {
   const state = await isRunning(SERVER_CONTAINER, resolveAppbayHome());
-  return state.kind === "ok" && state.value;
+  if (state.kind === "unknown") return { running: false, unknown: state.reason };
+  return { running: state.value };
 }
 
 /**
  * Get basic info about the running server container.
  */
-async function getServerInfo(): Promise<{ running: boolean; uptime?: string; image?: string }> {
+async function getServerInfo(): Promise<{ running: boolean; unknown?: string; uptime?: string; image?: string }> {
   const detail = await apiInspectContainer(SERVER_CONTAINER, { appbayHome: resolveAppbayHome() });
-  if (detail.kind !== "ok" || !detail.value?.State.Running) return { running: false };
+  if (detail.kind === "unknown") return { running: false, unknown: detail.reason };
+  if (!detail.value?.State.Running) return { running: false };
   return { running: true, uptime: detail.value.State.StartedAt, image: detail.value.Config?.Image ?? detail.value.Image };
 }
 
@@ -165,7 +168,12 @@ const startCommand = new Command("start")
   .option("--open", "open the web UI in a browser after start")
   .action(async (options: { open?: boolean }) => {
     // 1. Check if already running.
-    if (await isServerRunning()) {
+    const state = await serverRunning();
+    if (state.unknown) {
+      console.error(`Could not ask the runtime whether the server is running: ${state.unknown}`);
+      process.exit(1);
+    }
+    if (state.running) {
       console.log(`Appbay server is already running at ${SERVER_URL}`);
       process.exit(0);
     }
@@ -280,6 +288,10 @@ const statusCommand = new Command("status")
         console.log(`  Image:   ${info.image}`);
       }
     } else {
+      if (info.unknown) {
+        console.error(`Could not ask the runtime: ${info.unknown}`);
+        process.exit(1);
+      }
       console.log("Appbay server is not running.");
       console.log('Run "appbay server start" to start it.');
     }

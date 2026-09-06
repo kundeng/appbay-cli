@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-06):** 1 file read · open: 4 · next: issue #11 (ship the injector); row 28 (multi-home DNS) awaits Kun's decision; row 22 (single-node Swarm); row 12 (apps/web). Issues #8 and #9 closed on Lima guests. Row 12 is about a repo this tree cannot see.
+**Position (2026-09-06):** 1 file read · open: 5 · next: Kun's decisions D1, D2, D3 (review 04) and row 28; then issue #11 (ship the injector); row 22 (single-node Swarm). The human review track starts at docs/steering/product.md. Row 12 is about a repo this tree cannot see.
 
 ## Protocol
 
@@ -58,3 +58,4 @@ the next session resumes from.
 | 33 | `traits/definitions/secrets.ts:249`, `tools/appbay-inject` | 1 | `entrypoint-wrapper` mounts `$APPBAY_HOME/bin/appbay-inject`, which nothing builds or installs; Docker binds a directory in its place, Podman refuses the mount. With a hand-built binary the mode works on both runtimes. | verified, run | issue #11; the guide states the manual prerequisite |
 | 34 | `traits/definitions/secrets.ts:249` | 1 | The injector bind mount had no SELinux label; on an enforcing host the container could not read it and exited 139 before the entrypoint ran. | verified, run (Fedora 44, enforcing) | committed (S45): `:ro,z`; pinned by a compile test |
 | 35 | `apps/cli/src/commands/init-system.ts:260,500`, `runtime/container-runtime.ts:261` | 1 | The docker-group grant keyed on a probe for `docker` taken before the install step, so a fresh host never granted the service account the socket; and `systemdUnit: "docker"` is not a unit name, so the ordering was dropped. The unit test fed `docker.service` itself and passed (shape 3). | verified, run (Rocky 9.8) | committed (S45): post-bootstrap state decides; `docker.service`; a plan test with no runtime present |
+| 36 | `docs/history/2026-09-06-review/` | R | The post-fix full review: 21 findings, seven fixed at once (S46: phantom `wrapper-live` mode, five deploy failure branches that did not block dependents, a shallow overlay merge, one-shot services never ready, `--as` installs sharing vault keys, `server status` folding unknown, a shell string in `up --open`). Three need Kun: D1 plaintext `.env.local` fallback when the vault is locked, D2 the master password as a file beside the vault, D3 the backup trait on a CLI-only install. | verified, read | S46 committed; D1–D3 open |
