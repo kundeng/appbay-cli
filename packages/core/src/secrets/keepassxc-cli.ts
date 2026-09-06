@@ -35,7 +35,7 @@ const BIN = "keepassxc-cli";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_BUFFER = 1024 * 1024;
 
-export interface KeepassxcResult {
+interface KeepassxcResult {
   stdout: string;
   stderr: string;
 }

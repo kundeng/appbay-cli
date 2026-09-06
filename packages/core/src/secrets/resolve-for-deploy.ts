@@ -163,7 +163,7 @@ export async function resolveSecretsForDeploy(
 const HKDF_SALT = "appbay-inject-v1";
 const HKDF_INFO = "secret-injection";
 
-export interface BundleWriteResult {
+interface BundleWriteResult {
   volumeName: string;
   secretCount: number;
   errors: Array<{ ref: SecretRef; error: string }>;
@@ -264,7 +264,7 @@ export async function writeEncryptedBundle(
 // Wrapper-file resolution
 // ---------------------------------------------------------------------------
 
-export interface WrapperFileResult {
+interface WrapperFileResult {
   volumeName: string;
   filesWritten: number;
   errors: Array<{ ref: SecretRef; error: string }>;

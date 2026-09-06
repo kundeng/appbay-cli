@@ -60,7 +60,7 @@ import {
   explainAppbayHome,
 } from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
-import { cliContainerBin, cliRuntimeProfile } from "../utils/docker.js";
+import { cliRuntimeProfile } from "../utils/docker.js";
 import { resolveRuntimeSocket } from "./server.js";
 import { runInitPreflight, requiredChecksFailed, formatCheck } from "../utils/checks.js";
 

@@ -20,7 +20,6 @@ import { platform, arch, release } from "node:os";
 import { VERSION } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { tryExec, versions } from "@appbay/core";
-import { cliContainerBin } from "../utils/docker.js";
 
 /** Try to execute a command, returning a fallback string on failure. */
 function tryExecOrFallback(binary: string, args: string[], fallback = "not available"): string {

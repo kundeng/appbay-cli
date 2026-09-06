@@ -2,8 +2,7 @@
  * `appbay size [app]` — show disk usage for apps.
  */
 import { Command } from "commander";
-import { cliContainerBin } from "../utils/docker.js";
-import { discoverApps } from "@appbay/core";
+import { discoverApps, containerExec } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
@@ -15,13 +14,12 @@ function getDirSize(dir: string): string {
 }
 
 function getVolumeSize(name: string): string {
-  const result = spawnSync(
-    cliContainerBin(),
+  const result = containerExec(
     ["system", "df", "-v", "--format", "{{.Name}}\t{{.Size}}"],
-    { encoding: "utf-8", timeout: 15_000 },
+    { appbayHome: resolveAppbayHome(), timeout: 15_000 },
   );
-  if (result.status !== 0) return "—";
-  const line = (result.stdout as string)
+  if (result.exitCode !== 0) return "—";
+  const line = result.output
     .trim()
     .split("\n")
     .find((l) => l.startsWith(name + "\t") || l.startsWith(name + " "));

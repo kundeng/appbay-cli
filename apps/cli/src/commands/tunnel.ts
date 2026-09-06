@@ -1,11 +1,9 @@
 import { Command } from "commander";
-import { runningContainerNames, SHARED_NETWORK } from "@appbay/core";
-import { spawnSync, spawn } from "node:child_process";
+import { runningContainerNames, SHARED_NETWORK, containerExec, containerSpawn } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
-import { cliContainerBin } from "../utils/docker.js";
 
 function getAppUrl(app: string): string | null {
   const appsDir = resolveAppsDir();
@@ -52,12 +50,9 @@ export const tunnelCommand = new Command("tunnel")
   .option("--port <port>", "override the port to tunnel")
   .action((app: string, options: { port?: string }) => {
     // Check cloudflared is available
-    const cfCheck = spawnSync(cliContainerBin(), ["image", "ls", "-q", "cloudflare/cloudflared"], {
-      encoding: "utf-8",
-      timeout: 10_000,
-    });
-
-    const hasImage = cfCheck.status === 0 && (cfCheck.stdout as string).trim().length > 0;
+    const appbayHome = resolveAppbayHome();
+    const cfCheck = containerExec(["image", "ls", "-q", "cloudflare/cloudflared"], { appbayHome, timeout: 10_000 });
+    const hasImage = cfCheck.exitCode === 0 && cfCheck.output.trim().length > 0;
 
     let targetUrl: string;
     if (options.port) {
@@ -75,25 +70,18 @@ export const tunnelCommand = new Command("tunnel")
     const containerName = `appbay.tunnel.${app}`;
 
     // Stop existing tunnel for this app
-    spawnSync(cliContainerBin(), ["rm", "-f", containerName], {
-      encoding: "utf-8",
-      timeout: 10_000,
-    });
+    containerExec(["rm", "-f", containerName], { appbayHome, timeout: 10_000 });
 
     console.log(`Creating tunnel for ${app} → ${targetUrl}`);
     console.log("Waiting for Cloudflare URL...\n");
 
     if (!hasImage) {
       console.log("Pulling cloudflared image...");
-      spawnSync(cliContainerBin(), ["pull", "cloudflare/cloudflared:latest"], {
-        stdio: "inherit",
-        timeout: 120_000,
-      });
+      containerExec(["pull", "cloudflare/cloudflared:latest"], { appbayHome, stdio: "inherit", timeout: 120_000 });
     }
 
     // Start tunnel in background
-    const child = spawn(
-      cliContainerBin(),
+    const child = containerSpawn(
       [
         "run", "--rm",
         "--name", containerName,
@@ -101,7 +89,7 @@ export const tunnelCommand = new Command("tunnel")
         "cloudflare/cloudflared:latest",
         "tunnel", "--url", targetUrl,
       ],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      { appbayHome, stdio: ["ignore", "pipe", "pipe"] },
     );
 
     let found = false;
@@ -140,7 +128,7 @@ export const tunnelCommand = new Command("tunnel")
     process.on("SIGINT", () => {
       console.log("\nStopping tunnel...");
       child.kill();
-      spawnSync(cliContainerBin(), ["rm", "-f", containerName], { timeout: 5_000 });
+      containerExec(["rm", "-f", containerName], { appbayHome, timeout: 5_000 });
       process.exit(0);
     });
   });
@@ -148,7 +136,8 @@ export const tunnelCommand = new Command("tunnel")
 export const tunnelDownCommand = new Command("tunnel-down")
   .description("Stop all running Cloudflare tunnels")
   .action(async () => {
-    const named = await runningContainerNames("appbay.tunnel.", resolveAppbayHome());
+    const appbayHome = resolveAppbayHome();
+    const named = await runningContainerNames("appbay.tunnel.", appbayHome);
     if (named.kind === "unknown") {
       console.error(`Could not list tunnels: ${named.reason}`);
       process.exit(1);
@@ -161,7 +150,7 @@ export const tunnelDownCommand = new Command("tunnel-down")
     }
 
     for (const name of tunnels) {
-      spawnSync(cliContainerBin(), ["rm", "-f", name], { timeout: 10_000 });
+      containerExec(["rm", "-f", name], { appbayHome, timeout: 10_000 });
       const app = name.replace("appbay.tunnel.", "");
       console.log(`Stopped tunnel: ${app}`);
     }

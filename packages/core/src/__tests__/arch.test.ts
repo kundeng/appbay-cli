@@ -47,13 +47,22 @@ interface Rule {
 
 const RULES: Rule[] = [
   {
-    name: "only runtime/ spawns a process (core)",
-    scope: ["packages/core/src"],
+    name: "only runtime/ spawns a process; the CLI spawns host tools, never the container binary",
     pattern: /\b(spawnSync|execFileSync|execSync|execFileAsync|spawn)\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {
       "packages/core/src/secrets/providers/sops.ts": "spawns the sops binary, not the container runtime",
       "packages/core/src/services/catalog-service.ts": "spawns git for a catalog source",
+      "apps/cli/src/commands/init-system.ts": "host bootstrap: package manager, systemctl, useradd",
+      "apps/cli/src/commands/setup.ts": "host tools during setup",
+      "apps/cli/src/commands/fixfs.ts": "host filesystem repair: chown, chmod",
+      "apps/cli/src/commands/size.ts": "du on the host",
+      "apps/cli/src/commands/stats.ts": "host statistics tools",
+      "apps/cli/src/commands/init.ts": "git clone of the bundled catalog; hostname -s",
+      "apps/cli/src/commands/open.ts": "the OS opener (open, xdg-open)",
+      "apps/cli/src/commands/update.ts": "sudo mv of the new binary; the binary's own --version",
+      "apps/cli/src/commands/up.ts": "re-invokes appbay for --open",
+      "apps/cli/src/commands/install.ts": "re-invokes appbay validate after an install",
     },
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",

@@ -78,6 +78,12 @@ function scopeErrorSuggestion(scope: string): string {
  * is exactly how `appbay up openwebui` and `appbay up` came to produce different artifacts.
  */
 export interface CompileOptions {
+  /**
+   * The install root, read for the ingress provider and the instance config. Defaults to two
+   * levels above `appsDir`, the layout a scratch home in a test has; callers with a real
+   * install pass it (`compileInstall` does).
+   */
+  appbayHome?: string;
   /** Path to apps directory (e.g., $APPBAY_HOME/etc/apps). */
   appsDir: string;
   /** Path to rendered output directory (for diff against current state). */
@@ -193,6 +199,7 @@ const DEFAULT_RUNTIME_FACTS: RuntimeFacts = {
  */
 export async function compile(options: CompileOptions): Promise<CompileResult> {
   const {
+    appbayHome = join(options.appsDir, "..", ".."),
     appsDir,
     rendersDir,
     stateDir,
@@ -283,6 +290,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     try {
       const appResult = await compileApp({
         app,
+        appbayHome,
         appsDir,
         rendersDir,
         installedApps,
@@ -396,6 +404,7 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
 
 interface CompileAppInput {
   app: DiscoveredApp;
+  appbayHome: string;
   appsDir: string;
   rendersDir: string;
   installedApps: Set<string>;
@@ -422,6 +431,7 @@ interface CompileAppOutput {
 async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   const {
     app,
+    appbayHome,
     appsDir,
     rendersDir,
     installedApps,
@@ -623,7 +633,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         // appsDir is $APPBAY_HOME/etc/apps, so the installation root is two levels up.
         // Resolved per app rather than threaded through every call site; the resolver
         // caches per home path, so this is one file read for the whole compile.
-        ingressProvider: resolveIngressProvider(join(appsDir, "..", "..")),
+        ingressProvider: resolveIngressProvider(appbayHome),
         domain: nsValues.DOMAIN,
       },
     });
@@ -704,11 +714,10 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   // the same reason: `when: {instance: {…}}` asks about the INSTALLATION, not about which
   // other apps happen to be deployed. The overlay `when:` answers that other question and
   // is deliberately not reused here.
-  const instanceHome = join(appsDir, "..", "..");
   const buildResult = resolveBuilds(
     compose,
     config?.builds as Record<string, import("../schemas/appbay-yaml.js").BuildSpec> | undefined,
-    instanceConfigFor(instanceHome),
+    instanceConfigFor(appbayHome),
   );
   compose = buildResult.compose;
   for (const message of buildResult.errors) {

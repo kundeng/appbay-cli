@@ -16,11 +16,11 @@ import {
   deploy,
   loadProjectVars,
   isSystemApp,
+  containerExec,
 } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { printDeployReport } from "../utils/deploy-report.js";
-import { cliContainerBin } from "../utils/docker.js";
 
 export const upCommand = new Command("up")
   .description("Compile and deploy selected apps")
@@ -91,7 +91,7 @@ export const upCommand = new Command("up")
     if (!hasFailures && options.tail && apps.length > 0) {
       const appName = apps[0];
       const composePath = join(resolveAppbayHome(), "var", "lib", "renders", appName, "docker-compose.rendered.yml");
-      spawnSync(cliContainerBin(), ["compose", "-f", composePath, "logs", "-f"], { stdio: "inherit" });
+      containerExec(["compose", "-f", composePath, "logs", "-f"], { appbayHome, stdio: "inherit" });
     }
 
     process.exit(hasFailures ? 1 : 0);

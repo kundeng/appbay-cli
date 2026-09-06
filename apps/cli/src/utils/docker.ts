@@ -14,7 +14,6 @@
  * callers — the running/stopped indicator.
  */
 
-import { spawnSync } from "node:child_process";
 import {
   containerBin,
   containerCompose,
@@ -22,6 +21,7 @@ import {
   findContainerByLabel,
   APP_LABEL,
   type RuntimeProfile,
+  type DockerComposeResult,
   type Inspection,
   type ContainerMatch,
 } from "@appbay/core";
@@ -30,23 +30,15 @@ import { resolveAppbayHome } from "./appbay-home.js";
 /**
  * The container binary for CLI invocations.
  *
- * ⚠️ Use THIS from CLI commands, never core's `containerBin()` directly. Core
- * resolves APPBAY_HOME from `$APPBAY_HOME` or `~/.appbay`; the CLI additionally
- * honours the path saved at `~/.config/appbay/home` by `appbay init`. A command
- * calling core's resolver directly would read the wrong project.yaml on any
- * install that chose a custom `--dir`, and would do it silently — the binary
- * name would just be the default.
+ * CLI commands call this rather than core's `containerBin()` with no argument. Core's
+ * `resolveHome` reads `$APPBAY_HOME`, the host pointer and the user pointer; the CLI's
+ * `resolveAppbayHome` consults the CLI-side system config as well (`utils/system-config.ts`),
+ * so the home the two derive can differ on a host `init-system` set up. The wrapper passes
+ * the CLI's answer down; a command that let core default the home could read the wrong
+ * instance config silently.
  */
 export function cliContainerBin(): string {
   return containerBin(resolveAppbayHome());
-}
-
-/** Result of a docker compose invocation. */
-export interface DockerComposeResult {
-  /** Process exit code (0 = success). */
-  exitCode: number;
-  /** Combined stdout/stderr output. */
-  output: string;
 }
 
 /**

@@ -22,7 +22,7 @@
  *   3. `docker`                          — default, preserves prior behaviour
  */
 
-import { spawnSync, type SpawnSyncOptions } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions, type SpawnSyncOptions } from "node:child_process";
 import { join } from "node:path";
 import {
   loadInstanceConfig,
@@ -352,6 +352,18 @@ export function containerExec(
     };
   }
   return { exitCode: 0, output: (result.stdout as string | null) ?? "" };
+}
+
+/**
+ * The asynchronous form of `containerExec`, for a child the CLI streams or waits on:
+ * `compose logs -f`, a tunnel container. The caller owns the ChildProcess.
+ */
+export function containerSpawn(
+  args: string[],
+  options: SpawnOptions & { appbayHome?: string } = {},
+): ChildProcess {
+  const { appbayHome, ...spawnOptions } = options;
+  return spawn(containerBin(appbayHome), args, spawnOptions);
 }
 
 /**

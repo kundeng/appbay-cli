@@ -107,7 +107,7 @@ export function clearSavedAppbayHome(pointer: string = CONFIG_FILE): boolean {
  * This module is imported by `index.ts`, so its top level runs BEFORE that assignment.
  */
 
-export type HomeExplanation = ReturnType<typeof explainHome>;
+type HomeExplanation = ReturnType<typeof explainHome>;
 
 /** Every tier and the winner, over this CLI's two pointer files. */
 export function explainAppbayHome(): HomeExplanation {

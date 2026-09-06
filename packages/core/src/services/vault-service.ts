@@ -123,15 +123,8 @@ export function resolveKdbxPassword(appbayHome: string): string {
   return resolveMasterPassword(appbayHome);
 }
 
-/**
- * Resolve the conventional path to the KeePass database file.
- */
-export function resolveKdbxPath(appbayHome: string): string {
-  if (process.env.APPBAY_KEEPASS_DB) {
-    return process.env.APPBAY_KEEPASS_DB;
-  }
-  return join(appbayHome, "var", "lib", "secrets.kdbx");
-}
+import { resolveKdbxPath } from "../secrets/providers/keepass.js";
+export { resolveKdbxPath };
 
 // ---------------------------------------------------------------------------
 // Vault CRUD operations (vault.enc — AES-256-GCM)

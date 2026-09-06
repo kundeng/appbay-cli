@@ -35,7 +35,7 @@ export const SYSTEM_CONFIG_DIR = "/etc/appbay";
 export const SYSTEM_CONFIG_FILE = join(SYSTEM_CONFIG_DIR, "config");
 
 /** Parsed system-level config. */
-export interface SystemConfig {
+interface SystemConfig {
   /** The resolved APPBAY_HOME path for this host. */
   home: string;
 }

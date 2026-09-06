@@ -576,6 +576,10 @@ export async function checkServer(appbayHome: string): Promise<HealthCheckResult
  * Check GPU availability via nvidia-smi.
  */
 export function checkGpu(appbayHome: string): HealthCheckResult {
+  // Absent tooling is not a failed GPU: without nvidia-smi the host cannot be asked.
+  if (tryExec("nvidia-smi", ["--version"]) === null) {
+    return { name: "GPU", status: "unknown", detail: "nvidia-smi not found; GPU presence cannot be determined", required: false };
+  }
   const output = tryExec("nvidia-smi", ["--query-gpu=name", "--format=csv,noheader"]);
   if (output) {
     const gpus = output.split("\n").filter(Boolean);
@@ -589,7 +593,7 @@ export function checkGpu(appbayHome: string): HealthCheckResult {
   return {
     name: "GPU",
     status: "failed",
-    detail: "nvidia-smi not found or no GPUs detected",
+    detail: "nvidia-smi found no GPU",
     fix: "Install NVIDIA drivers and nvidia-container-toolkit for GPU support",
     required: false,
   };

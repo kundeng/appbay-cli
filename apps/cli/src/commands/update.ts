@@ -12,8 +12,8 @@ import { createWriteStream, renameSync, chmodSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { VERSION, compareSemver } from "@appbay/core";
-import { cliContainerBin } from "../utils/docker.js";
+import { VERSION, compareSemver, containerExec } from "@appbay/core";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 const REPO = "kundeng/appbay-cli";
 const BINARY_NAME = "appbay";
@@ -191,13 +191,11 @@ async function pullSystemImages(): Promise<void> {
 
   for (const img of SYSTEM_IMAGES) {
     process.stdout.write(`  ${img}...`);
-    // spawnSync does not throw on a non-zero exit; the status is the only signal.
-    const pull = spawnSync(cliContainerBin(), ["pull", img], { stdio: "pipe", encoding: "utf-8" });
-    if (pull.status === 0) {
+    const pull = containerExec(["pull", img], { appbayHome: resolveAppbayHome(), stdio: "pipe" });
+    if (pull.exitCode === 0) {
       process.stdout.write(" done\n");
     } else {
-      const reason = (pull.stderr || pull.error?.message || `exit ${String(pull.status)}`).trim().split("\n").pop();
-      process.stdout.write(` FAILED (${reason})\n`);
+      process.stdout.write(` FAILED (${pull.output.trim().split("\n").pop()})\n`);
     }
   }
 }

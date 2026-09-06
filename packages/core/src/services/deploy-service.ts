@@ -28,12 +28,6 @@ export { isCaddyConfigPath, installCaddyConfig, installRoute, type RouteInstallR
  */
 export { loadProjectVars };
 
-/**
- * ⚠️ RETIRED by RFC-001 §5 and kept only as a name. `deploy()` no longer takes one: overlays
- * evaluate against the INSTALLED app set, which `compile()` derives itself.
- */
-export type RunningAppsDiscoverer = () => Set<string>;
-
 /** Options for the deploy pipeline. */
 export interface DeployOptions {
   appbayHome: string;
@@ -107,7 +101,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   // 🚨 A DECLARED BACKUP THAT NOTHING RUNS IS WORSE THAN NO BACKUP, because it reads as
   // covered. The backup trait compiles to METADATA ONLY — it returns compose unchanged and
-  // leaves execution to the scheduler/job queue in apps/web. On a CLI-only installation
+  // leaves execution to the appbay server's job queue, which is not in this tree. On a CLI-only installation
   // that queue is not deployed, so `schedule` and `retention` are recorded, shown, and
   // never acted on. Nothing errors; the app simply is not backed up.
   //

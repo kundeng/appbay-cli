@@ -130,7 +130,7 @@ async function runShepherdActions(
 // ---------------------------------------------------------------------------
 
 /** What the planner knows about one app beyond its compile output. */
-export interface PlannedApp {
+interface PlannedApp {
   app: AppCompileResult;
   /** The compiler reported an error for this app: it is refused, not deployed half-configured. */
   compileFailed: boolean;

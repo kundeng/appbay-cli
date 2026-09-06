@@ -19,6 +19,7 @@ set -uo pipefail
 VM="${VM:-appbay-docker}"
 PRIV="${PRIV:-env}"
 H="/tmp/appbay-legacy-journey"
+WORKDIR="${WORKDIR:-/home/ubuntu}"   # where `appbay` runs on the target; the multipass home by default
 
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
@@ -51,7 +52,7 @@ NO_YAML=$(vm "test -f $H/etc/control-plane/users.yaml && echo present || echo ab
                                                    || bad "could not stage the legacy install"
 
 echo "── First run: the export must happen"
-OUT=$(vm "cd /home/ubuntu && APPBAY_HOME=$H appbay admin reset-password legacyadmin --generate --reveal 2>&1")
+OUT=$(vm "cd $WORKDIR && APPBAY_HOME=$H appbay admin reset-password legacyadmin --generate --reveal 2>&1")
 echo "$OUT" | grep -qi "Password reset for local AppBay user: legacyadmin" \
   && ok "reset succeeded against a legacy install" \
   || { bad "reset failed on a legacy install"; echo "$OUT" | tail -3 | sed 's/^/       /'; }
@@ -95,7 +96,7 @@ BEFORE=$(vm "grep -c addedlater $H/etc/control-plane/users.yaml" | tr -d '[:spac
 # 🚨 ASSERT THE SECOND RUN SUCCEEDED, not merely that the extra account survived. If the
 # run ERRORED it would also leave the file untouched, and this check would pass for exactly
 # the wrong reason — a green tick over a command that never did anything.
-OUT2=$(vm "cd /home/ubuntu && APPBAY_HOME=$H appbay admin reset-password legacyadmin --generate 2>&1")
+OUT2=$(vm "cd $WORKDIR && APPBAY_HOME=$H appbay admin reset-password legacyadmin --generate 2>&1")
 echo "$OUT2" | grep -qi "Password reset for local AppBay user: legacyadmin" \
   && ok "second run succeeded" \
   || { bad "second run failed — the survival check below would be meaningless"; echo "$OUT2" | tail -2 | sed 's/^/       /'; }

@@ -131,11 +131,12 @@ export const installCommand = new Command("install")
       // Post-install validation
       if (options.validate !== false) {
         try {
-          const { execSync } = await import("node:child_process");
-          execSync(`appbay validate ${name}`, {
+          const { spawnSync } = await import("node:child_process");
+          const validated = spawnSync("appbay", ["validate", name], {
             stdio: "inherit",
             env: { ...process.env, APPBAY_HOME: home },
           });
+          if (validated.status !== 0) throw new Error(`validate exited ${String(validated.status)}`);
         } catch {
           // The files are on disk, and that is all "installed" can honestly mean here: the
           // manifest does not compile on this install, so it is not ready to deploy.

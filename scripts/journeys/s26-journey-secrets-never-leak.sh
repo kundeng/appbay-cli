@@ -21,6 +21,7 @@ PRIV="${PRIV:-env}"
 HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 CBIN="${CBIN:-docker}"
 APP="leakcheck"
+WORKDIR="${WORKDIR:-/home/ubuntu}"   # where `appbay` runs on the target; the multipass home by default
 # Distinctive enough that a match cannot be coincidence.
 SENTINEL="Zq7-SENTINEL-NEVER-LOG-ME-4f2a"
 
@@ -28,7 +29,7 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd /home/ubuntu && appbay $1 2>&1"; }
+ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
 
 cleanup() {
   ab "down $APP" >/dev/null 2>&1
@@ -61,8 +62,8 @@ traits:
     refs:
       APP_SECRET: vault://$APP/APP_SECRET
 EOF" >/dev/null 2>&1
-vm "cd /home/ubuntu && printf '%s' '$SENTINEL' | appbay secrets set $APP/APP_SECRET" >/dev/null 2>&1
-vm "cd /home/ubuntu && appbay secrets get $APP/APP_SECRET 2>/dev/null | grep -q '$SENTINEL'" >/dev/null 2>&1 \
+vm "cd $WORKDIR && printf '%s' '$SENTINEL' | appbay secrets set $APP/APP_SECRET" >/dev/null 2>&1
+vm "cd $WORKDIR && appbay secrets get $APP/APP_SECRET 2>/dev/null | grep -q '$SENTINEL'" >/dev/null 2>&1 \
   && ok "secret stored with the sentinel value" || { bad "could not store the sentinel secret"; exit 1; }
 
 echo "── Compile: the value must not reach stdout or the rendered artifact"

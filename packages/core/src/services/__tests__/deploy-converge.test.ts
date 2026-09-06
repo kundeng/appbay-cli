@@ -115,7 +115,7 @@ describe("when the runtime cannot be asked, the unknown is recorded, not guessed
   });
 });
 
-describe("findCrashedServices — one implementation for the CLI and the web worker", () => {
+describe("findCrashedServices — one implementation", () => {
   it("names the services that exited non-zero", async () => {
     const out = await findCrashedServices(observerWith([ok(row("exited", "id-1", 137))]), APP);
     expect(out).toEqual({ kind: "ok", value: [`${APP} exited 137`] });

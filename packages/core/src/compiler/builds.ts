@@ -36,7 +36,7 @@ import { APP_LABEL } from "./identity.js";
 // ---------------------------------------------------------------------------
 
 /** One resolved build, ready to run before deploy. */
-export interface ResolvedBuild {
+interface ResolvedBuild {
   service: string;
   image: string;
   /** Build context, relative to the app directory. */
@@ -49,7 +49,7 @@ export interface ResolvedBuild {
   pullIfPresent?: string;
 }
 
-export interface ResolveBuildsResult {
+interface ResolveBuildsResult {
   compose: Record<string, unknown>;
   builds: ResolvedBuild[];
   /** Fatal problems — a service that would deploy with no usable image. */

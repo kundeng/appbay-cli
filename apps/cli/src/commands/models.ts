@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { cliContainerBin, runningAppContainer } from "../utils/docker.js";
-import { spawnSync } from "node:child_process";
+import { runningAppContainer } from "../utils/docker.js";
+import { containerExec } from "@appbay/core";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 
 interface OllamaModel {
@@ -26,24 +27,20 @@ async function getOllamaUrl(): Promise<string> {
   if (!container) return "http://localhost:11434";
 
   // Try host port mapping first
-  const port = spawnSync(
-    cliContainerBin(),
-    ["port", container, "11434"],
-    { encoding: "utf-8", timeout: 5_000 },
-  );
-  if (port.status === 0 && port.stdout) {
-    const match = (port.stdout as string).trim().match(/:(\d+)/);
+  const appbayHome = resolveAppbayHome();
+  const port = containerExec(["port", container, "11434"], { appbayHome, timeout: 5_000 });
+  if (port.exitCode === 0 && port.output) {
+    const match = port.output.trim().match(/:(\d+)/);
     if (match) return `http://localhost:${match[1]}`;
   }
 
   // Fall back to container IP on the appbay_shared network
-  const ip = spawnSync(
-    cliContainerBin(),
+  const ip = containerExec(
     ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", container],
-    { encoding: "utf-8", timeout: 5_000 },
+    { appbayHome, timeout: 5_000 },
   );
-  if (ip.status === 0 && ip.stdout) {
-    const addr = (ip.stdout as string).trim().split(" ").filter(Boolean)[0];
+  if (ip.exitCode === 0 && ip.output) {
+    const addr = ip.output.trim().split(" ").filter(Boolean)[0];
     if (addr) return `http://${addr}:11434`;
   }
 

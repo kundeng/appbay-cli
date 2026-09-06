@@ -28,12 +28,13 @@ HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 CBIN="${CBIN:-docker}"
 APP="applyprobe"
 DB="$HOME_DIR/var/lib/appbay.db"
+WORKDIR="${WORKDIR:-/home/ubuntu}"   # where `appbay` runs on the target; the multipass home by default
 
 pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd /home/ubuntu && appbay $1 2>&1"; }
+ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
 
 rows() { # deploy rows recorded for this app
   vm "python3 -c \"

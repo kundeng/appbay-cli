@@ -20,7 +20,6 @@ import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK, apiInspectContainer, resolveRuntimeSocket, runtimeSocketFor } from "@appbay/core";
-import { cliContainerBin } from "../utils/docker.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -98,10 +97,10 @@ async function composeFileExists(composePath: string): Promise<boolean> {
  */
 async function waitForHealth(): Promise<boolean> {
   for (let i = 0; i < HEALTH_MAX_RETRIES; i++) {
-    const result = tryExec("curl", ["-sf", HEALTH_ENDPOINT]);
-    if (result !== null) {
-      return true;
-    }
+    const healthy = await fetch(HEALTH_ENDPOINT, { signal: AbortSignal.timeout(HEALTH_RETRY_DELAY_MS) })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (healthy) return true;
     await new Promise((resolve) => setTimeout(resolve, HEALTH_RETRY_DELAY_MS));
   }
   return false;

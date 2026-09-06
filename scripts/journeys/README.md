@@ -28,6 +28,7 @@ VM=appbay-rhel PRIV=sudo CBIN=podman ./s26-journey-lifecycle.sh   # rootful Podm
 | `PRIV` | `env` | privilege prefix. **`env` is a no-op on purpose** — an empty variable collapses to a zero-length argv element and breaks the exec. Rootful installs need `sudo`. |
 | `CBIN` | `docker` | container CLI (`podman` on the RHEL host) |
 | `HOME_DIR` | `/home/ubuntu/.appbay` | APPBAY_HOME on the target |
+| `WORKDIR` | `/home/ubuntu` | the directory `appbay` runs from on the target; `/root` on the Lima guests |
 
 On a Mac with Lima instead of multipass, put `lib/multipass-lima-shim` on PATH as
 `multipass` (the file's header shows the two lines); `limactl shell` and `limactl copy` stand in

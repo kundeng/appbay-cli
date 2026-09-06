@@ -1,7 +1,6 @@
 import { Command } from "commander";
-import { SHARED_NETWORK } from "@appbay/core";
-import { spawnSync } from "node:child_process";
-import { cliContainerBin } from "../utils/docker.js";
+import { SHARED_NETWORK, containerExec } from "@appbay/core";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 export const mcpCommand = new Command("mcp")
   .description("MCP (Model Context Protocol) tools")
@@ -23,7 +22,7 @@ export const mcpCommand = new Command("mcp")
         console.log("Starting MCP Inspector on http://localhost:6274");
         console.log("Press Ctrl+C to stop.\n");
 
-        const result = spawnSync(cliContainerBin(), args, { stdio: "inherit" });
-        process.exit(result.status ?? 0);
+        const result = containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" });
+        process.exit(result.exitCode);
       }),
   );

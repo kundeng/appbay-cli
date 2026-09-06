@@ -6,9 +6,8 @@
  * Ollama API. Otherwise it pulls Docker images for the named apps.
  */
 import { Command } from "commander";
-import { cliContainerBin, requireRunningApp } from "../utils/docker.js";
-import { spawnSync } from "node:child_process";
-import { discoverApps } from "@appbay/core";
+import { requireRunningApp } from "../utils/docker.js";
+import { discoverApps, containerExec } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { join } from "node:path";
@@ -34,13 +33,12 @@ async function pullModel(name: string): Promise<void> {
   const container = await requireRunningApp("ollama");
 
   console.log(`Pulling model: ${name}`);
-  const result = spawnSync(
-    cliContainerBin(),
+  const result = containerExec(
     ["exec", container, "ollama", "pull", name],
-    { stdio: "inherit", timeout: 600_000 },
+    { appbayHome: resolveAppbayHome(), stdio: "inherit", timeout: 600_000 },
   );
 
-  if (result.status !== 0) {
+  if (result.exitCode !== 0) {
     console.error(`Failed to pull model "${name}".`);
     process.exit(1);
   }

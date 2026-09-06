@@ -1,10 +1,8 @@
 import { Command } from "commander";
-import { cliContainerBin } from "../utils/docker.js";
-import { resolveRuntimeSocket } from "@appbay/core";
-import { spawnSync } from "node:child_process";
+import { containerExec, resolveRuntimeSocket } from "@appbay/core";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import { resolveAppsDir } from "../utils/appbay-home.js";
+import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { parse as parseYaml } from "yaml";
 
 function resolveImage(target: string): string {
@@ -36,16 +34,15 @@ export const diveCommand = new Command("dive")
     const image = resolveImage(target);
     console.log(`Inspecting: ${image}\n`);
 
-    const result = spawnSync(
-      cliContainerBin(),
+    const result = containerExec(
       [
         "run", "--rm", "-it",
         "-v", `${resolveRuntimeSocket()}:/var/run/docker.sock`,
         "wagoodman/dive:latest",
         image,
       ],
-      { stdio: "inherit" },
+      { appbayHome: resolveAppbayHome(), stdio: "inherit" },
     );
 
-    process.exit(result.status ?? 0);
+    process.exit(result.exitCode);
   });

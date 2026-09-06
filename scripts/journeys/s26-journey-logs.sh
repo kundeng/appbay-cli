@@ -21,6 +21,7 @@ PRIV="${PRIV:-env}"
 HOME_DIR="${HOME_DIR:-/home/ubuntu/.appbay}"
 CBIN="${CBIN:-docker}"
 APP="logprobe"
+WORKDIR="${WORKDIR:-/home/ubuntu}"   # where `appbay` runs on the target; the multipass home by default
 CTR="appbay.$APP.app"
 SENTINEL="LOGLINE-8b31-REAL-CONTAINER-OUTPUT"
 
@@ -28,8 +29,8 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd /home/ubuntu && appbay $1 2>&1"; }
-rc()  { vm "cd /home/ubuntu && appbay $1 >/dev/null 2>&1; echo \$?" | tr -d '[:space:]'; }
+ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
+rc()  { vm "cd $WORKDIR && appbay $1 >/dev/null 2>&1; echo \$?" | tr -d '[:space:]'; }
 
 cleanup() {
   ab "down $APP" >/dev/null 2>&1

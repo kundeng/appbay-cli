@@ -22,7 +22,7 @@ import { podmanRootfulEnv } from "@appbay/core";
 export const SERVER_UNIT_NAME = "appbay-server.service";
 export const SERVER_UNIT_PATH = `/etc/systemd/system/${SERVER_UNIT_NAME}`;
 
-export interface ServerUnitOptions {
+interface ServerUnitOptions {
   /** Absolute path to the appbay binary — the unit cannot rely on PATH. */
   binaryPath: string;
   /** The APPBAY_HOME this host is bound to. */

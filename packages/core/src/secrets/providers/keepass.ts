@@ -77,12 +77,14 @@ function parseKeePassUri(uri: string): ParsedKeePassUri {
 // KeePass database resolution
 // ---------------------------------------------------------------------------
 
-function resolveDbPath(): string {
-  if (process.env.APPBAY_KEEPASS_DB) {
-    return process.env.APPBAY_KEEPASS_DB;
-  }
+/** The KeePass database: `APPBAY_KEEPASS_DB`, else `<home>/var/lib/secrets.kdbx`. The one reader of that variable. */
+export function resolveKdbxPath(appbayHome: string = resolveHome()): string {
+  return process.env.APPBAY_KEEPASS_DB || join(appbayHome, "var", "lib", DEFAULT_DB_NAME);
+}
 
-  return join(resolveHome(), "var", "lib", DEFAULT_DB_NAME);
+/** The optional key file, `APPBAY_KEEPASS_KEYFILE`. The one reader of that variable. */
+function keepassKeyfile(): string | undefined {
+  return process.env.APPBAY_KEEPASS_KEYFILE || undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +137,7 @@ export class KeePassSecretProvider implements SecretProvider {
 
   async resolve(uri: string): Promise<string> {
     const parsed = parseKeePassUri(uri);
-    const dbPath = resolveDbPath();
+    const dbPath = resolveKdbxPath();
     const password = resolveMasterPassword();
 
     if (!existsSync(dbPath)) {
@@ -155,14 +157,14 @@ export class KeePassSecretProvider implements SecretProvider {
       password,
       parsed.entryPath,
       parsed.field,
-      process.env.APPBAY_KEEPASS_KEYFILE,
+      keepassKeyfile(),
     );
   }
 
   async check(uri: string): Promise<CheckResult> {
     try {
       const parsed = parseKeePassUri(uri);
-      const dbPath = resolveDbPath();
+      const dbPath = resolveKdbxPath();
 
       if (!existsSync(dbPath)) {
         return { uri, ok: false, error: `KeePass database not found at ${dbPath}` };
@@ -178,7 +180,7 @@ export class KeePassSecretProvider implements SecretProvider {
         password,
         parsed.entryPath,
         "Password",
-        process.env.APPBAY_KEEPASS_KEYFILE,
+        keepassKeyfile(),
       );
       return { uri, ok: true };
     } catch (err) {

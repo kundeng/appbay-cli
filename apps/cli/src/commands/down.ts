@@ -1,12 +1,8 @@
 /**
- * `appbay down [apps...] --all` command.
+ * `appbay down [apps...] --all`: `compose down` against each app's rendered file, in the
+ * reverse of the start order. `restart` stops through the same function.
  *
- * Stops selected apps by running `docker compose down` against their
- * rendered compose files in the renders directory.
- *
- * Exit codes:
- *   0 -- all selected apps stopped successfully
- *   1 -- one or more apps failed to stop or no rendered compose found
+ * Exit codes: 0 when every selected app stopped; 1 when one failed to stop.
  */
 
 import { Command } from "commander";
@@ -17,112 +13,81 @@ import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 
-/**
- * Check whether a rendered compose file exists for an app.
- */
 async function renderedComposeExists(composePath: string): Promise<boolean> {
   try {
-    const info = await stat(composePath);
-    return info.isFile();
+    return (await stat(composePath)).isFile();
   } catch {
     return false;
   }
+}
+
+interface StopResult {
+  stopped: number;
+  failed: number;
+  /** The requested names no app directory carries. */
+  unknown: string[];
+}
+
+/**
+ * Stop the named apps (every discovered app when `names` is empty) in the reverse of the
+ * start order `up` uses: dependents first, the edge everything routes through last. An
+ * order that cannot be honoured stops nothing and throws.
+ */
+export async function stopApps(appbayHome: string, names: string[]): Promise<StopResult> {
+  const appsDir = join(appbayHome, "etc", "apps");
+  const rendersDir = join(appbayHome, "var", "lib", "renders");
+  const discovered = await discoverApps({ appsDir });
+  const requested = new Set(names);
+  const targets = names.length > 0 ? discovered.filter((app) => requested.has(app.name)) : discovered;
+  const unknown = names.filter((name) => !discovered.some((app) => app.name === name));
+
+  const projects = loadProjects(appbayHome);
+  if (projects.error) throw new Error(projects.error);
+  const graph = deployOrder(
+    targets.map((a) => ({ appName: a.name, project: a.appbayConfig?.project ?? "default", app: a })),
+    projects.config.projects,
+  );
+  if (graph.errors.length > 0) throw new Error(graph.errors.join("\n"));
+
+  let stopped = 0;
+  let failed = 0;
+  for (const { app } of [...graph.order].reverse()) {
+    const composePath = join(rendersDir, app.name, "docker-compose.rendered.yml");
+    if (!(await renderedComposeExists(composePath))) {
+      console.log(`  - ${pad(app.name, 14)} (no rendered compose, skipped)`);
+      continue;
+    }
+    console.log(`  Stopping ${app.name}...`);
+    const result = dockerCompose(["down"], composePath);
+    if (result.exitCode !== 0) {
+      console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
+      console.error(`    ${result.output}`);
+      failed++;
+    } else {
+      console.log(`  Stopped ${app.name}`);
+      stopped++;
+    }
+  }
+  return { stopped, failed, unknown };
 }
 
 export const downCommand = new Command("down")
   .description("Stop selected apps")
   .argument("[apps...]", "specific apps to stop (default: all)")
   .option("--all", "stop all discovered apps")
-  .action(async (apps: string[], options: { all?: boolean }) => {
-    const appbayHome = resolveAppbayHome();
-    const appsDir = join(appbayHome, "etc", "apps");
-    const rendersDir = join(appbayHome, "var", "lib", "renders");
-
-    // Discover apps to determine which to stop.
-    let discovered;
+  .action(async (apps: string[]) => {
+    console.log("Stopping apps...\n");
+    let result: StopResult;
     try {
-      discovered = await discoverApps({ appsDir });
+      result = await stopApps(resolveAppbayHome(), apps);
     } catch (err) {
-      console.error(
-        `Discovery failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      console.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
-
-    // Filter to requested apps if specified.
-    let targetApps = discovered;
-    if (apps.length > 0) {
-      const requested = new Set(apps);
-      targetApps = discovered.filter((app) => requested.has(app.name));
-
-      // Warn about apps that were requested but not found.
-      for (const name of apps) {
-        if (!discovered.some((app) => app.name === name)) {
-          console.warn(`  Warning: app "${name}" not found`);
-        }
-      }
-    }
-
-    if (targetApps.length === 0) {
+    for (const name of result.unknown) console.warn(`  Warning: app "${name}" not found`);
+    if (result.stopped + result.failed === 0 && result.unknown.length === apps.length && apps.length > 0) {
       console.log("No apps found to stop.");
-      process.exit(0);
     }
-
-    // Reverse boot order: user apps first, then system apps in the reverse of the order
-    // they boot in — the edge everything routes through goes last.
-    //
-    // 🚨 This used to be `targetApps.filter(isSystemApp).reverse()`, which reverses the
-    // INPUT order, and `discoverApps` sorts alphabetically. Alphabetical reversed is not
-    // reverse-boot-order: with both providers present it produced [traefik, caddy], which is
-    // BOOT order — the exact opposite of what the comment claimed. Latent only because one
-    // ingress provider is installed at a time, so the list had one element. Derive the order
-    // from SYSTEM_APP_BOOT_ORDER instead of assuming the caller supplied it.
-    // The reverse of the start order, from the same graph `up` uses: dependents stop first,
-    // the edge everything routes through goes last. An order that cannot be honoured refuses.
-    const projects = loadProjects(appbayHome);
-    if (projects.error) { console.error(projects.error); process.exit(1); }
-    const graph = deployOrder(
-      targetApps.map((a) => ({ appName: a.name, project: a.appbayConfig?.project ?? "default", app: a })),
-      projects.config.projects,
-    );
-    if (graph.errors.length > 0) { for (const e of graph.errors) console.error(`  ${e}`); process.exit(1); }
-    const orderedApps = graph.order.map((o) => o.app).reverse();
-
-    console.log("Stopping apps...\n");
-
-    let hasFailures = false;
-    let stopped = 0;
-
-    for (const app of orderedApps) {
-      const composePath = join(
-        rendersDir,
-        app.name,
-        "docker-compose.rendered.yml",
-      );
-
-      // Check if the rendered compose exists.
-      const exists = await renderedComposeExists(composePath);
-      if (!exists) {
-        console.log(`  - ${pad(app.name, 14)} (no rendered compose, skipped)`);
-        continue;
-      }
-
-      // Run docker compose down.
-      console.log(`  Stopping ${app.name}...`);
-      const result = dockerCompose(["down"], composePath);
-
-      if (result.exitCode !== 0) {
-        console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
-        console.error(`    ${result.output}`);
-        hasFailures = true;
-      } else {
-        console.log(`  Stopped ${app.name}`);
-        stopped++;
-      }
-    }
-
-    // Summary.
-    console.log(`\n${stopped} stopped`);
-
-    process.exit(hasFailures ? 1 : 0);
+    console.log(`\n${result.stopped} stopped`);
+    process.exit(result.failed > 0 ? 1 : 0);
   });

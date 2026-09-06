@@ -1,8 +1,7 @@
 import { Command } from "commander";
-import { runningContainerNames } from "@appbay/core";
+import { runningContainerNames, containerExec } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { spawnSync } from "node:child_process";
-import { cliContainerBin } from "../utils/docker.js";
 
 export const statsCommand = new Command("stats")
   .description("Show resource usage statistics for running containers")
@@ -28,7 +27,7 @@ export const statsCommand = new Command("stats")
 
     args.push(...containers);
 
-    spawnSync(cliContainerBin(), args, { stdio: "inherit" });
+    containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" });
   });
 
 export const smiCommand = new Command("smi")

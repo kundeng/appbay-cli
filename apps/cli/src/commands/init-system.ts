@@ -67,7 +67,7 @@ function collect(value: string, previous: string[]): string[] {
 }
 
 /** A single bootstrap action. */
-export interface SystemAction {
+interface SystemAction {
   id: string;
   label: string;
   /** Whether this action would change anything on this host. */
@@ -79,7 +79,7 @@ export interface SystemAction {
 }
 
 /** Result of distro detection. */
-export interface DistroInfo {
+interface DistroInfo {
   /** "rhel" | "debian" | "unknown" */
   family: "rhel" | "debian" | "unknown";
   /** Pretty name from /etc/os-release, e.g. "Rocky Linux 9.4". */

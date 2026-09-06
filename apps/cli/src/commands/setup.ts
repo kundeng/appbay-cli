@@ -22,8 +22,7 @@ import {
   clearContainerRuntimeCache,
   type AcmeDnsProvider,
   SHARED_NETWORK, checkNetwork } from "@appbay/core";
-import { cliContainerBin } from "../utils/docker.js";
-import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists } from "@appbay/core";
+import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists, containerExec } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,11 +43,8 @@ function detectPlatform(): { os: string; docker: string } {
   const platform = process.platform === "darwin" ? "macOS" : "Linux";
 
   // Detect Docker runtime
-  const result = spawnSync(cliContainerBin(), ["context", "inspect", "--format", "{{.Name}}"], {
-    stdio: ["pipe", "pipe", "pipe"],
-    encoding: "utf-8",
-  });
-  const context = result.status === 0 ? String(result.stdout).trim() : "";
+  const result = containerExec(["context", "inspect", "--format", "{{.Name}}"], { appbayHome: resolveAppbayHome() });
+  const context = result.exitCode === 0 ? result.output.trim() : "";
 
   let docker = "Docker Engine";
   if (context.includes("orbstack") || context.includes("colima")) {
@@ -61,13 +57,11 @@ function detectPlatform(): { os: string; docker: string } {
 }
 
 function validateDocker(): boolean {
-  const result = spawnSync(cliContainerBin(), ["info"], { stdio: ["pipe", "pipe", "pipe"] });
-  return result.status === 0;
+  return containerExec(["info"], { appbayHome: resolveAppbayHome() }).exitCode === 0;
 }
 
 function validateCompose(): boolean {
-  const result = spawnSync(cliContainerBin(), ["compose", "version"], { stdio: ["pipe", "pipe", "pipe"] });
-  return result.status === 0;
+  return containerExec(["compose", "version"], { appbayHome: resolveAppbayHome() }).exitCode === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,18 +345,12 @@ async function resetSetup(): Promise<void> {
     const appDir = join(appbayHome, "etc", "apps", name);
     if (existsSync(join(appDir, "docker-compose.yml"))) {
       console.log(`  Stopping ${name}...`);
-      spawnSync(cliContainerBin(), ["compose", "-f", join(appDir, "docker-compose.yml"), "down"], {
-        stdio: ["pipe", "pipe", "pipe"],
-        cwd: appDir,
-      });
+      containerExec(["compose", "-f", join(appDir, "docker-compose.yml"), "down"], { appbayHome, cwd: appDir });
     }
   }
 
   // Stop server
-  spawnSync(cliContainerBin(), ["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], {
-    stdio: ["pipe", "pipe", "pipe"],
-    cwd: appbayHome,
-  });
+  containerExec(["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], { appbayHome, cwd: appbayHome });
 
   // Remove generated configs (keep app definitions and vault)
   // Docker containers may own some files, so use docker run for cleanup
@@ -382,9 +370,7 @@ async function resetSetup(): Promise<void> {
       try {
         await rm(p, { recursive: true, force: true });
       } catch {
-        spawnSync(cliContainerBin(), ["run", "--rm", "-v", `${appbayHome}:/appbay`, "alpine", "rm", "-rf", `/appbay/${rel}`], {
-          stdio: ["pipe", "pipe", "pipe"],
-        });
+        containerExec(["run", "--rm", "-v", `${appbayHome}:/appbay`, "alpine", "rm", "-rf", `/appbay/${rel}`], { appbayHome });
       }
       console.log(`  Removed $APPBAY_HOME/${rel}`);
     }

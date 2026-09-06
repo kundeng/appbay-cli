@@ -25,6 +25,7 @@ export async function compileInstall(
 ): Promise<CompileResult> {
   const stateDir = join(appbayHome, "var", "lib", "state");
   return compile({
+    appbayHome,
     appsDir: join(appbayHome, "etc", "apps"),
     rendersDir: join(appbayHome, "var", "lib", "renders"),
     stateDir,

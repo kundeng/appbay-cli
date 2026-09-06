@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { cliContainerBin, requireRunningApp } from "../utils/docker.js";
-import { spawnSync } from "node:child_process";
+import { containerExec } from "@appbay/core";
+import { requireRunningApp } from "../utils/docker.js";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 export const ollamaCommand = new Command("ollama")
   .description("Run Ollama CLI commands inside the Ollama container")
@@ -10,11 +11,10 @@ export const ollamaCommand = new Command("ollama")
     const container = await requireRunningApp("ollama");
 
     const ttyFlag = process.stdin.isTTY ? ["-it"] : ["-i"];
-    const result = spawnSync(
-      cliContainerBin(),
+    const result = containerExec(
       ["exec", ...ttyFlag, container, "ollama", ...args],
-      { stdio: "inherit" },
+      { appbayHome: resolveAppbayHome(), stdio: "inherit" },
     );
 
-    process.exit(result.status ?? 1);
+    process.exit(result.exitCode);
   });
