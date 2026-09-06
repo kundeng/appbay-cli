@@ -260,6 +260,13 @@ async function edgeIsRunning(provider: string): Promise<boolean> {
   return edge.kind === "ok" && edge.value?.running === true;
 }
 
+/** The edge's state for a decision that must not proceed over an unanswered runtime. */
+async function edgeState(provider: string, appbayHome: string): Promise<"running" | "not-running" | { unknown: string }> {
+  const edge = await findContainerByLabel(APP_LABEL, provider, { appbayHome });
+  if (edge.kind === "unknown") return { unknown: edge.reason };
+  return edge.value?.running ? "running" : "not-running";
+}
+
 // ---------------------------------------------------------------------------
 // Status subcommand
 // ---------------------------------------------------------------------------
@@ -343,10 +350,12 @@ async function resetSetup(): Promise<void> {
   }
   // A render that is already gone is skipped by stopApps; the edge itself may still run.
   for (const provider of ["caddy", "traefik"]) {
-    if (await edgeIsRunning(provider)) {
-      console.error(`  Reset aborted: the ${provider} edge is still running and its render is not here to stop it. Stop it by hand (\`${containerBin(appbayHome)} ps\`), then re-run.`);
-      process.exit(1);
-    }
+    const state = await edgeState(provider, appbayHome);
+    if (state === "not-running") continue;
+    console.error(state === "running"
+      ? `  Reset aborted: the ${provider} edge is still running and its render is not here to stop it. Stop it by hand (\`${containerBin(appbayHome)} ps\`), then re-run.`
+      : `  Reset aborted: could not ask the runtime whether the ${provider} edge runs (${state.unknown}).`);
+    process.exit(1);
   }
   if (existsSync(join(appbayHome, "docker-compose.server.yml"))) {
     const server = containerExec(["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], { appbayHome, cwd: appbayHome, timeout: 120_000 });
@@ -619,11 +628,13 @@ export const setupCommand = new Command("setup")
           const reset = spawnSync(binaryPath, [...self.args, "edge", "users", "reset-password", "admin", "--generate", "--reveal"], {
             stdio: ["pipe", "pipe", "pipe"], env: process.env, encoding: "utf-8",
           });
+          // The password is on stdout whatever the restart did; it is the deliverable, so it is
+          // written before the status is judged.
+          process.stdout.write(String(reset.stdout));
           if (reset.status !== 0) {
             console.error(String(reset.stderr || "Unable to initialize the edge administrator password.").trim());
             process.exit(1);
           }
-          process.stdout.write(String(reset.stdout));
         }
     }
 

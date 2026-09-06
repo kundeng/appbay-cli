@@ -163,7 +163,8 @@ function appChain({ app, refusal, dependsOn, waitReady }: PlannedApp): Converge[
   // every listing and unreachable (issue #60, journey 7). Scoped to the failing app; its
   // neighbours still deploy.
   if (refusal !== undefined) {
-    return [link("compile", null, async () => diverged(refusal))];
+    // Refused on its own account: the refusal, not a skip, is what its row must say.
+    return [{ id: convergeId(name, "compile"), app: name, kind: "compile", dependsOn: [], run: async () => diverged(refusal) }];
   }
 
   // Filled by the `secrets` link and read by the links after it. Sound only because links

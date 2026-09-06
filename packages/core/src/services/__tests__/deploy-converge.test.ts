@@ -90,6 +90,12 @@ describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
     expect(result.apps).toEqual([]);
     expect(result.compileErrors).toEqual([{ appName: "typo", stage: "target", message: 'no installed app named "typo"' }]);
   });
+
+  it("an empty target list deploys nothing, not everything", async () => {
+    const result = await deploy({ appbayHome: home, targetApps: [], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+    expect(result.apps).toEqual([]);
+    expect(result.compileErrors).toEqual([]);
+  });
 });
 
 describe("🚨 a service that starts and immediately dies is NOT a success", () => {

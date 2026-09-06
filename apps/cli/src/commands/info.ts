@@ -3,8 +3,8 @@
  *
  * Prints system information relevant to Appbay:
  *   - OS platform and architecture
- *   - Docker version
- *   - Docker Compose version
+ *   - container runtime version
+ *   - compose version
  *   - GPU availability (nvidia-smi)
  *   - APPBAY_HOME path
  *   - Number of discovered apps
@@ -57,7 +57,7 @@ export const infoCommand = new Command("info")
     console.log("Appbay System Info\n");
     console.log(`  Appbay version:  ${VERSION}`);
     console.log(`  OS:              ${platform()} ${arch()} (${release()})`);
-    console.log(`  ${(runtimeProfile(resolveAppbayHome()).displayName + ":").padEnd(17)}${dockerVersion}`);
+    console.log(`  ${(runtimeProfile(appbayHome).displayName + ":").padEnd(17)}${dockerVersion}`);
     console.log(`  Compose:         ${composeVersion}`);
     console.log(`  GPU:             ${gpuInfo}`);
     console.log(`  APPBAY_HOME:     ${appbayHome}`);

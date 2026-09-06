@@ -65,6 +65,15 @@ describe("commands against a scratch home", () => {
     expect(payload.ok).toBe(!requiredNotOk);
   });
 
+  it("apply and pull refuse a target nothing matches, instead of converging or reporting success", () => {
+    const apply = appbay(["apply", "typo", "--dry-run"]);
+    expect(apply.status).toBe(1);
+    expect(apply.stderr).toContain('no installed app named "typo"');
+    const pull = appbay(["pull", "whoami", "typo"]);
+    expect(pull.status).toBe(1);
+    expect(pull.stderr).toContain('app "typo" not found');
+  });
+
   it("compile renders whoami and its traefik fragment", () => {
     const r = appbay(["compile", "whoami"]);
     expect(r.status, r.stderr).toBe(0);

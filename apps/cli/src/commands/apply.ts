@@ -1,8 +1,7 @@
 /**
- * `appbay apply [apps...] --dry-run --yes` — apply a compiled plan.
- *
- * Unlike `up` which compiles + deploys in one step, `apply` works with
- * a previously compiled plan. Useful for review-then-apply workflows.
+ * `appbay apply [apps...] --dry-run --yes`: compile, show the plan, and with `--yes` converge
+ * through the same `deploy()` as `up`. The plan is a preview of the rendered files; the
+ * converge is what changes the runtime.
  */
 import { Command } from "commander";
 import { deploy, type CompileResult, loadProjectVars, compileInstall } from "@appbay/core";
@@ -41,6 +40,13 @@ export const applyCommand = new Command("apply")
       process.exit(1);
     }
 
+    // `compileInstall` drops a name nothing matches; name it here, as deploy() does for `up`.
+    const unknown = (targetApps ?? []).filter((name) => !result.apps.some((a) => a.appName === name));
+    if (unknown.length > 0) {
+      for (const name of unknown) console.error(`  [${name}] target: no installed app named "${name}"`);
+      process.exit(1);
+    }
+
     const changed = result.apps.filter(a => a.plan.status === "new" || a.plan.status === "changed");
     const unchanged = result.apps.filter(a => a.plan.status === "unchanged");
 
@@ -49,10 +55,8 @@ export const applyCommand = new Command("apply")
     // handed to deploy(), which converges it and reports what compose did.
     if (changed.length === 0) {
       console.log(`No plan changes; ${String(unchanged.length)} app(s) have an unchanged render.`);
-      if (!options.yes || options.dryRun) {
-        if (!options.dryRun) console.log("Use --yes to converge them anyway (a container that is gone is started).");
-        return;
-      }
+      if (options.dryRun) { console.log("Dry run — no changes applied."); return; }
+      if (!options.yes) { console.log("Use --yes to converge them anyway (a container that is gone is started)."); return; }
     } else {
       console.log(`Plan: ${changed.length} change(s), ${unchanged.length} unchanged\n`);
     }
@@ -86,7 +90,7 @@ export const applyCommand = new Command("apply")
     console.log("Applying...\n");
     const deployResult = await deploy({
       appbayHome: resolveAppbayHome(),
-      targetApps: result.apps.map((a) => a.appName),
+      targetApps,
       namespace: options.namespace,
       projectVars: await loadProjectVars(resolveAppbayHome()),
       dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),

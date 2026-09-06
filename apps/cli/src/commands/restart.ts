@@ -40,14 +40,9 @@ export const restartCommand = new Command("restart")
       dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),
     });
 
-    if (result.compileErrors.length > 0) {
-      console.error("Compile errors:");
-      for (const err of result.compileErrors) {
-        console.error(`  ${err.appName ? `[${err.appName}]` : "[global]"} ${err.stage}: ${err.message}`);
-      }
-    }
     if (result.apps.length === 0) {
       if (result.compileErrors.length === 0) console.log("No apps found to start.");
+      else printDeployReport(result);
       process.exit(result.compileErrors.length > 0 || stopFailed > 0 ? 1 : 0);
     }
 

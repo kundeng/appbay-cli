@@ -66,6 +66,11 @@ export const pullCommand = new Command("pull")
     if (targets.length > 0) {
       const names = new Set(targets);
       apps = discovered.filter((a) => names.has(a.name));
+      const unknown = targets.filter((name) => !discovered.some((a) => a.name === name));
+      if (unknown.length > 0) {
+        for (const name of unknown) console.error(`  app "${name}" not found`);
+        process.exit(1);
+      }
     }
 
     if (apps.length === 0) {

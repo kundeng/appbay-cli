@@ -92,7 +92,6 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
   return dest;
 }
 
-/** Atomically replace the running binary with newBin. Falls back to sudo. */
 /**
  * Put `newBin` at `target`, keeping the previous binary beside it as `.appbay.old` until the
  * caller has seen the new one run. Returns `restore`, which puts the old binary back, and
@@ -126,8 +125,13 @@ function replaceBinary(newBin: string, target: string): { restore: () => void; c
     if (code !== "EACCES" && code !== "EPERM") throw err;
     try {
       sudo("mv", target, oldTarget);
-      sudo("mv", newBin, target);
-      sudo("chmod", "755", target);
+      try {
+        sudo("mv", newBin, target);
+        sudo("chmod", "755", target);
+      } catch (moveErr) {
+        spawnSync("sudo", ["mv", oldTarget, target], { stdio: "inherit" });
+        throw moveErr;
+      }
     } catch (sudoErr) {
       const msg = sudoErr instanceof Error ? sudoErr.message : String(sudoErr);
       throw new Error(`Cannot write to ${target}. Set APPBAY_INSTALL_DIR to a writable directory, or run with sudo.\n${msg}`);
@@ -198,9 +202,10 @@ async function selfUpdate(): Promise<void> {
     timeout: 30_000,
   });
   if (verResult.error || verResult.status !== 0) {
-    replaced.restore();
     const why = verResult.error?.message || (verResult.stderr as string) || `exit ${String(verResult.status)}`;
-    throw new Error(`the new binary at ${selfPath} did not run (${why}); the previous binary was put back.`);
+    let restored = "the previous binary was put back";
+    try { replaced.restore(); } catch (restoreErr) { restored = `and the previous binary could NOT be put back (${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)})`; }
+    throw new Error(`the new binary at ${selfPath} did not run (${why}); ${restored}.`);
   }
   replaced.commit();
   const newVersion = ((verResult.stdout as string) || "").trim();

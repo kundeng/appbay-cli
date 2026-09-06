@@ -121,4 +121,7 @@ program.addCommand(fixfsCommand);
 program.addCommand(updateCommand);
 program.addCommand(completionCommand);
 
-program.parse();
+program.parseAsync().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});

@@ -23,7 +23,7 @@ function upstreamUrl(app: string): string | null {
   })();
   try {
     const compose = parseYaml(readFileSync(renderPath, "utf-8")) as { services?: Record<string, { ports?: unknown[]; networks?: Record<string, { aliases?: string[] } | null> }> };
-    for (const [svc, config] of Object.entries(compose.services ?? {})) {
+    for (const config of Object.values(compose.services ?? {})) {
       const alias = config.networks?.[SHARED_NETWORK]?.aliases?.[0];
       if (!alias) continue;
       const first = config.ports?.[0];
@@ -69,7 +69,11 @@ export const tunnelCommand = new Command("tunnel")
 
     if (!hasImage) {
       console.log("Pulling cloudflared image...");
-      containerExec(["pull", "cloudflare/cloudflared:latest"], { appbayHome, stdio: "inherit", timeout: 120_000 });
+      const pulled = containerExec(["pull", "cloudflare/cloudflared:latest"], { appbayHome, stdio: "inherit", timeout: 120_000 });
+      if (pulled.exitCode !== 0) {
+        console.error(`Could not pull cloudflared${pulled.failedToStart || pulled.timedOut ? `: ${pulled.output.trim()}` : ""}.`);
+        process.exit(1);
+      }
     }
 
     // Start tunnel in background
@@ -78,6 +82,9 @@ export const tunnelCommand = new Command("tunnel")
         "run", "--rm",
         "--name", containerName,
         "--network", SHARED_NETWORK,
+        // Linux Docker resolves host.docker.internal only when told to; Podman and Docker
+        // Desktop already do, and accept the flag.
+        "--add-host", "host.docker.internal:host-gateway",
         "cloudflare/cloudflared:latest",
         "tunnel", "--url", targetUrl,
       ],
@@ -108,6 +115,12 @@ export const tunnelCommand = new Command("tunnel")
         process.exit(1);
       }
     }, 30_000);
+
+    child.on("error", (err) => {
+      clearTimeout(timeout);
+      console.error(`Could not start the tunnel container: ${err.message}`);
+      process.exit(1);
+    });
 
     child.on("exit", (code) => {
       clearTimeout(timeout);

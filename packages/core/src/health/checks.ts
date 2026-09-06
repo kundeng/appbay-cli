@@ -920,7 +920,9 @@ export async function checkSharedNetworkDns(appbayHome: string): Promise<HealthC
     "busybox:latest", "nslookup", `${probeName}.`,
   ], { appbayHome, timeout: 60_000, label: "dns probe" });
 
-  if (probe.failedToStart || probe.timedOut) {
+  // nslookup exits 1 on a name it cannot resolve; the runtime exits 125 when the container
+  // never ran (no image offline, no network, a daemon that refused). Only the first is a verdict.
+  if (probe.failedToStart || probe.timedOut || (probe.exitCode !== 0 && probe.exitCode !== 1)) {
     return { name: "Shared network DNS", status: "unknown", detail: `the probe could not run (${probe.output.trim()})`, required: true };
   }
   if (probe.exitCode === 0) {

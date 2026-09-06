@@ -117,7 +117,8 @@ round n:
 - [x] 1.9 knip's unused exported types
 - [x] 2.1 review round 1, fixes
 - [x] 2.2 review round 2, fixes
-- [x] 2.3 review round 3, fixes (round 4 pending)
+- [x] 2.3 review round 3, fixes
+- [x] 2.4 review round 4, fixes (round 5 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -205,3 +206,20 @@ consequences of round-2 fixes.
 | R3.13 | LOW | `converges.ts` | `shepherd:post` depends on `route` (R2.18) | still Kun's |
 
 Not pinned by a test after this round (recorded, not claimed): the edge restart's three answers, the DNS probe's unknown, the `update` restore path, `apply --yes` over unchanged plans, `exec`'s service choice, setup's reset abort, `selfInvocation` under bun. The rest of the round-3 fixes carry a test or the arch rule.
+
+**2026-09-06 — round 4.** Three fresh reviewers. Two HIGH, six MEDIUM; two of the eight were
+consequences of round-3 fixes, one was a latent hang in the engine client.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R4.1 | Q5 HIGH | `engine-api.ts get()` | a daemon that closes the socket mid-reply left the request unsettled: the idle timeout never fires on a closed socket, so every observation the deploy makes could hang (reproduced on node 24 and bun 1.3.6) | fixed: the response's `close` before `end` rejects; a socket-server test cuts a reply off and expects `unknown` within a moment |
+| R4.2 | S1/Q1 HIGH | `apply.ts` | round 3's `--yes` change handed `deploy()` an empty target list for a typo'd name, and an empty list meant "every app": `apply typo --yes` converged the install (reproduced) | fixed at both ends: `deploy()` treats `[]` as nothing; `apply` names an unknown target and exits 1; `apply` passes the user's names; scratch-home test |
+| R4.3 | S1/Q1 MED | `pull.ts` | unknown names dropped, "1 pulled", exit 0 | fixed: named, exit 1; scratch-home test |
+| R4.4 | S1 MED | `tunnel.ts --port` | `host.docker.internal` is not resolvable on Linux Docker without `--add-host`; the tunnel printed a URL that served nothing (confirmed on the Rocky guest) | fixed: `--add-host host.docker.internal:host-gateway`; the child's `error` event is heard; a failed pull fails the command |
+| R4.5 | Q1/S7 MED | `checks.ts` DNS probe | round 3's fix left exit 125 (the container never ran: no image offline, no network) as a failed lookup with a destructive fix | fixed: only nslookup's own exit 1 is a verdict |
+| R4.6 | S1 MED | `deploy-report.ts` | "the one printer" did not print `compileErrors`; `up` and `restart` each had a copy, `apply` had none, so a `projects.yaml` cycle under `apply --yes` failed silently | fixed: the printer prints them; the copies are gone |
+| R4.7 | S7/Q1 MED | `deploy-report.ts` | every deployed row said "Started", including `convergeAction` unknown and already-running | fixed: the sentence follows the action |
+| R4.8 | REGRESSION MED | `setup.ts` | round 3's exit 1 from `edge users reset-password` on a failed restart made setup discard the child's stdout, and with it the rotated bootstrap password | fixed: stdout is written before the status is judged |
+| R4.9 | LOW | several | `edgeIsRunning` folded `unknown` into "not running" in the reset guard; `update`'s sudo branch could leave no binary and its restore could mask the original error; a duplicate doc block; thrown user errors surfaced as stacks (`parseAsync` with a handler); a refused app's row could show a skip instead of its refusal; a signal-killed child read "exited with code null"; `execFile` outside the arch rules; a dead `.catch`; stale test header and imports; stale "Docker" in two headers; an unused loop variable | fixed |
+| R4.10 | LOW | `edge-identity-service.ts`, `run-shepherd.ts`, `resolve-for-deploy.ts`, `secrets.ts` | the binary is resolved from the default home at five sites the deploy could hand a home to | recorded: a single-home CLI cannot observe it; S49 1.5 with the config loader |
+| R4.11 | LOW | `observe.ts:94` | an exited container that vanishes between list and inspect reads as a completed one-shot | recorded: the row is gone on the next read; no operator-visible verdict rests on one pass |

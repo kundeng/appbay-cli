@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { engineObserver, findCrashedServices, isReady } from "../observe.js";
-import { apiPing } from "../engine-api.js";
+import { apiPing, apiInspectContainer } from "../engine-api.js";
 
 interface Fake { Id: string; Names: string[]; State: string; Status: string; Labels: Record<string, string>; ExitCode?: number }
 let containers: Fake[] = [];
@@ -31,6 +31,13 @@ beforeAll(async () => {
       json(200, out.map(({ ExitCode: _e, ...c }) => c)); return;
     }
     const m = /^\/containers\/([^/]+)\/json$/.exec(url.pathname);
+    if (m && decodeURIComponent(m[1]!) === "truncated") {
+      // A daemon that dies mid-reply: headers, five bytes, then the socket is gone.
+      res.writeHead(200, { "content-type": "application/json", "content-length": "1000" });
+      res.write("{\"Id\"");
+      res.socket?.destroy();
+      return;
+    }
     if (m) {
       const c = containers.find((x) => x.Id === decodeURIComponent(m[1]!) || x.Names.includes(`/${decodeURIComponent(m[1]!)}`));
       if (!c) { json(404, { message: "no such container" }); return; }
@@ -50,6 +57,14 @@ const c = (name: string, state: string, labels: Record<string, string>, extra: P
 
 describe("engine observer", () => {
   it("pings", async () => { expect(await apiPing({ socketPath: sock })).toEqual({ kind: "ok", value: true }); });
+
+  it("a reply the daemon cut off mid-body is unknown within a moment, not a hang (S48 round 4)", async () => {
+    const started = Date.now();
+    const r = await apiInspectContainer("truncated", { socketPath: sock, timeoutMs: 10_000 });
+    expect(r.kind).toBe("unknown");
+    expect(r.kind === "unknown" ? r.reason : "").toMatch(/closed|aborted|unexpectedly|hang up|ECONNRESET|EPIPE/i);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
 
   it("finds the edge by its label, whatever its name, preferring the running one", async () => {
     containers = [c("appbay.caddy.caddy", "exited", { "com.appbay.app": "caddy" }), c("appbay.system.caddy.caddy", "running", { "com.appbay.app": "caddy" })];

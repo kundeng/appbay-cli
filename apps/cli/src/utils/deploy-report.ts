@@ -7,6 +7,14 @@ import type { DeployResult } from "@appbay/core";
 import { pad } from "./formatting.js";
 
 export function printDeployReport(result: DeployResult): { hasFailures: boolean } {
+  if (result.compileErrors.length > 0) {
+    console.error("Compile errors:");
+    for (const err of result.compileErrors) {
+      console.error(`  ${err.appName ? `[${err.appName}]` : "[global]"} ${err.stage}: ${err.message}`);
+    }
+    if (result.apps.length > 0) console.error("");
+  }
+
   // 🚨 The bracket is prefixed `plan:` because it is a verdict about the COMPILED
   // ARTIFACT, and a bare `[UNCHANGED]` was read — by operators and by this command's own
   // summary — as a verdict about the deployment (appbay-cli#4). They disagree exactly
@@ -20,10 +28,16 @@ export function printDeployReport(result: DeployResult): { hasFailures: boolean 
 
     if (app.status === "deployed") {
       console.log(`  ${pad(app.appName, 14)} [plan: ${statusLabel}]${sysTag}`);
+      // The sentence follows what the observer saw, not the plan: a new render whose
+      // containers compose left alone did not "start".
       console.log(
-        app.planStatus === "unchanged" && app.convergeAction === "started"
-          ? `  Started ${app.appName} — the plan was unchanged, the container was not`
-          : `  Started ${app.appName}`,
+        app.convergeAction === "unknown"
+          ? `  Converged ${app.appName}; could not read whether it started (${app.unknownReason ?? "compose did not answer"})`
+          : app.convergeAction === "already-running"
+            ? `  Converged ${app.appName}; compose changed nothing, the container was already running`
+            : app.planStatus === "unchanged"
+              ? `  Started ${app.appName} — the plan was unchanged, the container was not`
+              : `  Started ${app.appName}`,
       );
     } else if (app.status === "failed") {
       console.error(`  Failed: ${app.appName} — ${app.error}`);

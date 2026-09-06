@@ -2,7 +2,7 @@
  * `appbay server start|stop|status` command.
  *
  * Manages the Appbay server (control plane) lifecycle. The server runs as a
- * Docker Compose stack defined in `docker-compose.server.yml` located in
+ * compose stack defined in `docker-compose.server.yml` located in
  * `$APPBAY_HOME`.
  *
  * Subcommands:

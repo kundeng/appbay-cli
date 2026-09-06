@@ -24,8 +24,13 @@ function get(path: string, socketPath: string, timeoutMs: number = TIMEOUT_MS): 
   return new Promise((resolve, reject) => {
     const req = request({ socketPath, path, method: "GET", timeout: timeoutMs }, (res) => {
       const chunks: Buffer[] = [];
+      let ended = false;
       res.on("data", (c: Buffer) => chunks.push(c));
-      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf-8") }));
+      res.on("end", () => { ended = true; resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf-8") }); });
+      // A daemon that restarts mid-reply closes the socket without `end`; the idle timeout
+      // never fires on a closed socket, so the response's own close is what settles the call.
+      res.on("close", () => { if (!ended) reject(new Error("connection closed before the reply ended")); });
+      res.on("error", reject);
     });
     req.on("timeout", () => req.destroy(new Error(`no answer from ${socketPath} within ${String(timeoutMs)} ms`)));
     req.on("error", reject);

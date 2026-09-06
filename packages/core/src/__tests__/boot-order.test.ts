@@ -1,10 +1,10 @@
 /**
  * System app boot ordering — the sequence `appbay up` deploys in and `appbay down` reverses.
  *
- * ⚠️ This module had no tests, and it decides deployment order for the edge proxy: the app
- * every other app routes through. The properties below are the ones callers actually rely
- * on, and two of them are easy to break by accident because they concern ORDER, which a
- * type checker cannot see and a smoke test with one system app installed cannot distinguish.
+ * This module decides deployment order for the edge proxy, the app every other app routes
+ * through. The properties below are the ones callers rely on, and the ones about ORDER are
+ * easy to break by accident: a type checker cannot see order, and a smoke test with one
+ * system app installed cannot distinguish it.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ import {
   SYSTEM_APP_BOOT_ORDER,
   isSystemApp,
   deployOrder,
+  dependentsOf,
 } from "../boot-order.js";
 
 describe("isSystemApp", () => {
@@ -29,7 +30,7 @@ describe("isSystemApp", () => {
 });
 
 describe("teardown is the reverse of boot", () => {
-  it("reversing the PARTITIONED system list is not the same as reversing the input", () => {
+  it("reversing the deploy order is not the same as reversing the input", () => {
     // 🚨 The bug this pins. `appbay down` built its order as
     // `targetApps.filter(isSystemApp).reverse()`, and targetApps comes from `discoverApps`,
     // which sorts ALPHABETICALLY. Reversing an alphabetical list is not reverse-boot-order:
@@ -46,8 +47,7 @@ describe("teardown is the reverse of boot", () => {
   });
 });
 
-describe("deployOrder — projects.yaml expanded to app edges", async () => {
-  const { deployOrder, dependentsOf } = await import("../boot-order.js");
+describe("deployOrder — projects.yaml expanded to app edges", () => {
   const app = (appName: string, project = "default") => ({ appName, project });
 
   it("with no file, system apps come first and user apps keep their order", () => {

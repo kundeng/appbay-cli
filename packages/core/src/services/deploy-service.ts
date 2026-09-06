@@ -84,12 +84,15 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   // Every installed app, whether or not it is a target: the projects they declare are the
   // ones `after:` may name, and each has a `.env`, empty if it declares nothing, because
   // compose and the render copy read it.
-  const installed = await discoverApps({ appsDir }).catch(() => []);
+  const installed = await discoverApps({ appsDir });
   for (const app of installed) {
     await writeFile(join(appsDir, app.name, ".env"), "", { flag: "a" }).catch(() => undefined);
   }
 
-  const missing = (targetApps ?? []).filter((name) => !installed.some((a) => a.name === name));
+  // `compile()` reads an empty list as "every app"; a caller that filtered its targets down
+  // to nothing asked for nothing.
+  if (targetApps !== undefined && targetApps.length === 0) return emptyDeployResult();
+  const missing = targetApps?.filter((name) => !installed.some((a) => a.name === name)) ?? [];
   if (missing.length > 0) {
     return emptyDeployResult(missing.map((name) => ({ appName: name, stage: "target", message: `no installed app named "${name}"` })));
   }

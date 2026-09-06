@@ -48,11 +48,12 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "only runtime/ spawns a process; the CLI spawns host tools, never the container binary",
-    pattern: /\b(spawnSync|execFileSync|execSync|execFileAsync|spawn)\(/,
+    pattern: /\b(spawnSync|execFileSync|execSync|execFileAsync|execFile|spawn)\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {
       "packages/core/src/secrets/providers/sops.ts": "spawns the sops binary, not the container runtime",
       "packages/core/src/services/catalog-service.ts": "spawns git for a catalog source",
+      "packages/core/src/secrets/keepassxc-cli.ts": "spawns keepassxc-cli, the KeePass tool, not the container runtime",
       "apps/cli/src/commands/init-system.ts": "host bootstrap: package manager, systemctl, useradd",
       "apps/cli/src/commands/setup.ts": "host tools during setup",
       "apps/cli/src/commands/fixfs.ts": "host filesystem repair: chown, chmod",
@@ -70,7 +71,7 @@ const RULES: Rule[] = [
   },
   {
     name: "nothing outside runtime/ spawns the container binary, by any name",
-    pattern: /\b(?:spawn|spawnSync|execFileSync|execSync|tryExec)\(\s*(?:(?:bin|binary|runtime)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(|\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync)\s*(?:as|:)\s*\w+\s*[,}]|\bBun\.spawn(?:Sync)?\(/,
+    pattern: /\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync|tryExec)\(\s*(?:(?:bin|binary|runtime)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(|\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync)\s*(?:as|:)\s*\w+\s*[,}]|\bBun\.spawn(?:Sync)?\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {},
     allowed: {

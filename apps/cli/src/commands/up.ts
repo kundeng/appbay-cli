@@ -59,16 +59,8 @@ export const upCommand = new Command("up")
       },
     });
 
-    // Report compile errors
-    if (result.compileErrors.length > 0) {
-      console.error("Compile errors:");
-      for (const err of result.compileErrors) {
-        const prefix = err.appName ? `[${err.appName}]` : "[global]";
-        console.error(`  ${prefix} ${err.stage}: ${err.message}`);
-      }
-    }
-
     if (result.apps.length === 0 && result.compileErrors.length > 0) {
+      printDeployReport(result);
       process.exit(1);
     }
 

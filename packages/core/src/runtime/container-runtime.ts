@@ -346,7 +346,7 @@ export function containerExec(
       exitCode: result.status ?? 1,
       output:
         (result.stderr as string | null) ||
-        `${label ?? bin} exited with code ${String(result.status)}`,
+        (result.status === null ? `${label ?? bin} was killed by ${result.signal ?? "a signal"}` : `${label ?? bin} exited with code ${String(result.status)}`),
     };
   }
   return { exitCode: 0, output: (result.stdout as string | null) ?? "" };

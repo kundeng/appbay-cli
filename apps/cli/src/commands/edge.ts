@@ -170,7 +170,7 @@ const migrate = new Command("migrate")
       },
       startStack: async (p) => {
         const r = await deploy({ appbayHome, targetApps: [p], dockerCompose: (a, c, e) => dockerCompose(a, c, e) });
-        if (r.compileErrors.length > 0) throw new Error(`${p} did not compile: ${r.compileErrors.map((e) => `${e.stage}: ${e.message}`).join("; ")}`);
+        if (r.compileErrors.length > 0) throw new Error(`${p} could not be deployed: ${r.compileErrors.map((e) => `${e.stage}: ${e.message}`).join("; ")}`);
         const failed = r.apps.find((a) => a.status === "failed");
         if (failed) throw new Error(failed.error ?? `${p} failed to deploy`);
         if (r.apps.some((a) => a.convergeAction === "unknown")) throw new Error(`${p}: the runtime could not be read after start`);
