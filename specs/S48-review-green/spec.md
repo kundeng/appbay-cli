@@ -123,7 +123,8 @@ round n:
 - [x] 2.6 review round 6, fixes
 - [x] 2.7 review round 7, fixes
 - [x] 2.8 review round 8, fixes
-- [x] 2.9 review round 9, fixes (round 10 pending)
+- [x] 2.9 review round 9, fixes
+- [ ] 2.10 review round 10 and onward until a round returns nothing above LOW in every region (see `docs/history/2026-09-06-s48-handoff.md`)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -312,3 +313,8 @@ Podman: `appbay down` → the nine undeployed apps "(not deployed)", `whoami` an
 refused with the project named, exit 1, the real install's containers still up; `delete
 whoami --force` refused. Rocky: `appbay down` → all "(not deployed)", exit 0; `delete whoami
 --force` → deleted, "Nothing was running, so no volumes were touched."
+
+**2026-09-06 — session stop.** The operator's usage limit ended the session with round 10
+and the round-9 journeys in flight; their results are not recorded and are to be treated as
+not run. The handoff for the next agent is `docs/history/2026-09-06-s48-handoff.md`: exact
+next actions, the journey commands for both guests, what is waiting on Kun.

@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-06):** S48 in flight (review rounds; core and CLI regions at LOW-only as of round 9, the round-9 diff pending) · open: 44 · next after S48: Kun's decisions D1, D2, D3 (review 04) and row 28; then issue #11 (ship the injector); row 22 (single-node Swarm); issue #12 (a trait owns its converge); S49 (config loader, eslint, builds.ts spawns). The human review track starts at docs/steering/product.md.
+**Position (2026-09-06):** S48 in flight; the session stopped before round 10 — resume from `docs/history/2026-09-06-s48-handoff.md` (core and CLI regions at LOW-only as of round 9, the round-9 diff review not recorded) · open: 44 · next after S48: Kun's decisions D1, D2, D3 (review 04) and row 28; then issue #11; row 22; issue #12; S49. The human review track starts at docs/steering/product.md.
 
 ## Protocol
 
