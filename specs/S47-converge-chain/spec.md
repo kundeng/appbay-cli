@@ -1,7 +1,7 @@
 ---
 spec_id: S47-converge-chain
-status: ACTIVE
-closed_as: null
+status: CLOSED
+closed_as: SHIPPED
 since: 2026-09-06
 until: null
 epic: correctness
@@ -98,7 +98,7 @@ their constructors under `TraitDefinition` beside `transform()`. The unit is nam
 
 ## Out of Scope
 
-- A `converge()` on `TraitDefinition`. Tracked as a GitHub issue opened at close.
+- A `converge()` on `TraitDefinition`. Issue #12 carries it, with the shepherd marker and the config-hash drift check below.
 - A marker in `var/lib/state/` that makes a one-shot shepherd action observable. Until it
   exists the shepherd converges report converged when the actions ran clean, every run.
 - Drift detection from `com.docker.compose.config-hash`. Verified present on Docker; not
@@ -140,9 +140,9 @@ flowchart LR
 
 ```
 packages/core/src/services/
-  deploy-service.ts        deploy(): setup, plan, run, fold; public types; resolveDeployEnv; render writer
+  deploy-service.ts        deploy(): setup, plan, run, fold; DeployOptions; re-exports of the public names
   deploy/converge.ts       Verdict, Converge, DeployContext, runConverges (the skip rule)
-  deploy/converges.ts      Render, Secrets, Shepherd, Project, Route, CompileFailed
+  deploy/converges.ts      the six links; writeRenderedOutput, resolveDeployEnv, runShepherdActions (moved)
   deploy/report.ts         foldDeployResult: verdicts → AppDeployResult and the counts
   deploy/route.ts          runCaddyCommand, installCaddyConfig, installRoute, describeRouteFailure (moved)
 ```
@@ -264,23 +264,54 @@ sequenceDiagram
 
 # 3 · Tasks
 
-- [ ] 1.1 `deploy/converge.ts`: the contract and `runConverges` (1.4)
-- [ ] 1.2 `deploy/report.ts`: `foldDeployResult` and its table test (1.2)
-- [ ] 1.3 `deploy/converges.ts`: the six converges; `deploy()` becomes setup, plan, run,
+- [x] 1.1 `deploy/converge.ts`: the contract and `runConverges` (1.4)
+- [x] 1.2 `deploy/report.ts`: `foldDeployResult` and its table test (1.2)
+- [x] 1.3 `deploy/converges.ts`: the six converges; `deploy()` becomes setup, plan, run,
       fold; both branches, `notReady`, the dead `existsSync` guard, `stateDir` and the
       explicit wrapper call go (1.1, 1.3, 1.6, 1.7)
-- [ ] 1.4 `apps/cli/src/utils/deploy-report.ts`: the "plan was unchanged" phrase only when
+- [x] 1.4 `apps/cli/src/utils/deploy-report.ts`: the "plan was unchanged" phrase only when
       it was (1.5)
-- [ ] 1.5 `deploy/route.ts`: the Caddy and route functions move; `arch.test.ts` and
+- [x] 1.5 `deploy/route.ts`: the Caddy and route functions move; `arch.test.ts` and
       `edge-target.test.ts` follow them; the file header stops naming a tRPC caller (1.8,
       ledger row 12)
-- [ ] 1.6 New tests: skip rule with an unobservable dependency, `.env` copied on an
+- [x] 1.6 New tests: skip rule with an unobservable dependency, `.env` copied on an
       unchanged plan, `convergeAction` on a new plan (1.9)
-- [ ] 1.7 Journey on Docker; Podman if the guest answers; log the result
-- [ ] 1.8 `docs/steering/structure.md` names `services/deploy/`; ledger rows updated; the
+- [x] 1.7 Journey on Docker (Rocky 9 guest) and on rootful Podman (Fedora guest); log below
+- [x] 1.8 `docs/steering/structure.md` names `services/deploy/`; ledger rows updated; the
       trait-owned-converge issue opened; close
 
 ## Log
 
 **2026-09-06** — created from the review conversation over `deploy-service.ts`; baseline
 core 1111 passed, CLI 385 passed, `tsc --noEmit` clean.
+
+**2026-09-06** — shipped in four commits: ed23b7c (contract, executor, fold, their table test),
+e47cf9a (the cutover: one chain per app, `deploy-service.ts` 869 → 161 lines, route functions
+to `deploy/route.ts`), 0211a1c (the three tests for the new behaviour, `structure.md`), and
+the close. core 1126 passed (1111 before), CLI 385, `tsc --noEmit` clean in both packages.
+
+Behaviour that changed, each with its test or journey: `convergeAction` is recorded on a new
+plan; an unobservable dependency blocks its dependents; the render's `.env` is copied on an
+unchanged plan; post-deploy shepherd actions run on an unchanged plan too (the old unchanged
+branch never ran them; no trait emits one today, so no test); the readiness wait runs before
+the route install; wrapper-file secrets are materialised once, by the trait's action.
+
+Runtime evidence, the new Linux arm64 binary (md5 `19cab435a34c5642f11e19eda276ac62`)
+installed in both Lima guests and `s29-journey-deploy-reporting.sh` run through the
+multipass shim:
+
+```
+PATH=/tmp/mp:$PATH VM=podman PRIV=sudo CBIN=podman HOME_DIR=/root/.appbay \
+  ./scripts/journeys/s29-journey-deploy-reporting.sh            → 10 passed, 0 failed
+PATH=/tmp/mp2:$PATH VM=rocky PRIV="sudo env PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  CBIN=docker HOME_DIR=/var/lib/appbay ./scripts/journeys/s29-journey-deploy-reporting.sh
+                                                                → 10 passed, 0 failed
+```
+
+R1–R5 are appbay-cli#4 (the deployment is counted, the idempotent control still says 0, the
+recreated container is a deployment while the plan stays UNCHANGED); R7–R10 are appbay-cli#5
+(a stopped edge is "not running", not "rejected", and the partial converge is reported as
+partial). On Rocky, `sudo` drops `/usr/local/bin` from PATH, so the first run failed at
+`appbay init` inside the payload; `PRIV` carries the PATH. `s26-journey-apply-success.sh` does
+not run on either guest: it and fifteen other journeys `cd /home/ubuntu`, the multipass user's
+home (ledger row 42).
