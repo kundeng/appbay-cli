@@ -18,8 +18,8 @@ identity sprints that followed the first seam review:
 
 - **Correct:** the deploy path finds the edge by label, observes the runtime over its API
   socket, waits for readiness in project order, and reports unknown when it could not look.
-  Every app carries its identity, with or without an upstream block. Verified on Docker;
-  Podman verification is an open issue.
+  Every app carries its identity, with or without an upstream block. Verified on Docker, on
+  rootful Podman, and on a RHEL-family Docker service install.
 - **Legible:** one loader per file, one home resolver, one observer, one compile entry; the
   arch test enforces the rules with lists that only shrink. Fix-narrative comments are down
   by a third and the moved functions carry invariants.

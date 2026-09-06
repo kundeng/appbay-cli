@@ -9,6 +9,7 @@ Where each kind of truth lives. A directory is listed only if it exists.
 | `reference/` | contract material: `appbay.yaml`, CLI commands, the scope model, API endpoints | by hand, checked by `check:docs-cli` |
 | `deploy/` | installation, deployment, migration procedures | by hand |
 | `rfc/` | RFC-001 and its measured findings and evidence probes | frozen once a spec adopts an item |
+| `design/` | stable cross-cutting anchors: the data architecture every state-touching spec declares | by hand |
 | `history/` | dated evidence: review sets under `<date>-review/`, the review ledger, the seam review | by reviews and by hand |
 | `images/` | screenshots the guides embed | |
 
@@ -19,6 +20,3 @@ Current truth belongs in steering, guides, reference, and code. Time-bound findi
 history. A durable doc never names a sprint id or a review date; a sprint points up to the
 durable doc it must obey.
 
-Not present yet: `design/`, the stable cross-cutting anchors. Every spec declares
-`anchors: [data-architecture]`; the document is owed and is the first write of the next
-sprint.

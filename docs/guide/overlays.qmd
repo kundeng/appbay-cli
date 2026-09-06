@@ -123,7 +123,7 @@ Overlays are evaluated during the compile step, before traits are applied. The e
 2. For each app being compiled, its overlays are checked against that set.
 3. If a `when` clause is satisfied, the `services` fragment is deep-merged into the app's Compose model.
 4. Multiple matching overlays are applied in declaration order.
-5. After all overlays are merged, traits are applied on top.
+5. Traits are applied to the compose model; the overlay fragments are merged in at render, so a trait's changes and an overlay's compose side by side.
 
 ::: {.callout-note}
 ## Targeting an app does not change what it renders

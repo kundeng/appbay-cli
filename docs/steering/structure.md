@@ -14,9 +14,11 @@ packages/core/src/
   secrets/      secret providers and the deploy-time resolver
   shepherd/     one-shot helper containers run around a deploy
 apps/cli/src/
-  commands/     one file per command; argument parsing and printing only
+  commands/     one file per command; argument parsing and printing; today also the
+                host-tool and container-CLI spawns for logs, exec, pull, bootstrap and setup
   utils/        home resolution, formatting, the compose wrapper
-scripts/journeys/   end-to-end runs against a Docker VM and a Podman VM
+packages/db/        the web control plane's SQLite schema; used only by `rebuild-cache`
+scripts/journeys/   end-to-end runs against a Docker VM and a Podman VM (multipass; Lima via a shim)
 specs/              sprints, in order; the one marked ACTIVE is the head
 docs/               steering, guides, reference, rfc, history
 ```
@@ -38,7 +40,7 @@ The rule each layer owes:
 | `compiler`, `traits`, `identity` | what a manifest means and every name the system generates | spawn a process |
 | `runtime` | every `docker` or `podman` invocation for mutation, and every observation, which goes over the runtime's API socket and never parses CLI text | know what an app is |
 | `services`, `health` | a use case end to end, reporting what it observed | parse runtime output or resolve the home directory itself |
-| `apps/cli` | argv in, text out | hold a deploy, a doctor, or a parser of its own |
+| `apps/cli` | argv in, text out; the host-tool spawns of `init-system`, `setup`, `fixfs` | hold a deploy, a doctor, or a parser of its own; the container-CLI spawns still in `logs`, `exec`, `pull` and `up --tail` are the remaining move into `runtime/` |
 
 A fact has one reader. When a second reader appears, the first one moves to where
 both can call it, and the second is deleted.

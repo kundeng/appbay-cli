@@ -44,18 +44,19 @@ shape, not a promise to the user; it is in `structure.md`.
 ## Secrets: what is chosen, and what is established
 
 The secrets trait lets a manifest choose how a resolved secret reaches the container:
-`none`, `runtime-env` (the default), `wrapper-file`, `entrypoint-wrapper`, or
-`wrapper-live`. The modes differ in exposure: an environment variable is readable by
-anything that can inspect the container; a wrapper file on a shared volume is readable by
-whatever mounts it; a live wrapper narrows the window further. The product's position is
-that the manifest author chooses with the exposure stated beside each mode, and that the
-default is the safest mode the app can run under.
+`none`, `runtime-env` (the default), `wrapper-file`, or `entrypoint-wrapper`. The modes
+differ in exposure: an environment variable is readable by anything that can inspect the
+container; a wrapper file on a shared volume is readable by whatever mounts it; the
+entrypoint wrapper decrypts into the process and nothing else. The manifest author chooses
+with the exposure stated beside each mode in the secrets guide.
 
-What has not been established is that every mode keeps the secret out of a render, an
-argv, and a log. The fix history has three defects of that shape, and the review has not
-yet audited the current modes. Until it has, this page states the intent and not the
-guarantee; the security-review pass named in the verification sprint is where the
-guarantee is earned, mode by mode.
+What is established, on Docker and on rootful Podman: no mode puts a value on a command
+line or in a render; `runtime-env` puts it in the compose child's environment for the
+duration of `up`; `wrapper-file` writes files on a volume through a helper container fed on
+stdin; `entrypoint-wrapper` works when the injector binary is present, and shipping that
+binary is open work. Two things the product does not yet promise: the vault's master
+password is a file on disk beside the vault, and an install whose vault is locked falls back
+to a plaintext `.env.local` and says so. Both are recorded as decisions for the maintainer.
 
 ## Decided definitions
 
@@ -84,7 +85,7 @@ These are the maintainer's, and a spec or a doc that contradicts one is wrong.
   `packages/core` and `apps/cli`. A comment or test here that names a web caller describes
   something this tree cannot see.
 - The catalog of installable apps is a sibling repository, `appbay-catalog`. This repo
-  ships ten system apps in `packages/core/src/system-apps.ts`.
+  ships twelve system apps in `packages/core/src/system-apps.ts`, generated from `system-apps/`.
 - Two runtimes are supported, and a change is not done until it has run on both.
 
 ## Related work

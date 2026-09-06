@@ -30,7 +30,7 @@ Contract at each boundary:
 | generated values → compile | `(namespace, service, key) → value` | both: compile reads, and writes a new key on first use | `GeneratedValueStore` |
 | compile → render | one compose document per app, plus edge fragments written into the provider app's directory | down | files; the render is derived and disposable |
 | render → runtime | `compose -f <render> up -d` | down | the compose binary owns naming and recreate semantics |
-| runtime → services | container state | up | today: parsed CLI text; target: typed rows from one adapter function |
+| runtime → services | container state | up | typed rows from one adapter (`runtime/observe.ts`) over the Engine API socket; no CLI text is parsed |
 
 ## Lifecycle table
 

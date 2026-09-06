@@ -4,7 +4,8 @@ Docker/Podman-native PaaS control plane around Compose: `appbay.yaml` is a
 policy layer beside an upstream `docker-compose.yml`; traits, overlays and
 scoped variables compile it into the compose file that actually runs.
 `README.md` has the command surface and setup. `specs/` holds the sprints,
-worked in order; the one with `status: ACTIVE` is the head of the queue.
+worked in order; the one with `status: ACTIVE` is the head of the queue, and when none
+is, the next sprint is named in the review ledger's position line.
 `docs/steering/` holds what the product is, its pillars, and the definitions Kun has
 decided; `docs/history/` holds the dated review sets, the review ledger, and the seam
 review a session resumes from.
