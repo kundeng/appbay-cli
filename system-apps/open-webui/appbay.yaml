@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "chat.${{project.DOMAIN}}"
+    host: "chat.${{ns:DOMAIN}}"
     port: 8080
     service: open-webui
     exposure: both

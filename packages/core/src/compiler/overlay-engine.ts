@@ -24,10 +24,10 @@ export interface OverlayInput {
     services: Record<string, Record<string, unknown>>;
   }>;
   /**
-   * The apps this one may be wired to: installed apps that share a collection with it.
-   * `when: [a, b]` asks where a and b are declared, never whether they are running
-   * (docs/steering/product.md, decided definitions). An app that declares no
-   * collection is in `default`, so a home with no collections behaves as one stack.
+   * The apps this one may be wired to: installed apps in the same project. `when: [a, b]`
+   * asks where a and b are declared, never whether they are running
+   * (docs/steering/product.md, decided definitions). An app that declares no project is
+   * in `default`, so a home that declares none behaves as one project.
    */
   peers: Set<string>;
 }
@@ -74,13 +74,13 @@ function evaluateClause(
   if (isAndClause(clause)) {
     const missing = clause.filter((app) => !peers.has(app));
     if (missing.length > 0) {
-      return `AND clause not met: not declared in a shared collection: ${missing.join(", ")}`;
+      return `AND clause not met: not in this app's project: ${missing.join(", ")}`;
     }
     return null;
   }
   const { any: apps } = clause;
   if (!apps.some((app) => peers.has(app))) {
-    return `OR clause not met: none of ${apps.join(", ")} are declared in a shared collection`;
+    return `OR clause not met: none of ${apps.join(", ")} are in this app's project`;
   }
   return null;
 }

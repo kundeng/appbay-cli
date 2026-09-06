@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "jellyfin.${{project.DOMAIN}}"
+    host: "jellyfin.${{ns:DOMAIN}}"
     port: 8096
     service: jellyfin
     exposure: external

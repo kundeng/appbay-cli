@@ -26,10 +26,11 @@ export const upCommand = new Command("up")
   .description("Compile and deploy selected apps")
   .argument("[apps...]", "specific apps to deploy (default: all)")
   .option("--all", "deploy all discovered apps")
+  .option("--namespace <ns>", "namespace for every app whose manifest pins none")
   .option("--collection <name>", "deploy only apps in this collection")
   .option("--tail", "tail logs after deploy")
   .option("--open", "open in browser after deploy")
-  .action(async (apps: string[], options: { all?: boolean; collection?: string; tail?: boolean; open?: boolean }) => {
+  .action(async (apps: string[], options: { all?: boolean; collection?: string; tail?: boolean; open?: boolean; namespace?: string }) => {
     const appbayHome = resolveAppbayHome();
 
     // Resolve target apps
@@ -55,6 +56,7 @@ export const upCommand = new Command("up")
       appbayHome,
       targetApps,
       collection: options.collection,
+      namespace: options.namespace,
       projectVars,
       dockerCompose: (subArgs, composePath, env) => {
         return dockerCompose(subArgs, composePath, env);

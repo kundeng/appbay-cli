@@ -44,7 +44,7 @@ Service-scoped traits like `ingress` are declared under `services.<name>.traits`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `host` | string | required | The hostname for routing (supports `${{project.DOMAIN}}`) |
+| `host` | string | required | The hostname for routing (supports `${{ns:DOMAIN}}`) |
 | `port` | number | required | Target port on the service |
 | `exposure` | enum | `both` | `internal` (LAN only), `external` (WAN), or `both` |
 | `tls` | object | omit for no TLS | TLS config: `{ staging: false }` for prod, `{ staging: true }` for LE staging |
@@ -104,21 +104,18 @@ services:
   jellyfin:
     traits:
       - type: ingress
-        host: jellyfin.${{project.DOMAIN}}
+        host: jellyfin.${{ns:DOMAIN}}
         port: 8096
         exposure: external
         tls:
           staging: false
 ```
 
-The `${{project.DOMAIN}}` reference resolves at compile time from the `domain:` line in
-`$APPBAY_HOME/etc/system.yaml`.
-
-⚠️ It is the only scope reference that resolves, and `DOMAIN` is the only key. The other
-settings in `etc/system.yaml` (`home:`, `project:`, `container_runtime:`) are not variables.
-`${{environment.KEY}}` and `${{service.KEY}}` are accepted by the parser but nothing populates
-those maps, so they always fail — see [Scope Model](../reference/scope-model.qmd). For a
-per-deployment value, use a plain Compose `${VAR}` read from the app's `.env`.
+The `${{ns:DOMAIN}}` reference resolves at compile time from the app's namespace values:
+`etc/namespaces/<ns>.yaml` over `default.yaml`, which `appbay init` seeds with the system's
+`DOMAIN`. `ns` is the only scope; any key in those files is available the same way — see
+[Scope Model](../reference/scope-model.qmd). Omit `host:` entirely and the route defaults to
+`<app>.<domain>`, or `<ns>.<app>.<domain>` when namespaced.
 
 ### Ingress providers {#ingress-providers}
 
@@ -461,12 +458,12 @@ The scoped-env trait injects variables from the project/environment scope chain 
 traits:
   - type: scoped-env
     vars:
-      DOMAIN: ${{project.DOMAIN}}
+      DOMAIN: ${{ns:DOMAIN}}
       INSTANCE_ID: ${hash}
 ```
 
 The scope prefix selects which variable store is consulted. ⚠️ Only `project` has one:
-`${{project.DOMAIN}}` reads the `domain:` line from `$APPBAY_HOME/etc/system.yaml`. The
+`${{ns:DOMAIN}}` reads the `domain:` line from `$APPBAY_HOME/etc/system.yaml`. The
 `environment` and `service` prefixes parse but resolve against empty maps, so a reference to
 either always fails — see [Scope Model](../reference/scope-model.qmd).
 

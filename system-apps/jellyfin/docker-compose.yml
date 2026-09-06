@@ -14,7 +14,7 @@ services:
       - ${JELLYFIN_MEDIA_PATH:-/mnt/media}:/media:ro
     environment:
       JELLYFIN_CACHE_DIR: ${JELLYFIN_CACHE_PATH:-/cache}
-      JELLYFIN_PublishedServerUrl: https://jellyfin.${{project.DOMAIN}}
+      JELLYFIN_PublishedServerUrl: https://jellyfin.${{ns:DOMAIN}}
     ports:
       - "8096:8096"
       # Optional: DLNA auto-discovery (LAN only)

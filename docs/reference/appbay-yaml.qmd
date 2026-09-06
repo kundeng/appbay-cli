@@ -73,7 +73,7 @@ Static Compose overrides keyed by original service name. These are deep-merged i
 overrides:
   jellyfin:
     environment:
-      - TZ=${{project.TZ}}
+      - TZ=${{ns:TZ}}
     volumes:
       - jellyfin_config:/config
       - /mnt/media:/media:ro
@@ -129,7 +129,7 @@ services:
   jellyfin:
     traits:
       - type: ingress
-        host: "media.${{project.DOMAIN}}"
+        host: "media.${{ns:DOMAIN}}"
         port: 8096
         exposure: both
       - type: gpu
@@ -143,7 +143,7 @@ services:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `type` | `"ingress"` | (required) | Trait discriminator |
-| `host` | `string` | `<app>.<domain>`, or `<ns>.<app>.<domain>` when namespaced | Hostname for the route; omit it and the default derives from identity, so two instances get two hosts. Supports `${{scope.KEY}}`; two apps resolving one host is a compile error naming both |
+| `host` | `string` | `<app>.<domain>`, or `<ns>.<app>.<domain>` when namespaced | Hostname for the route; omit it and the default derives from identity, so two instances get two hosts. Supports `${{ns:KEY}}`; two apps resolving one host is a compile error naming both |
 | `port` | `number` | (required) | Container port to route to |
 | `exposure` | `"internal" \| "external" \| "both"` | `"both"` | Internal (LAN), external (WAN), or both |
 | `tls.staging` | `boolean` | `false` | Use Let's Encrypt staging certificates |
@@ -201,7 +201,7 @@ services:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `type` | `"scoped-env"` | (required) | Trait discriminator |
-| `vars` | `Record<string, string>` | (required) | Map of var name to value or `${{scope.KEY}}` reference |
+| `vars` | `Record<string, string>` | (required) | Map of var name to value or `${{ns:KEY}}` reference |
 
 ## Builds section
 
@@ -290,7 +290,7 @@ services:
   jellyfin:
     traits:
       - type: ingress
-        host: "media.${{project.DOMAIN}}"
+        host: "media.${{ns:DOMAIN}}"
         port: 8096
       - type: gpu
         variant: nvidia

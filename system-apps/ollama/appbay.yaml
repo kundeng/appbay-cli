@@ -16,7 +16,7 @@ traits:
     # refuse-without-a-GPU behaviour. Most GPU apps should not.
     required: false
   - type: ingress
-    host: "ollama.${{project.DOMAIN}}"
+    host: "ollama.${{ns:DOMAIN}}"
     port: 11434
     service: ollama
     exposure: internal

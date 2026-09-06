@@ -51,6 +51,7 @@ import {
   parseInstanceConfig,
   SERVER_CONTAINER,
   SHARED_NETWORK,
+  NAMESPACES_DIR_REL,
 } from "@appbay/core";
 import {
   resolveAppbayHome,
@@ -586,6 +587,11 @@ async function writeProjectConfig(
   // `etc/projects/<name>/project.yaml` — a different file with a different schema — while
   // holding domain, container_runtime and ingress_provider, none of which is project-scoped.
   const configPath = join(appbayHome, SYSTEM_CONFIG_REL);
+  // The default namespace's values: the system's DOMAIN is where every `${{ns:DOMAIN}}` starts.
+  const nsDir = join(appbayHome, NAMESPACES_DIR_REL);
+  await mkdir(nsDir, { recursive: true });
+  const defaultNs = join(nsDir, "default.yaml");
+  if (!existsSync(defaultNs)) await writeFile(defaultNs, `# Values every namespace inherits; \`<namespace>.yaml\` beside this overrides them.\nDOMAIN: ${domain}\n`, "utf-8");
   const legacyPath = join(appbayHome, LEGACY_INSTANCE_CONFIG_REL);
   if (await fileExists(configPath)) {
     return false;

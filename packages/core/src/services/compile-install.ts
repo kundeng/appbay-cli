@@ -13,8 +13,10 @@ import { NAMESPACES_DIR_REL } from "../schemas/namespace-values.js";
 export interface CompileInstallOptions {
   /** Apps to compile; undefined means every installed app. */
   apps?: string[];
-  /** Pre-loaded project variables, when the caller already has them. */
+  /** Pre-loaded base values (DOMAIN), when the caller already has them. */
   projectVars?: Record<string, string>;
+  /** The namespace for apps that pin none in their manifest. */
+  namespace?: string;
 }
 
 export async function compileInstall(
@@ -27,6 +29,7 @@ export async function compileInstall(
     rendersDir: join(appbayHome, "var", "lib", "renders"),
     stateDir,
     apps: options.apps,
+    namespace: options.namespace,
     namespacesDir: join(appbayHome, NAMESPACES_DIR_REL),
     projectVars: options.projectVars ?? (await loadProjectVars(appbayHome)),
     runtimeFacts: detectRuntimeFacts({ stateDir }),

@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "sysinfo.${{project.DOMAIN}}"
+    host: "sysinfo.${{ns:DOMAIN}}"
     port: 8080
     service: sysinfo
     exposure: internal

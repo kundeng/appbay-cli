@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "vault.${{project.DOMAIN}}"
+    host: "vault.${{ns:DOMAIN}}"
     port: 80
     service: vaultwarden
     exposure: external

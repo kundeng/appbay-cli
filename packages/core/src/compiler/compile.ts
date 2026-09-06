@@ -24,11 +24,11 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { APP_LABEL, SHARED_NETWORK, auxFileStem, defaultHost } from "./identity.js";
+import { APP_LABEL, SHARED_NETWORK } from "./identity.js";
 import { loadNamespaceValues } from "../schemas/namespace-values.js";
 
-/** The collection an app is in when it declares none: a home with no collections is one stack. */
-export const DEFAULT_COLLECTION = "default";
+/** The project an app is in when it declares none: a home that declares no projects is one. */
+export const DEFAULT_PROJECT = "default";
 import { z } from "zod";
 
 /** A YAML document that must be a mapping; anything else is a parse error, not `{}`. */
@@ -55,20 +55,12 @@ import { loadInstanceConfig, } from "../schemas/instance.js";
 import { resolveBuilds, buildShepherdAction } from "./builds.js";
 import { readInstanceConfigText } from "../schemas/instance.js";
 
-/** What an operator can do about an unresolved `${{scope.KEY}}` reference: name the store. */
+/** What an operator can do about an unresolved `${{ns:KEY}}` reference: name the store. */
 function scopeErrorSuggestion(scope: string): string {
-  switch (scope) {
-    case "project":
-      return "Only ${{project.DOMAIN}} is available today, from the `domain:` line in $APPBAY_HOME/project.yaml (etc/system.yaml). No other project-level variables are loaded.";
-    case "namespace":
-      return "Namespace values come from $APPBAY_HOME/etc/namespaces/<namespace>.yaml (flat KEY: value); an un-namespaced app reads default.yaml.";
-    case "app":
-      return "The app scope has NAME, NAMESPACE, STEM and, when the install has a domain, HOST.";
-    case "service":
-      return "The `service` scope is declared but nothing populates it, so no ${{service.KEY}} reference can resolve. Use a plain Compose ${VAR} read from the app's .env.";
-    default:
-      return "Valid scopes are: project, namespace, app, service.";
+  if (scope === "ns" || scope === "namespace" || scope === "project") {
+    return "Namespace values come from $APPBAY_HOME/etc/namespaces/<namespace>.yaml, layered over default.yaml (flat KEY: value). init seeds default.yaml with DOMAIN.";
   }
+  return "The one scope is ns: write ${{ns:KEY}}.";
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +135,8 @@ export interface AppCompileResult {
   shepherdActions: import("../traits/types.js").ShepherdAction[];
   /** Structured logical changes: which traits/overlays were applied. */
   logicalChanges: LogicalGroup[];
-  /** The collections this app declares, or `["default"]`. The deploy orders by them. */
-  collections: string[];
+  /** The project this app is part of, or `default`. The deploy orders by it. */
+  project: string;
 }
 
 /** An error encountered during compilation. */
@@ -249,12 +241,13 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
   // set meant `appbay up openwebui` saw one app installed and `appbay up` saw all of them,
   // so the same manifest compiled to different artifacts depending on the command line.
   const installedApps = new Set(discovered.map((app) => app.name));
-  // Collection membership over the FULL declared set: `when:` asks where a peer is declared.
-  const collectionsOf = (app: DiscoveredApp): string[] => app.appbayConfig?.collection?.length ? app.appbayConfig.collection : [DEFAULT_COLLECTION];
-  const membership = new Map(discovered.map((app) => [app.name, new Set(collectionsOf(app))]));
+  // Project membership over the FULL declared set: `when:` asks whether a peer is in the
+  // same project — the operator's unit of composition — never whether it is running.
+  const projectOf = (app: DiscoveredApp): string => app.appbayConfig?.project ?? DEFAULT_PROJECT;
+  const membership = new Map(discovered.map((app) => [app.name, projectOf(app)]));
   const peersOf = (name: string): Set<string> => {
-    const mine = membership.get(name) ?? new Set([DEFAULT_COLLECTION]);
-    return new Set([...membership].filter(([, theirs]) => [...theirs].some((c) => mine.has(c))).map(([n]) => n));
+    const mine = membership.get(name) ?? DEFAULT_PROJECT;
+    return new Set([...membership].filter(([, theirs]) => theirs === mine).map(([n]) => n));
   };
 
   // Filter to requested apps if specified.
@@ -298,7 +291,9 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
         generatedValueStore,
         namespace,
         projectVars,
-        namespaceValuesFor: (ns: string) => namespaceValues?.[ns] ?? (namespacesDir ? loadNamespaceValues(namespacesDir, ns) : {}),
+        namespaceValuesFor: (ns: string) => namespaceValues
+          ? { ...(namespaceValues.default ?? {}), ...(namespaceValues[ns] ?? {}) }
+          : namespacesDir ? { ...loadNamespaceValues(namespacesDir, "default"), ...(ns === "default" ? {} : loadNamespaceValues(namespacesDir, ns)) } : {},
       });
 
       results.push(appResult.result);
@@ -485,24 +480,15 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
   // Stage 2b: Resolve scoped variables (${{scope.KEY}})
   // -----------------------------------------------------------------------
 
-  // Scopes, per app: the host's values, this namespace's values, and what the compiler
-  // knows about the app itself. `HOST` is the default ingress host (identity.defaultHost).
-  const appScope: Record<string, string> = {
-    NAME: app.name,
-    NAMESPACE: appNamespace,
-    STEM: auxFileStem(appNamespace, app.name),
-    ...(projectVars.DOMAIN ? { HOST: defaultHost(appNamespace, app.name, projectVars.DOMAIN) } : {}),
-  };
-  const scopeResolver = new ScopeResolver({
-    project: projectVars,
-    namespace: namespaceValuesFor(appNamespace),
-    app: appScope,
-    service: {},
-  });
+  // The one value scope: the namespace's values, layered over the default namespace's,
+  // which init seeds with the system's DOMAIN (`projectVars` carries that base).
+  const nsValues = { ...projectVars, ...namespaceValuesFor(appNamespace) };
+  const scopeResolver = new ScopeResolver({ ns: nsValues });
 
-  const { result: resolvedCompose, errors: scopeErrors } =
+  const { result: resolvedCompose, errors: scopeErrors, warnings: scopeWarnings } =
     scopeResolver.resolveObject(compose);
   compose = resolvedCompose;
+  for (const w of new Set(scopeWarnings)) warnings.push(`${app.name}: ${w}`);
 
   for (const scopeErr of scopeErrors) {
     errors.push({
@@ -581,7 +567,8 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
     trait: { type: string; [key: string]: unknown },
     service?: string,
   ): { type: string; [key: string]: unknown } => {
-    const { result, errors: traitScopeErrors } = scopeResolver.resolveObject(trait);
+    const { result, errors: traitScopeErrors, warnings: traitScopeWarnings } = scopeResolver.resolveObject(trait);
+    for (const w of new Set(traitScopeWarnings)) warnings.push(`${app.name}: ${w}`);
     for (const scopeErr of traitScopeErrors) {
       traitScopeResolutionFailed = true;
       errors.push({
@@ -636,7 +623,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         // Resolved per app rather than threaded through every call site; the resolver
         // caches per home path, so this is one file read for the whole compile.
         ingressProvider: resolveIngressProvider(join(appsDir, "..", "..")),
-        domain: projectVars.DOMAIN,
+        domain: nsValues.DOMAIN,
       },
     });
 
@@ -794,7 +781,7 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
       traitMetadata,
       shepherdActions,
       logicalChanges,
-      collections: config?.collection?.length ? config.collection : [DEFAULT_COLLECTION],
+      project: config?.project ?? DEFAULT_PROJECT,
     },
     errors,
     warnings,

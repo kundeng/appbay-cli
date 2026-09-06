@@ -5,26 +5,26 @@ description: "Declarative cross-app wiring with when clauses"
 
 ## What are overlays?
 
-Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The condition is **which apps are declared in the same collection** -- a statement about how a stack is composed, evaluated at compile time.
+Conditional overlays are Compose fragments that are merged into an app's configuration only when specified conditions are met. The condition is **which apps are declared in the same project** -- a statement about how a stack is composed, evaluated at compile time.
 
 For example, Open WebUI can connect to Ollama when Ollama is installed alongside it, and fall back to a standalone configuration when it is not. This is declared once and evaluated automatically at compile time.
 
 ::: {.callout-important}
 ## `when:` is about where, not when
 
-A `when` clause asks whether the peer is **declared in a collection this app is also in**.
-It is a statement about the composition of a stack, made when the manifests are written. It
-never asks whether the peer is running: a peer that is declared and not yet up still gets
-its overlay, and readiness is the deploy's job, not the compiler's.
+A `when` clause asks whether the peer is **in this app's project**. It is a statement about
+the composition of a stack, made when the manifests are written. It never asks whether the
+peer is running: a peer that is declared and not yet up still gets its overlay, and
+readiness is the deploy's job, not the compiler's.
 
-An app that declares no `collection:` is in the implicit collection `default`, so a home
-with no collections behaves as one stack and `when: [ollama]` means what it always did.
-Once apps declare collections, a peer in a different collection is not wired: to connect
-`searxng` to `open-webui`'s RAG overlay, put `ai-stack` in searxng's collections.
+An app that declares no `project:` is in `default`, so a home that declares no projects
+behaves as one and `when: [ollama]` means what it always did. Once apps declare projects, a
+peer in a different project is not wired: to connect `searxng` to `open-webui`'s RAG
+overlay, give both `project: ai-stack`. Collections and tags are labels and play no part.
 
 Two earlier meanings were retired. Overlays once evaluated against a `docker ps` snapshot,
 so a restart-looping peer satisfied a clause and a host with no daemon lost every overlay;
-then against every app in the home, so a peer installed for a different stack wired itself
+then against every app in the home, so a peer installed for a different project wired itself
 into this one.
 :::
 

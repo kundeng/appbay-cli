@@ -229,6 +229,7 @@ export function buildCaddySnippet(
  */
 function attachToSharedNetwork(
   compose: Record<string, unknown>,
+  namespace: string | undefined,
   appName: string,
   service: string | undefined,
 ): Record<string, unknown> {
@@ -240,7 +241,9 @@ function attachToSharedNetwork(
   const services = { ...((result.services ?? {}) as Record<string, unknown>) };
   const svc = { ...((services[service] as Record<string, unknown>) ?? {}) };
 
-  const alias = `${appName}_${service}`;
+  // The same alias the provider fragment dials; a namespaced app without `upstream:` used to
+  // get `<app>_<svc>` here and `<ns>_<app>_<svc>` in the fragment, and the route never connected.
+  const alias = sharedNetworkAlias(namespace, appName, service);
   const serviceNetworks: Record<string, unknown> = Array.isArray(svc.networks)
     ? Object.fromEntries(svc.networks.map((network) => [String(network), {}]))
     : typeof svc.networks === "object" && svc.networks !== null
@@ -321,7 +324,7 @@ export const ingressTraitDefinition: TraitDefinition<"ingress"> = {
     const serviceName = input.service ?? appName;
 
     // Attach the target service to the shared network for Traefik routing.
-    let compose = attachToSharedNetwork(input.compose, appName, input.service);
+    let compose = attachToSharedNetwork(input.compose, input.context.namespace, appName, input.service);
 
     // Strip host port mappings for the ingress port — Traefik handles routing
     // via the shared network, so publishing host ports causes conflicts when

@@ -1,5 +1,5 @@
 /**
- * Declared order is executed order (S39 R1, R2). Two apps, `db` in `data` and `web` in
+ * Declared order is executed order. Two apps, `db` in project `data` and `web` in project
  * `app` with `after: [data]`: web does not start until db is READY, readiness is observed
  * from compose ps (running, and healthy where a healthcheck exists), the wait is bounded, and
  * a timeout fails db and skips web with the reason instead of proceeding.
@@ -18,10 +18,10 @@ beforeEach(async () => {
     const dir = join(home, "etc", "apps", name);
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "docker-compose.yml"), `services:\n  ${name}:\n    image: ${name}:latest\n`);
-    await writeFile(join(dir, "appbay.yaml"), `collection: [${collection}]\n`);
+    await writeFile(join(dir, "appbay.yaml"), `project: ${collection}\n`);
   }
   await mkdir(join(home, "etc"), { recursive: true });
-  await writeFile(join(home, "etc", "collections.yaml"), "collections:\n  app:\n    after: [data]\n");
+  await writeFile(join(home, "etc", "projects.yaml"), "projects:\n  app:\n    after: [data]\n");
 });
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 
@@ -78,11 +78,11 @@ describe("readiness gating", () => {
     expect(log).not.toContain("web:up");
   });
 
-  it("refuses the whole run, before anything starts, when collections.yaml has a cycle", async () => {
-    await writeFile(join(home, "etc", "collections.yaml"), "collections:\n  app:\n    after: [data]\n  data:\n    after: [app]\n");
+  it("refuses the whole run, before anything starts, when projects.yaml has a cycle", async () => {
+    await writeFile(join(home, "etc", "projects.yaml"), "projects:\n  app:\n    after: [data]\n  data:\n    after: [app]\n");
     const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
     const r = await deploy({ appbayHome: home, dockerCompose: run, observer, sleep: noSleep });
-    expect(r.compileErrors.map((e) => e.stage)).toContain("collections");
+    expect(r.compileErrors.map((e) => e.stage)).toContain("projects");
     expect(r.compileErrors.map((e) => e.message).join("\n")).toMatch(/cycle/);
     expect(log.filter((l) => l.endsWith(":up"))).toEqual([]);
   });

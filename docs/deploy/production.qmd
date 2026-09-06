@@ -44,7 +44,7 @@ services:
   jellyfin:
     traits:
       - type: ingress
-        host: "media.${{project.DOMAIN}}"
+        host: "media.${{ns:DOMAIN}}"
         port: 8096
         exposure: both
         tls:

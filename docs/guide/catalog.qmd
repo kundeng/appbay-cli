@@ -111,12 +111,12 @@ required_inputs:
   - name: N8N_HOST
     description: Public domain for n8n
     type: string
-    default: "n8n.${{project.DOMAIN}}"
+    default: "n8n.${{ns:DOMAIN}}"
 ```
 
 - `type: secret` with `auto_generate: true` — a password is generated automatically if you don't provide one
 - `type: string` with `default` — pre-filled, you can accept or override
-- Scoped variables like `${{project.DOMAIN}}` are resolved from your `project.yaml`
+- Scoped variables like `${{ns:DOMAIN}}` are resolved from your `project.yaml`
 
 ## Post-install customization
 

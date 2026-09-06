@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { discoverApps, deployOrder, loadCollections } from "@appbay/core";
+import { discoverApps, deployOrder, loadProjects } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -79,11 +79,11 @@ export const downCommand = new Command("down")
     // from SYSTEM_APP_BOOT_ORDER instead of assuming the caller supplied it.
     // The reverse of the start order, from the same graph `up` uses: dependents stop first,
     // the edge everything routes through goes last. An order that cannot be honoured refuses.
-    const collections = loadCollections(appbayHome);
-    if (collections.error) { console.error(collections.error); process.exit(1); }
+    const projects = loadProjects(appbayHome);
+    if (projects.error) { console.error(projects.error); process.exit(1); }
     const graph = deployOrder(
-      targetApps.map((a) => ({ appName: a.name, collections: a.appbayConfig?.collection?.length ? a.appbayConfig.collection : ["default"], app: a })),
-      collections.config.collections,
+      targetApps.map((a) => ({ appName: a.name, project: a.appbayConfig?.project ?? "default", app: a })),
+      projects.config.projects,
     );
     if (graph.errors.length > 0) { for (const e of graph.errors) console.error(`  ${e}`); process.exit(1); }
     const orderedApps = graph.order.map((o) => o.app).reverse();

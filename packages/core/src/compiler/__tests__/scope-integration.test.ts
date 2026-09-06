@@ -29,7 +29,7 @@ describe("Scope resolution integration", () => {
   web:
     image: nginx
     environment:
-      - DOMAIN=\${{project.DOMAIN}}
+      - DOMAIN=\${{ns:DOMAIN}}
       - TZ=\${{project.TZ}}
 `,
     );
@@ -57,7 +57,7 @@ describe("Scope resolution integration", () => {
   web:
     image: nginx
     environment:
-      - DOMAIN=\${{namespace.DOMAIN}}
+      - DOMAIN=\${{ns:DOMAIN}}
 `,
     );
 
@@ -97,7 +97,7 @@ describe("Scope resolution integration", () => {
 
     const scopeErrors = result.errors.filter((e) => e.stage === "resolve-variables");
     expect(scopeErrors.length).toBeGreaterThan(0);
-    expect(scopeErrors[0].suggestion).toContain("project.yaml");
+    expect(scopeErrors[0].suggestion).toContain("etc/namespaces");
   });
 
   it("rejects unresolved variables in traits before provider rendering", async () => {
@@ -118,7 +118,7 @@ describe("Scope resolution integration", () => {
 traits:
   - type: ingress
     service: whoami
-    host: "whoami.\${{project.DOMAIN}}"
+    host: "whoami.\${{ns:DOMAIN}}"
     port: 80
 `,
     );
@@ -136,7 +136,7 @@ traits:
           appName: "whoami",
           stage: "resolve-variables",
           message: expect.stringContaining("app trait: ingress"),
-          suggestion: expect.stringContaining("project.yaml"),
+          suggestion: expect.stringContaining("etc/namespaces"),
         }),
       ]),
     );
@@ -184,7 +184,7 @@ traits:
   web:
     image: nginx
     environment:
-      - DOMAIN=\${{project.DOMAIN}}
+      - DOMAIN=\${{ns:DOMAIN}}
       - PORT=\${PORT:-3000}
 `,
     );
@@ -232,7 +232,7 @@ describe("suggestions for an unresolved ${{scope.KEY}}", () => {
     const all = [
       ...(await suggestionsFor(
         "services:\n  web:\n    image: nginx\n    environment:\n" +
-          "      - A=${{project.NOPE}}\n      - B=${{service.X}}\n      - C=${{bogus.Y}}\n",
+          "      - A=${{ns:NOPE}}\n      - B=${{app:X}}\n      - C=${{bogus.Y}}\n",
       )).values(),
     ].join("\n");
 
@@ -244,19 +244,16 @@ describe("suggestions for an unresolved ${{scope.KEY}}", () => {
   it("tells the truth per scope", async () => {
     const s = await suggestionsFor(
       "services:\n  web:\n    image: nginx\n    environment:\n" +
-        "      - A=${{project.NOPE}}\n      - B=${{service.X}}\n      - C=${{bogus.Y}}\n",
+        "      - A=${{ns:NOPE}}\n      - B=${{app:X}}\n      - C=${{bogus.Y}}\n",
     );
     const find = (needle: string) =>
       [...s.entries()].find(([msg]) => msg.includes(needle))?.[1] ?? "";
 
-    // project: one key resolves, and it says which and from where.
-    expect(find('scope "project"')).toContain("${{project.DOMAIN}}");
-    expect(find('scope "project"')).toContain("$APPBAY_HOME/project.yaml");
+    // ns: an undefined key says where the values file is.
+    expect(find('scope "ns"')).toContain("etc/namespaces");
 
-    // service: the store is not populated, so say that rather than name a file to edit.
-    expect(find('scope "service"')).toContain("nothing populates it");
-
-    // an unknown scope is a typo — list the valid ones.
-    expect(find('Unknown scope "bogus"')).toContain("project, namespace, app, service");
+    // any other scope name is a typo — name the one scope.
+    expect(find('Unknown scope "app"')).toContain("ns:");
+    expect(find('Unknown scope "bogus"')).toContain("ns:");
   });
 });

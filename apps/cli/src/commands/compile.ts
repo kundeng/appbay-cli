@@ -53,7 +53,8 @@ export const compileCommand = new Command("compile")
   .description("Compile app definitions into rendered compose files")
   .argument("[apps...]", "specific apps to compile (default: all)")
   .option("--output <dir>", "write rendered output to this directory")
-  .action(async (apps: string[], options: { output?: string }) => {
+  .option("--namespace <ns>", "namespace for every app whose manifest pins none")
+  .action(async (apps: string[], options: { output?: string; namespace?: string }) => {
     const appbayHome = resolveAppbayHome();
     const appsDir = join(appbayHome, "etc", "apps");
     const rendersDir = join(appbayHome, "var", "lib", "renders");
@@ -64,13 +65,13 @@ export const compileCommand = new Command("compile")
     // Discover currently running apps so conditional overlays fire correctly.
 
 
-    // Load project variables so ${{project.DOMAIN}} etc. resolve correctly.
+    // Load the install's variables; they sit under the namespace values.
     const projectVars = await loadProjectVars(appbayHome);
 
     // Run the full compiler pipeline.
     let result: CompileResult;
     try {
-      result = await compileInstall(appbayHome, { apps: apps.length > 0 ? apps : undefined, projectVars: projectVars });
+      result = await compileInstall(appbayHome, { apps: apps.length > 0 ? apps : undefined, projectVars, namespace: options.namespace });
     } catch (err) {
       console.error(
         `Compile failed: ${err instanceof Error ? err.message : String(err)}`,

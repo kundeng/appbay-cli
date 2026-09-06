@@ -61,29 +61,22 @@ guarantee is earned, mode by mode.
 
 These are the maintainer's, and a spec or a doc that contradicts one is wrong.
 
-- **`when:` is about where, not when.** An overlay clause `when: [ollama]` asks whether
-  `ollama` is declared in the same collection as this app. It is a statement about the
-  composition of a stack, made at declaration time. It does not ask whether `ollama` is
-  installed elsewhere in the home, and it never asks whether `ollama` is running. A
-  dependent that is declared and not yet running still gets its overlay; readiness is the
-  deploy path's problem, not the compiler's.
-- **A collection is a stack.** The apps that declare the same collection are one deployable
-  unit with a boot order. A collection is therefore a thing with a name and members, not a
-  label that apps happen to share.
-- **A namespace is identity, and it carries values.** It enters every generated name, so
-  two deployments of one app on one host do not collide. It is also where per-deployment
-  values live: `${{namespace.KEY}}` resolves from a values file for that namespace, the way
-  `project.yaml` and `environment.yaml` once meant to, with `${{project.KEY}}` as the
-  per-host layer beneath it. One axis with both jobs is simpler than a name axis and a
-  separate value tier. This reverses the S32 audit's rejection of RFC-001 item 4.6.
-
-## Open questions
-
-- **Single-node Swarm mode.** Swarm carries a runtime secret store (`docker secret`),
-  mounted into containers as files rather than passed as environment. Running compose
-  stacks under a one-node swarm would give the `wrapper-file` mode a store the runtime
-  owns instead of one appbay writes. Whether Podman has an equivalent, and what the
-  deploy path would look like as `stack deploy`, is unmeasured. Open until someone runs it.
+- **System** is physical: this box, this installation. Its runtime, socket, container store,
+  home directory and base domain live in `etc/system.yaml`, written by `appbay init`. No
+  manifest interpolates it.
+- **Project** is intent: an operator saying "these apps run together to do something." An
+  app declares `project: <name>`; absent means `default`. A project is the unit of
+  composition: `when:` sees peers in the same project, and `etc/projects.yaml` orders
+  projects. Compose calls each app directory a "project"; this is not that.
+- **Namespace** is one deployment of a project: it enters every generated name, so two
+  deployments of one project do not collide, and it names the values file that deployment
+  resolves. `${{ns:KEY}}` is the one value scope a manifest references, read from
+  `etc/namespaces/<ns>.yaml` layered over `default.yaml`, which init seeds with the system's
+  `DOMAIN`. `--namespace` on `up`, `compile` and `apply` sets it for apps that pin none.
+- **Collections and tags are labels.** They select (`up --collection`); they never compose,
+  order, or hold values.
+- **`when:` is about where, not when.** `when: [ollama]` asks whether `ollama` is in this
+  app's project. It never asks whether `ollama` is running; readiness is the deploy's job.
 
 ## Boundaries
 

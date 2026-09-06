@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,6 +36,7 @@ describe("commands against a scratch home", () => {
   it("init wrote the system config and seeded the default edge", () => {
     expect(existsSync(join(home, "etc", "system.yaml"))).toBe(true);
     expect(existsSync(join(home, "etc", "apps", "traefik", "docker-compose.yml"))).toBe(true);
+    expect(existsSync(join(home, "etc", "namespaces", "default.yaml"))).toBe(true);
   });
 
   it("list shows every seeded app with its namespace", () => {
@@ -68,6 +69,26 @@ describe("commands against a scratch home", () => {
     const r = appbay(["compile", "whoami"]);
     expect(r.status, r.stderr).toBe(0);
     expect(existsSync(join(home, "var", "lib", "renders", "whoami", "docker-compose.rendered.yml"))).toBe(true);
+  });
+
+  it("compile --namespace resolves ${{ns:KEY}} from that namespace's values file", () => {
+    writeFileSync(join(home, "etc", "namespaces", "lab.yaml"), "DOMAIN: lab.example.org\nTIER: lab\n");
+    mkdirSync(join(home, "etc", "apps", "echo"), { recursive: true });
+    writeFileSync(join(home, "etc", "apps", "echo", "docker-compose.yml"),
+      "services:\n  echo:\n    image: traefik/whoami\n    environment:\n      - TIER=${{ns:TIER}}\n");
+    writeFileSync(join(home, "etc", "apps", "echo", "appbay.yaml"), "traits:\n  - type: ingress\n    port: 80\n    service: echo\n");
+    const r = appbay(["compile", "echo", "--namespace", "lab"]);
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    const rendered = readFileSync(join(home, "var", "lib", "renders", "echo", "docker-compose.rendered.yml"), "utf-8");
+    expect(rendered).toContain("TIER=lab");
+    const fragment = readFileSync(join(home, "var", "lib", "renders", "echo", "etc", "apps", "traefik", "config", "dynamic", "lab.echo.yml"), "utf-8");
+    expect(fragment).toContain("Host(`lab.echo.lab.example.org`)");
+    // The alias the fragment dials is the alias the compose file declares.
+    expect(fragment).toContain("http://lab_echo_echo:80");
+    expect(rendered).toContain("- lab_echo_echo");
+    const plain = appbay(["compile", "echo"]);
+    expect(plain.status).not.toBe(0);
+    expect(plain.stdout + plain.stderr).toContain('"TIER" in scope "ns"');
   });
 
   it.skipIf(!hasRuntime)("ps lists nothing for an app that was never started, without failing", () => {

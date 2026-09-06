@@ -106,7 +106,7 @@ export async function discoverApps(
       } else {
         errors.push({
           file: appbayPath,
-          message: "Invalid appbay.yaml: Zod validation failed",
+          message: `Invalid appbay.yaml: ${result.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`,
           details: result.error.issues,
         });
       }

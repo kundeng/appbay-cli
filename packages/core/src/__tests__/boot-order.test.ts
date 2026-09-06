@@ -106,9 +106,9 @@ describe("teardown is the reverse of boot", () => {
   });
 });
 
-describe("deployOrder — collections.yaml expanded to app edges (S39, option C)", async () => {
+describe("deployOrder — projects.yaml expanded to app edges", async () => {
   const { deployOrder, dependentsOf } = await import("../boot-order.js");
-  const app = (appName: string, ...collections: string[]) => ({ appName, collections: collections.length ? collections : ["default"] });
+  const app = (appName: string, project = "default") => ({ appName, project });
 
   it("with no file, system apps come first and user apps keep their order", () => {
     const r = deployOrder([app("zeta"), app("caddy"), app("alpha")]);
@@ -116,7 +116,7 @@ describe("deployOrder — collections.yaml expanded to app edges (S39, option C)
     expect(r.order.map((a) => a.appName)).toEqual(["caddy", "zeta", "alpha"]);
   });
 
-  it("starts every app of an `after` collection before any app of the dependent one", () => {
+  it("starts every app of an `after` project before any app of the dependent one", () => {
     const r = deployOrder(
       [app("webui", "ai"), app("pg", "data"), app("redis", "data"), app("ollama", "ai")],
       { ai: { after: ["data"] }, data: { after: [] } },
@@ -129,19 +129,12 @@ describe("deployOrder — collections.yaml expanded to app edges (S39, option C)
     expect(dependentsOf("pg", r.dependsOn)).toEqual(new Set(["webui", "ollama"]));
   });
 
-  it("an app in both collections takes every edge and never depends on itself", () => {
-    const r = deployOrder([app("vectordb", "data", "ai"), app("webui", "ai")], { ai: { after: ["data"] } });
-    expect(r.errors).toEqual([]);
-    expect(r.order.map((a) => a.appName)).toEqual(["vectordb", "webui"]);
-    expect(r.dependsOn.get("vectordb")!.has("vectordb")).toBe(false);
-  });
-
   it("refuses a cycle, naming the apps", () => {
     const r = deployOrder([app("a", "x"), app("b", "y")], { x: { after: ["y"] }, y: { after: ["x"] } });
     expect(r.errors.join("\n")).toMatch(/cycle among: a, b/);
   });
 
-  it("refuses an `after` that names a collection nothing declares", () => {
+  it("refuses an `after` that names a project nothing declares", () => {
     const r = deployOrder([app("a", "x")], { x: { after: ["ghost"] } });
     expect(r.errors[0]).toContain('"ghost"');
   });

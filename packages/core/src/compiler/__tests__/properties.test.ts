@@ -102,8 +102,8 @@ const COMPOSE_WITH_SCOPED_VARS = `services:
   web:
     image: nginx:latest
     environment:
-      - DOMAIN=\${{project.DOMAIN}}
-      - ENV=\${{namespace.ENV_NAME}}
+      - DOMAIN=\${{ns:DOMAIN}}
+      - ENV=\${{ns:ENV_NAME}}
 `;
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ services:
   // 8. Scoped variable resolution -- most specific scope wins
   // -------------------------------------------------------------------------
 
-  it("scoped variable resolution: a namespace value is its own scope beside project", async () => {
+  it("scoped variable resolution: the namespace's file overrides the base DOMAIN values", async () => {
     await writeApp(tempDir, "myapp", COMPOSE_WITH_SCOPED_VARS, APPBAY_WITH_SCOPED_VARS);
 
     const result = await compile(

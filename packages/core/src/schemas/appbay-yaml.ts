@@ -2,7 +2,7 @@
  * Zod schema for appbay.yaml -- the per-app metadata file.
  *
  * Three logical sections:
- *   1. Scope   – project, environment, collection, operator, shared_network, tags
+ *   1. Scope   – namespace (a deployment), project (a composition), collection and tags (labels), operator, shared_network
  *   2. App Model – upstream, overrides, overlays
  *   3. Traits  – app-level and service-level trait configs (discriminated union on `type`)
  *
@@ -49,10 +49,12 @@ export const ScopeSchema = z.object({
    * to be expressible for "decided at deploy time" to mean anything.
    */
   namespace: z.string().optional(),
-  project: removedScopeField(
-    "project",
-    'Use `namespace:` instead — one axis replaces project + environment. A namespace is flat and dot-delimited, e.g. `namespace: uom.sim`.',
-  ),
+  /**
+   * The project this app is part of: the operator's unit of composition, "these apps run
+   * together". Single-valued; absent means `default`. `when:` sees peers in the same project,
+   * and `etc/projects.yaml` orders projects. Not Compose's "project", which is one app.
+   */
+  project: z.string().optional(),
   environment: removedScopeField(
     "environment",
     'Use `namespace:` instead. Note this is the SCOPE field only; `environment:` inside a service is Compose\'s own and is unaffected.',
@@ -429,10 +431,12 @@ export const AppbayYamlSchema = z.object({
   // -- Scope --
   /** See ScopeSchema.namespace — optional so the invocation can win. RFC-001 §4. */
   namespace: z.string().optional(),
-  project: removedScopeField(
-    "project",
-    'Use `namespace:` instead — one axis replaces project + environment. A namespace is flat and dot-delimited, e.g. `namespace: uom.sim`.',
-  ),
+  /**
+   * The project this app is part of: the operator's unit of composition, "these apps run
+   * together". Single-valued; absent means `default`. `when:` sees peers in the same project,
+   * and `etc/projects.yaml` orders projects. Not Compose's "project", which is one app.
+   */
+  project: z.string().optional(),
   environment: removedScopeField(
     "environment",
     'Use `namespace:` instead. Note this is the SCOPE field only; `environment:` inside a service is Compose\'s own and is unaffected.',

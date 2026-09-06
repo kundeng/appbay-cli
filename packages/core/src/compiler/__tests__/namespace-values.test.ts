@@ -27,7 +27,7 @@ describe("namespace values", () => {
   it("resolve from etc/namespaces/<ns>.yaml for the app's namespace", async () => {
     await mkdir(join(dir, "namespaces"), { recursive: true });
     await writeFile(join(dir, "namespaces", "uom.sim.yaml"), "TIER: sim\nREPLICAS: 2\n");
-    await app("litellm", "namespace: uom.sim\n", "services:\n  web:\n    image: nginx\n    environment:\n      - TIER=${{namespace.TIER}}\n      - N=${{namespace.REPLICAS}}\n");
+    await app("litellm", "namespace: uom.sim\n", "services:\n  web:\n    image: nginx\n    environment:\n      - TIER=${{ns:TIER}}\n      - N=${{ns:REPLICAS}}\n");
     const r = await compile(opts());
     expect(r.errors).toEqual([]);
     expect(r.apps[0]!.rendered).toContain("TIER=sim");
@@ -35,20 +35,37 @@ describe("namespace values", () => {
   });
 
   it("an un-namespaced app reads default.yaml, and a missing file is an empty scope", async () => {
-    await app("plain", "", "services:\n  web:\n    image: nginx\n    environment:\n      - X=${{namespace.X}}\n");
+    await app("plain", "project: default\n", "services:\n  web:\n    image: nginx\n    environment:\n      - X=${{ns:X}}\n");
     const r = await compile(opts());
-    expect(r.errors.map((e) => e.message).join("\n")).toContain('"X" in scope "namespace"');
+    expect(r.errors.map((e) => e.message).join("\n")).toContain('"X" in scope "ns"');
   });
 
-  it("the app scope knows NAME, NAMESPACE, STEM and HOST", async () => {
-    await app("litellm", "namespace: uom.sim\n", "services:\n  web:\n    image: nginx\n    environment:\n      - A=${{app.NAME}}\n      - B=${{app.NAMESPACE}}\n      - C=${{app.STEM}}\n      - D=${{app.HOST}}\n");
+  it("layers <ns>.yaml over default.yaml, and default.yaml carries the system's DOMAIN", async () => {
+    await mkdir(join(dir, "namespaces"), { recursive: true });
+    await writeFile(join(dir, "namespaces", "default.yaml"), "DOMAIN: example.org\nTIER: base\nSHARED: yes\n");
+    await writeFile(join(dir, "namespaces", "uom.sim.yaml"), "TIER: sim\n");
+    await app("svc", "namespace: uom.sim\n", "services:\n  web:\n    image: nginx\n    environment:\n      - T=${{ns:TIER}}\n      - S=${{ns:SHARED}}\n      - D=${{ns:DOMAIN}}\n");
+    const r = await compile(opts({ projectVars: {} }));
+    expect(r.errors).toEqual([]);
+    expect(r.apps[0]!.rendered).toContain("T=sim");
+    expect(r.apps[0]!.rendered).toContain("S=yes");
+    expect(r.apps[0]!.rendered).toContain("D=example.org");
+  });
+
+  it("accepts the pre-S43 dotted ${{project.KEY}} for one release, with a warning naming the new spelling", async () => {
+    await app("old", "project: default\n", "services:\n  web:\n    image: nginx\n    environment:\n      - D=${{project.DOMAIN}}\n");
     const r = await compile(opts());
     expect(r.errors).toEqual([]);
-    const out = r.apps[0]!.rendered;
-    expect(out).toContain("A=litellm");
-    expect(out).toContain("B=uom.sim");
-    expect(out).toContain("C=uom-sim.litellm");
-    expect(out).toContain("D=uom-sim.litellm.example.org");
+    expect(r.apps[0]!.rendered).toContain("D=example.org");
+    expect(r.warnings.join("\n")).toContain("${{ns:DOMAIN}}");
+  });
+
+  it("rejects any other scope name, and a dotted spelling of ns", async () => {
+    await app("bad", "project: default\n", "services:\n  web:\n    image: nginx\n    environment:\n      - A=${{app:NAME}}\n      - B=${{ns.DOMAIN}}\n");
+    const r = await compile(opts());
+    const msgs = r.errors.map((e) => e.message).join("\n");
+    expect(msgs).toContain('Unknown scope "app"');
+    expect(msgs).toContain("write ${{ns:DOMAIN}}");
   });
 });
 
@@ -72,7 +89,7 @@ describe("the default ingress host", () => {
   });
 
   it("is a compile error, naming both apps, when two apps resolve one host", async () => {
-    const m = "services:\n  web:\n    traits:\n      - type: ingress\n        host: chat.${{project.DOMAIN}}\n        port: 80\n";
+    const m = "services:\n  web:\n    traits:\n      - type: ingress\n        host: chat.${{ns:DOMAIN}}\n        port: 80\n";
     await app("lobechat", m);
     await app("open-webui", m);
     const r = await compile(opts());

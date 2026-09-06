@@ -96,7 +96,7 @@ services:
   web:
     traits:
       - type: ingress
-        host: myapp.${{project.DOMAIN}}
+        host: myapp.${{ns:DOMAIN}}
         port: 3000
         exposure: external
         tls:
@@ -111,9 +111,9 @@ The scope section assigns organizational metadata:
 
 | Key | Cardinality | Default | Description |
 |-----|-------------|---------|-------------|
-| `project` | single | `default` | Variable scope namespace (`${{project.KEY}}` resolution) |
-| `environment` | single | `default` | Deployment variant (variable values, certs) |
-| `collection` | multi | `[]` | Operational grouping for batch operations |
+| `namespace` | single | (absent) | One deployment of a project: identity in every generated name, and the values file `${{ns:KEY}}` reads |
+| `project` | single | `default` | The apps that run together: what `when:` sees, and what `etc/projects.yaml` orders |
+| `collection` | multi | `[]` | Label for selection (`appbay up --collection`) |
 | `operator` | single | `local` | Which operator runs this app |
 | `shared_network` | multi | `[appbay_shared]` | Shared networks for cross-app communication |
 | `tags` | key-value | `{}` | Arbitrary metadata for filtering and UI grouping |
@@ -188,13 +188,13 @@ upstream:
 overrides:
   app:
     environment:
-      - NEXTCLOUD_TRUSTED_DOMAINS=${{project.DOMAIN}}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${{ns:DOMAIN}}
 
 services:
   app:
     traits:
       - type: ingress
-        host: cloud.${{project.DOMAIN}}
+        host: cloud.${{ns:DOMAIN}}
         port: 80
         exposure: external
         tls:

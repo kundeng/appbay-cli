@@ -26,7 +26,7 @@ import {
   extractSecretRefs,
 } from "../secrets/resolve-for-deploy.js";
 import { deployOrder, dependentsOf, isSystemApp } from "../boot-order.js";
-import { loadCollections } from "../schemas/collections.js";
+import { loadProjects } from "../schemas/projects.js";
 import { spawnSync } from "node:child_process";
 import { containerBin, resolveIngressProvider } from "../runtime/container-runtime.js";
 import { findCrashedServices, snapshotContainers, didConverge, isReady, findContainerByLabel, engineObserver, type DockerComposeRunner, type Observer } from "../runtime/observe.js";
@@ -101,8 +101,10 @@ export interface DeployOptions {
   /** Docker compose runner (injected by caller). */
   dockerCompose: DockerComposeRunner;
   /** Running apps discoverer (injected by caller). */
-  /** Project-level variables (e.g., { DOMAIN: "example.com" }). */
+  /** Base namespace values from the system (DOMAIN); `etc/namespaces/*.yaml` layer over them. */
   projectVars?: Record<string, string>;
+  /** The namespace for every app whose manifest pins none (`--namespace`). */
+  namespace?: string;
   /** Overrides `collections.yaml`'s readiness timeout; tests use it. */
   readinessTimeoutMs?: number;
   /** Test seam for the readiness poll's pause. */
@@ -472,7 +474,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   let compileResult: CompileResult;
   try {
-    compileResult = await compileInstall(appbayHome, { apps: targetApps, projectVars });
+    compileResult = await compileInstall(appbayHome, { apps: targetApps, projectVars, namespace: options.namespace });
   } catch (err) {
     return {
       apps: [],
@@ -525,20 +527,20 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   }
 
   // Phase 2-5: Deploy each app in the declared order: system apps first, then the edges
-  // etc/collections.yaml declares, expanded to apps. A cycle or an unknown name refuses the
-  // whole run before anything starts (S39 R1.2); there is no weaker order to fall back to.
-  const collectionsFile = loadCollections(appbayHome);
-  if (collectionsFile.error) {
-    result.compileErrors.push({ stage: "collections", message: collectionsFile.error });
+  // etc/projects.yaml declares among projects, expanded to apps. A cycle or an unknown name
+  // refuses the whole run before anything starts; there is no weaker order to fall back to.
+  const projectsFile = loadProjects(appbayHome);
+  if (projectsFile.error) {
+    result.compileErrors.push({ stage: "projects", message: projectsFile.error });
     return result;
   }
-  const graph = deployOrder(compileResult.apps, collectionsFile.config.collections);
+  const graph = deployOrder(compileResult.apps, projectsFile.config.projects);
   if (graph.errors.length > 0) {
-    for (const message of graph.errors) result.compileErrors.push({ stage: "collections", message });
+    for (const message of graph.errors) result.compileErrors.push({ stage: "projects", message });
     return result;
   }
   const orderedApps = graph.order;
-  const readinessTimeoutMs = options.readinessTimeoutMs ?? collectionsFile.config.readiness.timeout_seconds * 1000;
+  const readinessTimeoutMs = options.readinessTimeoutMs ?? projectsFile.config.readiness.timeout_seconds * 1000;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const notReady = new Set<string>();
   const crashGraceMs = options.crashGraceMs ?? 3000;

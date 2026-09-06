@@ -359,7 +359,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "ha.\${{project.DOMAIN}}"
+    host: "ha.\${{ns:DOMAIN}}"
     port: 8123
     service: homeassistant
     exposure: external
@@ -511,7 +511,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "jellyfin.\${{project.DOMAIN}}"
+    host: "jellyfin.\${{ns:DOMAIN}}"
     port: 8096
     service: jellyfin
     exposure: external
@@ -534,7 +534,7 @@ traits:
       - \${JELLYFIN_MEDIA_PATH:-/mnt/media}:/media:ro
     environment:
       JELLYFIN_CACHE_DIR: \${JELLYFIN_CACHE_PATH:-/cache}
-      JELLYFIN_PublishedServerUrl: https://jellyfin.\${{project.DOMAIN}}
+      JELLYFIN_PublishedServerUrl: https://jellyfin.\${{ns:DOMAIN}}
     ports:
       - "8096:8096"
       # Optional: DLNA auto-discovery (LAN only)
@@ -603,7 +603,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "cloud.\${{project.DOMAIN}}"
+    host: "cloud.\${{ns:DOMAIN}}"
     port: 80
     service: nextcloud
     exposure: external
@@ -708,7 +708,7 @@ traits:
     # refuse-without-a-GPU behaviour. Most GPU apps should not.
     required: false
   - type: ingress
-    host: "ollama.\${{project.DOMAIN}}"
+    host: "ollama.\${{ns:DOMAIN}}"
     port: 11434
     service: ollama
     exposure: internal
@@ -752,7 +752,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "chat.\${{project.DOMAIN}}"
+    host: "chat.\${{ns:DOMAIN}}"
     port: 8080
     service: open-webui
     exposure: both
@@ -827,7 +827,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "sysinfo.\${{project.DOMAIN}}"
+    host: "sysinfo.\${{ns:DOMAIN}}"
     port: 8080
     service: sysinfo
     exposure: internal
@@ -1049,7 +1049,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "vault.\${{project.DOMAIN}}"
+    host: "vault.\${{ns:DOMAIN}}"
     port: 80
     service: vaultwarden
     exposure: external
@@ -1109,7 +1109,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "whoami.\${{project.DOMAIN}}"
+    host: "whoami.\${{ns:DOMAIN}}"
     port: 80
     service: whoami
     exposure: internal

@@ -106,11 +106,12 @@ export function sortByDeployOrder<T extends { appName: string }>(
 /** What `deployOrder` needs to know about an app. */
 export interface OrderableApp {
   appName: string;
-  collections: string[];
+  /** The project the app is part of; `default` when it declares none. */
+  project: string;
 }
 
-/** Collection order as `etc/collections.yaml` declares it: `after[c]` are the collections c waits for. */
-export type CollectionOrder = Record<string, { after: string[] }>;
+/** Project order as `etc/projects.yaml` declares it: `after[p]` are the projects p waits for. */
+export type ProjectOrder = Record<string, { after: string[] }>;
 
 export interface DeployOrder<T extends OrderableApp> {
   order: T[];
@@ -122,14 +123,13 @@ export interface DeployOrder<T extends OrderableApp> {
 
 /**
  * The order apps start in: system apps first in boot order, then every edge that
- * `collections.yaml` declares, expanded to app level (option C of S39 §1.4). A cycle or an
- * unknown collection is an error naming the apps involved, returned before anything runs;
- * there is no weaker order to fall back to.
+ * `projects.yaml` declares, expanded to app level. A cycle or an unknown project is an error
+ * naming the apps involved, returned before anything runs; there is no weaker order.
  */
-export function deployOrder<T extends OrderableApp>(apps: T[], collections: CollectionOrder = {}): DeployOrder<T> {
+export function deployOrder<T extends OrderableApp>(apps: T[], projects: ProjectOrder = {}): DeployOrder<T> {
   const errors: string[] = [];
-  const byCollection = new Map<string, T[]>();
-  for (const app of apps) for (const c of app.collections) byCollection.set(c, [...(byCollection.get(c) ?? []), app]);
+  const byProject = new Map<string, T[]>();
+  for (const app of apps) byProject.set(app.project, [...(byProject.get(app.project) ?? []), app]);
 
   const dependsOn = new Map<string, Set<string>>(apps.map((a) => [a.appName, new Set<string>()]));
   const systemNames = apps.filter((a) => isSystemApp(a.appName)).map((a) => a.appName);
@@ -137,14 +137,14 @@ export function deployOrder<T extends OrderableApp>(apps: T[], collections: Coll
     if (isSystemApp(app.appName)) continue;
     for (const s of systemNames) dependsOn.get(app.appName)!.add(s);
   }
-  for (const [name, spec] of Object.entries(collections)) {
+  for (const [name, spec] of Object.entries(projects)) {
     for (const before of spec.after) {
-      if (!(before in collections) && !byCollection.has(before)) {
-        errors.push(`collection "${name}" is declared after "${before}", which no app declares and collections.yaml does not define`);
+      if (!(before in projects) && !byProject.has(before)) {
+        errors.push(`project "${name}" is declared after "${before}", which no app declares and projects.yaml does not define`);
         continue;
       }
-      for (const dependent of byCollection.get(name) ?? []) {
-        for (const dep of byCollection.get(before) ?? []) {
+      for (const dependent of byProject.get(name) ?? []) {
+        for (const dep of byProject.get(before) ?? []) {
           if (dep.appName !== dependent.appName) dependsOn.get(dependent.appName)!.add(dep.appName);
         }
       }

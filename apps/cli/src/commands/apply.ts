@@ -19,7 +19,8 @@ export const applyCommand = new Command("apply")
   .option("--dry-run", "show what would change without deploying")
   .option("--yes", "skip confirmation")
   .option("--all", "apply all apps")
-  .action(async (apps: string[], options: { dryRun?: boolean; yes?: boolean; all?: boolean }) => {
+  .option("--namespace <ns>", "namespace for every app whose manifest pins none")
+  .action(async (apps: string[], options: { dryRun?: boolean; yes?: boolean; all?: boolean; namespace?: string }) => {
     const appsDir = resolveAppsDir();
     const rendersDir = resolveRendersDir();
     const stateDir = resolveStateDir();
@@ -31,7 +32,7 @@ export const applyCommand = new Command("apply")
 
     let result: CompileResult;
     try {
-      result = await compileInstall(resolveAppbayHome(), { apps: targetApps });
+      result = await compileInstall(resolveAppbayHome(), { apps: targetApps, namespace: options.namespace });
     } catch (err) {
       console.error(`Compile failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
@@ -81,6 +82,7 @@ export const applyCommand = new Command("apply")
     const deployResult = await deploy({
       appbayHome: resolveAppbayHome(),
       targetApps: changed.map((a) => a.appName),
+      namespace: options.namespace,
       projectVars: await loadProjectVars(resolveAppbayHome()),
       dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),
     });

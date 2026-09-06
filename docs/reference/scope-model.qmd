@@ -42,27 +42,25 @@ top-level scope field is gone.
 :::
 
 ::: {.callout-warning}
-## The four scopes
+## One value scope: `${{ns:KEY}}`
 
-| scope | store | who writes it |
-|---|---|---|
-| `${{project.KEY}}` | `etc/system.yaml`, allow-listed keys (`DOMAIN`) | `appbay init` |
-| `${{namespace.KEY}}` | `etc/namespaces/<namespace>.yaml`, flat `KEY: value` | the operator, one file per deployment |
-| `${{app.KEY}}` | computed: `NAME`, `NAMESPACE`, `STEM`, `HOST` | the compiler |
-| `${{service.KEY}}` | reserved, empty | — |
+| level | what it is | file | a manifest reaches it by |
+|---|---|---|---|
+| **system** | physical: this installation's runtime, socket, store, home, base domain | `etc/system.yaml` | nothing; it is not a value scope |
+| **project** | intent: the apps that run together | `project:` in the manifest; `etc/projects.yaml` for order | `when:` and the start order, not values |
+| **namespace** | one deployment of a project: identity and values | `namespace:` in the manifest or `--namespace`; `etc/namespaces/<ns>.yaml` over `default.yaml` | `${{ns:KEY}}` |
+| **collection**, **tags** | labels | `collection:`, `tags:` | selection only |
 
-`namespace` is both identity and a value store: it enters every generated name, and it names
-the values file this deployment resolves against. An un-namespaced app is in `default` and
-reads `etc/namespaces/default.yaml` if one exists. `${{app.HOST}}` is the same string the
-ingress trait uses when a manifest omits `host:`.
-
-A reference to an unknown key or scope is a compile error naming the app and the reference,
-and the app is not deployed.
+`etc/namespaces/default.yaml` is seeded by `appbay init` with `DOMAIN`; every namespace
+inherits it and `<ns>.yaml` overrides per key. The pre-S43 spelling `${{project.DOMAIN}}`
+(dotted) resolves as `${{ns:DOMAIN}}` for one release with a warning naming the new form.
+Any other scope name is a compile error naming the one scope.
 
 ## Namespace
 
-A namespace is a deployment identity and a value store. It distinguishes two instances of the
-same app in one installation, and it names the file their `${{namespace.KEY}}` values come from.
+A namespace is one deployment of a project: identity and values. It distinguishes two
+instances of the same app in one installation, and it names the file their `${{ns:KEY}}`
+values come from.
 
 ```yaml
 # appbay.yaml
@@ -105,9 +103,9 @@ existing host in order to disambiguate installations that have nothing to disamb
 - Two instances of one app in one installation (`uom.sim` and `uom.prod`)
 - Separate variable values for the same config keys
 
-## Collection
+## Project, collection, tags
 
-A collection is an operational grouping -- a named set of apps that are deployed, restarted, or stopped together. Collections are purely a selection mechanism.
+A project is the unit of composition (`project: ai-stack`, one per app; `default` when absent); it is what `when:` sees and what `etc/projects.yaml` orders. Collections and tags are labels: `appbay up --collection ai` selects by them and nothing else reads them.
 
 ```yaml
 # appbay.yaml
@@ -147,40 +145,26 @@ appbay restart ollama jellyfin           # Restart apps by name
 
 ## Variable resolution
 
-Variables are resolved by scope prefix — each `${{scope.KEY}}` reference targets exactly one variable store. There is no cascading fallthrough.
-
-Collection is NOT part of variable resolution. It is a selector, not a scope level.
-
-### Variable reference syntax
-
-| Syntax | Resolves from | Only from |
-|---|---|---|
-| `${{project.KEY}}` | `etc/system.yaml` (`domain:` only) | project store only |
-| `${{environment.KEY}}` | `etc/projects/<name>/environments/<env>.yaml` | environment store only |
-| `${{service.KEY}}` | Service-level vars in `appbay.yaml` or `.env` | service store only |
-
-Undefined variable references produce explicit errors with the scope and key name. Appbay never silently substitutes empty strings.
-
-### Resolution example
+One scope, `${{ns:KEY}}`, read from the deployment's namespace values: `etc/namespaces/<ns>.yaml`
+layered over `etc/namespaces/default.yaml`. `appbay init` seeds `default.yaml` with `DOMAIN`, so
+every namespace inherits the system's base domain and may override it. There is no cascading
+fallthrough to any other store, and an undefined key is a compile error naming the scope and
+the key; Appbay never substitutes an empty string. Collections and tags are labels and play no
+part in resolution.
 
 ```yaml
-# projects/homelab/project.yaml
-vars:
-  DOMAIN: home.lan
-  TZ: UTC
+# etc/namespaces/default.yaml      (seeded by init)
+DOMAIN: home.lan
+TZ: UTC
 
-# projects/homelab/environments/prod.yaml
-vars:
-  DOMAIN: homelab.example.com    # separate environment-scope value, does NOT override project-scope
-  TZ: America/New_York
+# etc/namespaces/uom.prod.yaml
+DOMAIN: homelab.example.com        # this deployment's domain
+TZ: America/New_York
 ```
 
-Resolution of `${{project.DOMAIN}}` in any environment:
-- Returns `home.lan` — resolved from `project.yaml` only
-
-Resolution of `${{environment.DOMAIN}}`:
-- In `prod`: returns `homelab.example.com` — resolved from `prod.yaml`
-- In `dev` (if `dev.yaml` has no `DOMAIN`): compile error — undefined variable
+An app with `namespace: uom.prod` resolves `${{ns:DOMAIN}}` to `homelab.example.com`; an app
+with no namespace resolves it to `home.lan`. `--namespace uom.prod` on `up`, `compile` or
+`apply` puts every app that pins no namespace into `uom.prod` for that run.
 
 ### Magic generators
 
@@ -189,10 +173,10 @@ Resolution of `${{environment.DOMAIN}}`:
 | `${password:N}` | Random N-character password | Yes -- stored in `generated-values.yaml` |
 | `${uuid}` | Random UUID v4 | Yes |
 | `${base64:N}` | Random N-byte base64 string | Yes |
-| `${hash}` | Deterministic hash of (project + env + service + key) | No -- always reproducible |
+| `${hash}` | Deterministic hash of (namespace + service + key) | No -- always reproducible |
 | `${timestamp}` | Current ISO timestamp | No -- evaluated at render time |
 
-Generated values are keyed by `(project, environment, service, var_name)`. Once generated, they are reused on subsequent compiles to ensure deterministic output.
+Generated values are keyed by `(namespace, service, var_name)`. Once generated, they are reused on subsequent compiles to ensure deterministic output.
 
 ## Compose runtime mapping
 
@@ -203,9 +187,7 @@ When you run `appbay up --collection ai-stack`:
    -> [ollama, webui, tts]
 
 2. For each app, resolve variables:
-   ${{project.DOMAIN}} from $APPBAY_HOME/etc/system.yaml
-   (${{environment.KEY}} and ${{service.KEY}} resolve against empty maps -- see the
-    warning at the top of this page)
+   ${{ns:KEY}} from $APPBAY_HOME/etc/namespaces/<namespace>.yaml over default.yaml
 
 3. Compile each app:
    upstream transform -> overlays -> traits -> render
@@ -227,7 +209,7 @@ read is `$APPBAY_HOME/etc/system.yaml` at the root.
 
 ```
 $APPBAY_HOME/
-  project.yaml                          # the ONE config that is read; `domain:` -> ${{project.DOMAIN}}
+  project.yaml                          # the ONE config that is read; `domain:` -> ${{ns:DOMAIN}}
   etc/
     projects/                           # ⚠️ specified, not implemented -- nothing reads this
       homelab/

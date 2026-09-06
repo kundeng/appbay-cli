@@ -56,8 +56,8 @@ Appbay takes your Docker Compose apps and adds:
 
 - **Namespace isolation** — run multiple apps with identical service names without conflicts
 - **Traits** — declarative capabilities (ingress, GPU, auth, hooks, backup) attached to apps
-- **Conditional overlays** — automatic cross-app wiring within a collection (e.g., "when ollama is declared in this stack, inject its URL into webui")
-- **Scoped variables** — ${{scope.KEY}} references resolved at compile time (see the caveat under Scope Model)
+- **Conditional overlays** — automatic cross-app wiring within a project (e.g., "when ollama is in this project, inject its URL into webui")
+- **Scoped variables** — `${{ns:KEY}}` references resolved at compile time from the deployment's namespace values
 - **Secret URI references** — `vault://` in manifests, resolved at deploy time (the backend is an installation choice, not a manifest one)
 - **Config overrides** — `.env.local` for catalog-installed apps, upstream `.env` stays frozen
 - **Plan/diff** — see exactly what will change before deploying, with secrets redacted
@@ -164,16 +164,16 @@ what replaced it and exits non-zero.
 | Concept | Controls | Cardinality |
 |---------|----------|-------------|
 | **Namespace** | Deployment identity — container, network, DNS-alias and default-host names — and the deployment's values file | Single per app |
-| **Collection** | Which apps form a stack: what `when:` can see, and the start order in `etc/collections.yaml` | Multi per app |
+| **Project** | Which apps run together: what `when:` can see, and the start order in `etc/projects.yaml` | Single per app |
+| **Collection**, **tags** | Labels for selection (`up --collection`) | Multi per app |
 
 `namespace` replaced `project` + `environment` in `v0.0.1-alpha.12`; a non-default value for
 either is now a parse error naming the migration.
 
-Scopes: `${{project.KEY}}` reads the per-host values in `etc/system.yaml`; `${{namespace.KEY}}`
-reads `etc/namespaces/<namespace>.yaml`, the values of one deployment; `${{app.KEY}}` is what the
-compiler knows about the app (`NAME`, `NAMESPACE`, `STEM`, `HOST`). An ingress trait that omits
-`host:` is routed at `${{app.HOST}}`, so two instances of one app get two hosts. See
-[the scope model reference](docs/reference/scope-model.qmd).
+One value scope: `${{ns:KEY}}` reads `etc/namespaces/<namespace>.yaml` layered over
+`default.yaml`, which `init` seeds with the system's `DOMAIN`. An ingress trait that omits
+`host:` is routed at `<app>.<domain>` (or `<ns>.<app>.<domain>`), so two instances of one app
+get two hosts. See [the scope model reference](docs/reference/scope-model.qmd).
 
 ## Project Structure
 

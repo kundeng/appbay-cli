@@ -246,9 +246,10 @@ describe("defaults", () => {
   });
 
   it("rejects a NON-DEFAULT removed scope field instead of dropping it", () => {
-    // Zod strips unknown keys, so without an explicit rule `project: homelab` would parse
-    // clean and the value would vanish with no error — the trap this guards.
-    for (const [field, value] of [["project", "homelab"], ["environment", "prod"]] as const) {
+    // Zod strips unknown keys, so without an explicit rule `environment: prod` would parse
+    // clean and the value would vanish with no error — the trap this guards. (`project:` is
+    // back as the composition unit since S43 and accepts any name.)
+    for (const [field, value] of [["environment", "prod"]] as const) {
       const result = AppbayYamlSchema.safeParse({ [field]: value });
       expect(result.success).toBe(false);
       if (!result.success) {

@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "ha.${{project.DOMAIN}}"
+    host: "ha.${{ns:DOMAIN}}"
     port: 8123
     service: homeassistant
     exposure: external

@@ -191,12 +191,13 @@ has not been re-inited keeps working; `appbay init` moves it. Everything from he
 of this section is about the *second* file.
 :::
 
-### Project
+### Namespace
 
-A **namespace** disambiguates one copy of an app from another on the same host. It is a
-*label*, not a variable scope: it does not select a variable file, and `${{project.KEY}}` does
-not read it. That reference resolves against the **installation** config above, which is one
-file per host shared by every namespace on it — see [Scope Model](../reference/scope-model.qmd).
+A **namespace** is one deployment of a project. It enters every generated name, so two
+deployments of one app on one host do not collide, and it names the values file that
+deployment resolves `${{ns:KEY}}` from: `etc/namespaces/<ns>.yaml` over `default.yaml`. Set it in
+the manifest (`namespace: uom.prod`) or for a whole run with `--namespace` — see
+[Scope Model](../reference/scope-model.qmd).
 
 ```yaml
 # appbay.yaml
@@ -216,7 +217,7 @@ Use a namespace when you need two copies of an app side by side — `homelab` an
 get distinct containers, networks and shared aliases and never collide.
 
 ⚠️ They do **not** get distinct variables. There is one `domain:` per installation, so
-`${{project.DOMAIN}}` is the same value in every namespace. Per-namespace variables are not
+`${{ns:DOMAIN}}` is the same value in every namespace. Per-namespace variables are not
 implemented; use a plain Compose `${VAR}` from the app's `.env` for a value that must differ.
 
 ### Environment
@@ -240,7 +241,7 @@ variant in `namespace:` — `namespace: uom.sim` — and deploy a second copy al
 
 ### Collection
 
-A **collection** is a stack: a named set of apps that are composed together, deploy, restart and stop together, and may declare a start order among collections in `etc/collections.yaml`. An app can be in several. An app that declares none is in `default`.
+A **project** is the unit of composition: the apps an operator runs together to do something. Each app declares one (`project: ai-stack`); absent means `default`. It is what `when:` sees and what `etc/projects.yaml` orders. A **collection** is a label (`collection: [ai-stack, gpu-apps]`, multi-valued) that `appbay up --collection` selects by; **tags** likewise. Labels never compose, order or hold values.
 
 ```yaml
 # appbay.yaml
@@ -249,12 +250,10 @@ collection: [ai-stack, gpu-apps]
 
 Usage: `appbay up --collection ai-stack` deploys all apps tagged with that collection.
 
-Collections decide what an overlay's `when:` can see: a peer counts only if it shares a collection with the app. They do not participate in variable resolution; that is the namespace's job.
-
-#### Start order: `etc/collections.yaml`
+#### Start order: `etc/projects.yaml`
 
 ```yaml
-collections:
+projects:
   data-layer:
     description: databases and caches
   ai-stack:
@@ -263,43 +262,30 @@ readiness:
   timeout_seconds: 90        # per app; a timeout fails that app and skips its dependents
 ```
 
-The deploy expands collection order to edges between apps and starts them in that order,
+The deploy expands project order to edges between apps and starts them in that order,
 system apps (the edge) first. An app is **ready** when every one of its containers is running
 and every container with a healthcheck reports healthy; a service with no healthcheck is
 ready when it runs, so declare one for anything a dependent waits on. A cycle, or an `after:`
-naming a collection nothing declares, refuses the whole deploy before anything starts. An app
-that is in two ordered collections takes every edge from both; `appbay down` stops in the
-reverse of the same order.
+naming a project nothing declares, refuses the whole deploy before anything starts. `appbay down`
+stops in the reverse of the same order.
 
 ## Variable resolution
 
-Variables are resolved by scope prefix. Each `${{scope.KEY}}` reference targets a specific variable store:
+One scope, read from the deployment's namespace values:
 
 | Syntax | Resolves from |
 |--------|---------------|
-| `${{project.KEY}}` | the per-host values in `etc/system.yaml` (allow-listed: `DOMAIN`) |
-| `${{namespace.KEY}}` | `etc/namespaces/<namespace>.yaml`, the values of this deployment; `default.yaml` for an un-namespaced app |
-| `${{app.KEY}}` | what the compiler knows about this app: `NAME`, `NAMESPACE`, `STEM` (`app` or `ns.app`), `HOST` (the default ingress host, when the host has a domain) |
-| `${{service.KEY}}` | reserved; resolves against an empty map today |
+| `${{ns:KEY}}` | `etc/namespaces/<namespace>.yaml` layered over `default.yaml`; init seeds `default.yaml` with the system's `DOMAIN` |
+
+That is the only scope. `${{project.DOMAIN}}`, the pre-S43 spelling, resolves as `${{ns:DOMAIN}}` for one release with a warning.
 
 There is no cascading fallthrough between stores. An undefined reference produces an explicit
 error naming the scope and key; Appbay never silently substitutes an empty string.
 
-::: {.callout-warning}
-## Only the `project` store is implemented
-
-The table above is the intended model. Today `loadProjectVars` reads a single `domain:` line
-from `$APPBAY_HOME/etc/system.yaml`, and nothing reads `projects/<name>/project.yaml` or
-`environments/<env>.yaml` at all. So `${{project.DOMAIN}}` is the one reference that
-resolves; `${{environment.KEY}}` and `${{service.KEY}}` always fail.
-
-An unresolved reference survives the render as a literal and the deploy then refuses the app,
-so this fails safe — but plan around it rather than writing references that cannot work.
-:::
 
 ```yaml
 # In appbay.yaml or .env
-DOMAIN: ${{project.DOMAIN}}         # the only scope reference that resolves today
+DOMAIN: ${{ns:DOMAIN}}         # from the app's namespace values
 ```
 
 ### Magic generators
@@ -310,7 +296,7 @@ Appbay supports generator expressions that produce values on first evaluation an
 |-----------|---------|-------------|
 | `${password:N}` | `${password:16}` | Random alphanumeric string of length N |
 | `${uuid}` | `${uuid}` | Random UUID v4 |
-| `${hash}` | `${hash}` | Deterministic hash of project + environment + service + key |
+| `${hash}` | `${hash}` | Deterministic hash of namespace + service + key |
 | `${base64:N}` | `${base64:32}` | Random base64 string of N bytes |
 | `${timestamp}` | `${timestamp}` | Current timestamp (evaluated at render time, not stored) |
 
@@ -439,8 +425,8 @@ The pipeline runs in two phases. For each discovered app, stages run in this ord
 
 1. **Discover** -- Scan `etc/apps/` for directories with `docker-compose.yml`. Parse and validate `appbay.yaml` with Zod schemas. Errors are recorded but do not block other apps.
 2. **Upstream transform** -- For apps with an `upstream.source`, apply namespace isolation first (internal network creation, volume prefixing, shared network aliases). This runs *before* variable resolution so that scope references inside the upstream compose are visible to the resolver.
-3. **Resolve variables** -- Evaluate `${{scope.KEY}}` references against the variable store named by the scope prefix. Only `project` has a populated store (`$APPBAY_HOME/etc/system.yaml`'s `domain:`); see the warning under [Variable resolution](#variable-resolution). Magic generators (`${password:N}`, `${uuid}`, etc.) are evaluated and persisted.
-4. **Select overlays** -- Evaluate `when` clauses against the active app set; merge matching fragments into the compose model.
+3. **Resolve variables** -- Evaluate `${{ns:KEY}}` references against the app's namespace values (`etc/namespaces/<ns>.yaml` over `default.yaml`). Magic generators (`${password:N}`, `${uuid}`, etc.) are evaluated and persisted.
+4. **Select overlays** -- Evaluate `when` clauses against the app's project peers; merge matching fragments into the compose model.
 5. **Apply traits** -- Transform the compose model (add Traefik config, GPU devices, auth middleware, etc.) in declaration order.
 6. **Render** -- Write final compose YAML to `var/lib/renders/<app>/`
 7. **Plan/Diff** -- Compare rendered output against the previous render on disk; produce a redacted diff.

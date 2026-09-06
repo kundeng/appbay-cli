@@ -17,13 +17,12 @@
 
 /** Scope values at each level of the hierarchy. */
 export interface ScopeValues {
-  /** Per-host values from `etc/system.yaml` (the allow-listed keys). */
-  project: Record<string, string>;
-  /** Per-deployment values from `etc/namespaces/<ns>.yaml`. */
-  namespace: Record<string, string>;
-  /** What the compiler knows about this app: NAME, NAMESPACE, STEM, and HOST when a domain exists. */
-  app: Record<string, string>;
-  service: Record<string, string>;
+  /**
+   * The one value scope a manifest references: the namespace's values, layered as
+   * `etc/namespaces/default.yaml` (seeded by init with the system's DOMAIN) under
+   * `etc/namespaces/<ns>.yaml`. Referenced as `${{ns:KEY}}`.
+   */
+  ns: Record<string, string>;
 }
 
 /** An error produced when a variable reference cannot be resolved. */
@@ -44,6 +43,8 @@ export interface ResolveResult {
   resolved: string;
   /** Any unresolved references encountered during resolution. */
   errors: ScopeError[];
+  /** Deprecated spellings that resolved: the pre-S43 dotted `${{project.KEY}}`. */
+  warnings: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +52,9 @@ export interface ResolveResult {
 // ---------------------------------------------------------------------------
 
 /** Valid scope names in resolution priority order (highest first). */
-const VALID_SCOPES = ["service", "app", "namespace", "project"] as const;
+const VALID_SCOPES = ["ns"] as const;
+/** Spellings accepted for the one scope. `project` with a DOT is the pre-S43 form, kept for one release. */
+const SCOPE_ALIASES: Record<string, ScopeName> = { ns: "ns", namespace: "ns", project: "ns" };
 
 type ScopeName = (typeof VALID_SCOPES)[number];
 
@@ -65,7 +68,7 @@ type ScopeName = (typeof VALID_SCOPES)[number];
  * Uses a non-greedy match and requires the closing `}}`.
  * Does NOT match single-brace `${VAR}` references.
  */
-const SCOPE_REF_PATTERN = /\$\{\{(\w+)\.(\w+)\}\}/g;
+const SCOPE_REF_PATTERN = /\$\{\{(\w+)([:.])(\w+)\}\}/g;
 
 // ---------------------------------------------------------------------------
 // ScopeResolver
@@ -92,25 +95,25 @@ export class ScopeResolver {
    * cannot be resolved.
    */
   resolveRef(ref: string): string | ScopeError {
-    const match = /^\$\{\{(\w+)\.(\w+)\}\}$/.exec(ref);
+    const match = /^\$\{\{(\w+)([:.])(\w+)\}\}$/.exec(ref);
     if (!match) {
       return {
         reference: ref,
         scope: "unknown",
         key: "unknown",
-        message: `Invalid variable reference format: "${ref}". Expected $\{{scope.KEY}} where scope is one of: ${VALID_SCOPES.join(", ")}`,
+        message: `Invalid variable reference format: "${ref}". Expected $\{{ns:KEY}}`,
       };
     }
 
-    const scope = match[1] as string;
-    const key = match[2] as string;
-
-    if (!VALID_SCOPES.includes(scope as ScopeName)) {
+    const spelled = match[1] as string;
+    const key = match[3] as string;
+    const scope = SCOPE_ALIASES[spelled];
+    if (!scope || (match[2] === "." && spelled !== "project")) {
       return {
         reference: ref,
-        scope,
+        scope: spelled,
         key,
-        message: `Unknown scope "${scope}" in reference "${ref}". Valid scopes are: ${VALID_SCOPES.join(", ")}`,
+        message: `Unknown scope "${spelled}" in reference "${ref}". The one scope is ns: write $\{{ns:${key}}}`,
       };
     }
 
@@ -137,21 +140,24 @@ export class ScopeResolver {
    */
   resolve(template: string): ResolveResult {
     const errors: ScopeError[] = [];
+    const warnings: string[] = [];
 
     const resolved = template.replace(
       SCOPE_REF_PATTERN,
-      (fullMatch, scope: string, key: string) => {
-        if (!VALID_SCOPES.includes(scope as ScopeName)) {
+      (fullMatch, spelled: string, sep: string, key: string) => {
+        const scope = SCOPE_ALIASES[spelled];
+        if (!scope || (sep === "." && spelled !== "project")) {
           errors.push({
             reference: fullMatch,
-            scope,
+            scope: spelled,
             key,
-            message: `Unknown scope "${scope}" in reference "${fullMatch}". Valid scopes are: ${VALID_SCOPES.join(", ")}`,
+            message: `Unknown scope "${spelled}" in reference "${fullMatch}". The one scope is ns: write $\{{ns:${key}}}`,
           });
           return fullMatch;
         }
+        if (sep === ".") warnings.push(`${fullMatch} is the pre-S43 spelling; write $\{{ns:${key}}}. The dotted form is accepted for one release.`);
 
-        const scopeValues = this.values[scope as ScopeName];
+        const scopeValues = this.values[scope];
         const value = scopeValues[key];
 
         if (value === undefined) {
@@ -168,7 +174,7 @@ export class ScopeResolver {
       },
     );
 
-    return { resolved, errors };
+    return { resolved, errors, warnings };
   }
 
   /**
@@ -178,10 +184,11 @@ export class ScopeResolver {
    */
   resolveObject(
     obj: Record<string, unknown>,
-  ): { result: Record<string, unknown>; errors: ScopeError[] } {
+  ): { result: Record<string, unknown>; errors: ScopeError[]; warnings: string[] } {
     const errors: ScopeError[] = [];
-    const result = this.resolveValue(obj, errors) as Record<string, unknown>;
-    return { result, errors };
+    const warnings: string[] = [];
+    const result = this.resolveValue(obj, errors, warnings) as Record<string, unknown>;
+    return { result, errors, warnings };
   }
 
   // -------------------------------------------------------------------------
@@ -191,21 +198,22 @@ export class ScopeResolver {
   /**
    * Recursively resolve references in an arbitrary value.
    */
-  private resolveValue(value: unknown, errors: ScopeError[]): unknown {
+  private resolveValue(value: unknown, errors: ScopeError[], warnings: string[]): unknown {
     if (typeof value === "string") {
-      const { resolved, errors: refErrors } = this.resolve(value);
+      const { resolved, errors: refErrors, warnings: refWarnings } = this.resolve(value);
       errors.push(...refErrors);
+      warnings.push(...refWarnings);
       return resolved;
     }
 
     if (Array.isArray(value)) {
-      return value.map((item) => this.resolveValue(item, errors));
+      return value.map((item) => this.resolveValue(item, errors, warnings));
     }
 
     if (value !== null && typeof value === "object") {
       const resolved: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        resolved[k] = this.resolveValue(v, errors);
+        resolved[k] = this.resolveValue(v, errors, warnings);
       }
       return resolved;
     }

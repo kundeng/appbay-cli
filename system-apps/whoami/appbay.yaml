@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "whoami.${{project.DOMAIN}}"
+    host: "whoami.${{ns:DOMAIN}}"
     port: 80
     service: whoami
     exposure: internal

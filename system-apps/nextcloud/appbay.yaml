@@ -10,7 +10,7 @@ upstream:
 
 traits:
   - type: ingress
-    host: "cloud.${{project.DOMAIN}}"
+    host: "cloud.${{ns:DOMAIN}}"
     port: 80
     service: nextcloud
     exposure: external
