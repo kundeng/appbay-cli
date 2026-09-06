@@ -15,6 +15,7 @@ let containers: Fake[] = [];
 let networks = new Set<string>();
 let inspects = 0;
 let inspectFails = false;
+let vanished = new Set<string>();
 let dir: string; let sock: string; let server: Server;
 
 beforeAll(async () => {
@@ -35,6 +36,7 @@ beforeAll(async () => {
     const m = /^\/containers\/([^/]+)\/json$/.exec(url.pathname);
     if (m) inspects++;
     if (m && inspectFails) { json(500, { message: "inspect broke" }); return; }
+    if (m && vanished.has(decodeURIComponent(m[1]!))) { json(404, { message: "no such container" }); return; }
     if (m && decodeURIComponent(m[1]!) === "truncated") {
       // A daemon that dies mid-reply: headers, five bytes, then the socket is gone.
       res.writeHead(200, { "content-type": "application/json", "content-length": "1000" });
@@ -119,6 +121,18 @@ describe("engine observer", () => {
     const r = await obs().project("d");
     inspectFails = false;
     expect(r.kind).toBe("unknown");
+  });
+
+  it("a container that vanished between list and inspect is not a row (S48 round 6)", async () => {
+    containers = [
+      c("v-web-1", "running", { "com.docker.compose.project": "v", "com.docker.compose.service": "web" }, { Status: "Up 2 seconds" }),
+      c("v-job-1", "exited", { "com.docker.compose.project": "v", "com.docker.compose.service": "job" }, { ExitCode: 1 }),
+    ];
+    vanished = new Set(["id-v-job-1"]);
+    const rows = await obs().project("v");
+    vanished = new Set();
+    expect(rows.kind === "ok" ? rows.value.map((r) => r.service) : rows).toEqual(["web"]);
+    expect(await findCrashedServices(obs(), "v")).toEqual({ kind: "ok", value: ["job exited 1"] });
   });
 
   it("answers running-state and network existence", async () => {

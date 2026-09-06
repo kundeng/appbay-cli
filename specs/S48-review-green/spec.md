@@ -120,7 +120,8 @@ round n:
 - [x] 2.3 review round 3, fixes
 - [x] 2.4 review round 4, fixes
 - [x] 2.5 review round 5, fixes
-- [x] 2.6 review round 6, fixes (round 7 pending)
+- [x] 2.6 review round 6, fixes
+- [x] 2.7 review round 7, fixes (round 8 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -247,11 +248,30 @@ or journey had reached.
 
 | # | lens | where | finding | disposition |
 |---|---|---|---|---|
-| R6.1 | REGRESSION MED | `utils/pullable.ts` | round 5 keyed "built here" on the manifest having a `builds.<service>` entry; a build gated off by `when:` leaves the registry image in the render, and `pull` would have called it "built locally" | fixed: a service is built here iff its rendered image equals the manifest build's image, or the upstream declares `build:`; test with a gated-off build |
+| R6.1 | REGRESSION MED | `utils/pullable.ts` | round 5 keyed "built here" on the manifest having a `builds.<service>` entry; a build gated off by `when:` leaves the registry image in the render, and `pull` would have called it "built locally" | fixed in round 7 (the round-6 predicate still excluded any upstream `build:`, which is the only place the compiler consults a manifest build): with a manifest entry the service is built here iff the rendered image is the entry's image; without one, iff the upstream declares `build:`; fixture shaped like the caddy compose |
 | R6.2 | S1 MED | `edge.ts` migrate | `edge migrate --to caddy` ran `compose build` against the render, which carries no `build:`; on a host that never built the image the validate step failed with a pull error attributed to the config | fixed: the candidate's manifest build actions (now marked `kind: "build"`) run first, the way the deploy runs them; a failure names the build |
 | R6.3 | LOW | `checks.ts:501,503` | round 5's sudo-probe timeout landed at one of three sites | fixed: all three |
 | R6.4 | LOW | `observe.ts` | a container that vanished between list and inspect read as a ready row (or exit 0) | fixed: not a row; test that a Docker `(healthy)` row costs no inspect and a broken inspect makes the project unknown |
-| R6.5 | LOW | `down.ts` | `down typo` warned and exited 0 while `pull` and `restart` exit 1 | fixed: one rule; scratch-home test |
+| R6.5 | LOW | `down.ts` | `down typo` warned and exited 0 while `pull` and `restart` exit 1 | fixed: exit 1 on an unknown name (after stopping the known ones; `pull` and `restart` refuse first); scratch-home test |
 | R6.6 | LOW | several | `models rm` and `update`'s version lookups without timeouts; `OLLAMA_HOST` without a scheme; `dive` reading `${VAR:-default}` from the source compose; `logs` exit 0 on a signal; the download budget too small for a slow link; a stale sentence in `observe.ts`; the two-edges sentence untested | fixed |
 | R6.7 | LOW | `converges.ts` readiness poll | one stalled inspect during the poll makes the project unobservable rather than "not yet" | recorded: honest, if impatient; a design choice for a later sprint |
 | R6.8 | LOW | `boot-order.ts:111` | the cycle error names every remaining app, including dependents of the cycle | recorded |
+
+Not pinned by a test after this round: the migrate build path, the `dive` image, `logs`'
+signal exit, the `OLLAMA_HOST` scheme, the `models rm` and version-lookup timeouts, the
+download budget. The vanished-container `continue` gained a test in round 7.
+
+**2026-09-06 — round 7.** The core region's confirming pass and the CLI region each found
+pre-existing MEDIUMs no earlier round had reached; the diff reviewer found the round-6 pull
+predicate still unreachable.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R7.1 | S1/S7 MED | `observe.ts:125`, `converges.ts`, every compose call | the observer keys on `com.docker.compose.project=<app>`, but the project name was left to compose to derive; a top-level `name:` in the upstream or `COMPOSE_PROJECT_NAME` in `.env` moved the containers under a name the observer never asked for, and every check went vacuously green (measured on the Rocky guest) | fixed: `-p <app>` at every compose call for an app render (deploy, down, pull, update, logs, exec, up --tail, edge migrate); the render drops a top-level `name:`; tests on both runners |
+| R7.2 | GAP MED | `utils/pullable.ts` | the round-6 predicate excluded any upstream `build:`, which is the only place the compiler consults a manifest build, so the gated-off case still read "built locally" | fixed: with a manifest entry the pinned image decides; fixture shaped like the caddy compose |
+| R7.3 | S1/S8 MED | `edge-migration-service.ts` | the outgoing edge's backup was copied to `etc/apps/<from>.pre-<to>`, which discovery reads as an installed app: after a migration every `up` tried to start a second edge | fixed: backups live under `var/lib/backups/`; test |
+| R7.4 | S1/Q5 MED | `setup.ts --reset` | only the two edges were stopped before every render was removed; a running user app lost the file `down` acts from | fixed: every app stops first |
+| R7.5 | LOW | `pull.ts`, `update.ts` | an unreadable compose read as "nothing to pull (built locally)" | fixed: a failure |
+| R7.6 | LOW | several | the vanished-container `continue` untested (now tested); `dive` left `${VAR:-default}` for unpinned services (the default is taken); `logs`' header; spec rows R6.1/R6.5 overstated | fixed |
+| R7.7 | LOW | `observe.ts didConverge` | a container present before and gone after is not counted as a change, so `replicas` 2→1 reads "compose changed nothing" | recorded |
+| R7.8 | LOW | `route.ts` | the three-way edge lookup is written once per provider | recorded |

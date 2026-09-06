@@ -42,7 +42,7 @@ function composeInteractive(verb: "exec" | "run", app: string, command: string[]
   const composePath = renderedComposeOrExit(appbayHome, app);
   const cmd = command.length > 0 ? command : ["/bin/sh"];
   const extra = verb === "run" ? ["--rm"] : [];
-  const result = containerExec(["compose", "-f", composePath, verb, ...extra, serviceOf(composePath, app), ...cmd], { appbayHome, stdio: "inherit" });
+  const result = containerExec(["compose", "-f", composePath, "-p", app, verb, ...extra, serviceOf(composePath, app), ...cmd], { appbayHome, stdio: "inherit" });
   exitWithContainerResult(result);
 }
 

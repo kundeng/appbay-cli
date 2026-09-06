@@ -16,7 +16,7 @@
  * coexist. That is why this is a migration rather than an install.
  */
 
-import { cp, rm, stat } from "node:fs/promises";
+import { cp, rm, stat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Inspection } from "../runtime/container-runtime.js";
 import { apiListContainers } from "../runtime/engine-api.js";
@@ -163,13 +163,16 @@ export async function migrateEdge(opts: {
   }
   record("validate", `Candidate ${opts.to} configuration is valid`, true);
 
-  // 3. Back up the outgoing edge's config.
+  // 3. Back up the outgoing edge's config, outside etc/apps: anything under the apps
+  // directory that holds a compose file is an installed app to discovery, and a backup
+  // left there was listed, compiled and deployed as one on the next `up`.
   const outgoingDir = join(opts.appbayHome, "etc", "apps", opts.from);
-  const backupDir = `${outgoingDir}.pre-${opts.to}`;
+  const backupDir = join(opts.appbayHome, "var", "lib", "backups", `${opts.from}.pre-${opts.to}`);
   let backedUp = false;
   try {
     await stat(outgoingDir);
     await rm(backupDir, { recursive: true, force: true });
+    await mkdir(join(opts.appbayHome, "var", "lib", "backups"), { recursive: true });
     await cp(outgoingDir, backupDir, { recursive: true });
     backedUp = true;
     record("backup", `Backed up ${opts.from} configuration`, true, backupDir);

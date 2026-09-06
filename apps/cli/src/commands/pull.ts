@@ -87,13 +87,17 @@ export const pullCommand = new Command("pull")
       const target = existsSync(renderPath) ? renderPath : app.composePath;
 
       const pullable = pullableServices(target, app.composePath, app.appbayConfig?.builds);
+      if (pullable === null) {
+        console.log(`  ${app.name}... failed: its compose file could not be read`);
+        continue;
+      }
       if (pullable.length === 0) {
         console.log(`  ${app.name}... nothing to pull (built locally)`);
         pulled++;
         continue;
       }
       console.log(`  ${app.name}...`);
-      const result = dockerCompose(["pull", ...pullable], target);
+      const result = dockerCompose(["-p", app.name, "pull", ...pullable], target);
       if (result.exitCode === 0) {
         console.log(`    pulled`);
         pulled++;

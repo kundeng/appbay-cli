@@ -230,9 +230,10 @@ async function pullSystemImages(): Promise<number> {
   let failed = 0;
   for (const app of rendered) {
     const pullable = pullableServices(app.render, app.upstream, app.builds);
+    if (pullable === null) { failed++; console.log(`  ${app.name}... FAILED (its compose file could not be read)`); continue; }
     if (pullable.length === 0) { console.log(`  ${app.name}... nothing to pull (built locally)`); continue; }
     process.stdout.write(`  ${app.name}...`);
-    const pull = containerCompose(["pull", ...pullable], app.render, undefined, appbayHome);
+    const pull = containerCompose(["-p", app.name, "pull", ...pullable], app.render, undefined, appbayHome);
     if (pull.exitCode === 0) {
       process.stdout.write(" done\n");
     } else {

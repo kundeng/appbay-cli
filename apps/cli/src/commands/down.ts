@@ -61,7 +61,7 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
       continue;
     }
     console.log(`  Stopping ${app.name}...`);
-    const result = dockerCompose(["down"], composePath);
+    const result = dockerCompose(["-p", app.name, "down"], composePath);
     if (result.exitCode !== 0) {
       console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
       console.error(`    ${result.output}`);

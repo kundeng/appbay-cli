@@ -2,7 +2,7 @@
  * `appbay logs [app] [service] [--follow] [--tail <n>]`: `compose logs` against the app's
  * rendered file (its source compose when no render exists), streamed to the terminal.
  *
- * Exit codes: compose's own; 1 when the app is not found.
+ * Exit codes: compose's own; 1 when the app is not found or compose was killed by a signal.
  */
 
 import { Command } from "commander";
@@ -34,7 +34,7 @@ export const logsCommand = new Command("logs")
     }
 
     const composeFile = await resolveComposeFile(app, target.composePath, rendersDir);
-    const args = ["compose", "-f", composeFile, "logs"];
+    const args = ["compose", "-f", composeFile, "-p", app, "logs"];
     if (options.follow) args.push("--follow");
     if (options.tail) args.push("--tail", options.tail);
     if (service) args.push(service);

@@ -4,6 +4,7 @@
  * These tests drive it with fakes for the four operations it delegates and pin the two
  * refusals and the rollback, which are the reasons it exists.
  */
+import { existsSync } from "node:fs";
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -93,7 +94,9 @@ describe("migrateEdge", () => {
     expect(r.migrated).toBe(true);
     expect(calls).toEqual(["validate", "stop traefik", "start caddy", "health caddy"]);
     expect(r.steps.map((s) => s.id)).toEqual(["ports", "validate", "backup", "stop", "start", "health"]);
-    const backup = await readFile(join(home, "etc", "apps", "traefik.pre-caddy", "docker-compose.yml"), "utf-8");
+    // Outside etc/apps: a backup that lived there was discovered as an installed app (S48 round 7).
+    const backup = await readFile(join(home, "var", "lib", "backups", "traefik.pre-caddy", "docker-compose.yml"), "utf-8");
+    expect(existsSync(join(home, "etc", "apps", "traefik.pre-caddy"))).toBe(false);
     expect(backup).toBe("services: {}\n");
   });
 

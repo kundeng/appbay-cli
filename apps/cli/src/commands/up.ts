@@ -80,7 +80,7 @@ export const upCommand = new Command("up")
     if (!hasFailures && options.tail && apps.length > 0) {
       const appName = apps[0];
       const composePath = join(appbayHome, "var", "lib", "renders", appName, "docker-compose.rendered.yml");
-      const tail = containerExec(["compose", "-f", composePath, "logs", "-f"], { appbayHome, stdio: "inherit" });
+      const tail = containerExec(["compose", "-f", composePath, "-p", appName, "logs", "-f"], { appbayHome, stdio: "inherit" });
       if (tail.failedToStart) console.error(tail.output.trim());
     }
 

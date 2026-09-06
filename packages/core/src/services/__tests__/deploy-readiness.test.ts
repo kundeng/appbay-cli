@@ -34,7 +34,9 @@ function runner(answers: Record<string, (n: number) => ComposePsRow | ComposePsR
   const log: string[] = [];
   const run: DockerComposeRunner = (subArgs, composePath) => {
     const app = composePath.includes("/db/") ? "db" : "web";
-    log.push(`${app}:${subArgs[0]}`);
+    // `-p <app>` precedes the verb: the project name is stated, not derived (S48 round 7).
+    expect(subArgs.slice(0, 2)).toEqual(["-p", app]);
+    log.push(`${app}:${subArgs[2]}`);
     return { exitCode: 0, output: "" };
   };
   const observer: Observer = {

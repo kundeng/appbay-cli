@@ -201,7 +201,10 @@ function appChain({ app, refusal, dependsOn, waitReady }: PlannedApp): Converge[
     link("project", "shepherd:pre", async (ctx) => {
       const composePath = join(ctx.rendersDir, name, "docker-compose.rendered.yml");
       const before = await snapshotContainers(ctx.observer, name);
-      const dc = ctx.dockerCompose(["up", "-d"], composePath, state.env);
+      // The project name is stated, not derived from the directory: a top-level `name:` in
+      // the upstream or COMPOSE_PROJECT_NAME in the app's .env would otherwise label the
+      // containers under a name the observer never asks for (S48 round 7).
+      const dc = ctx.dockerCompose(["-p", name, "up", "-d"], composePath, state.env);
       if (dc.exitCode !== 0) return diverged(dc.output);
       const after = await snapshotContainers(ctx.observer, name);
       // `up -d` returning means "started", not "still running": read now, and once more after

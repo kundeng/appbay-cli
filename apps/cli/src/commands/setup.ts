@@ -338,11 +338,12 @@ async function resetSetup(): Promise<void> {
 
   console.log(`  Resetting Appbay at ${appbayHome}\n`);
 
-  // Stop the edge apps through the one stop path, from the render each was started from; a
-  // failed stop aborts the reset rather than deleting the renders out from under a running
-  // container, which would leave it with no command that reaches it.
+  // Every app stops through the one stop path, from the render each was started from,
+  // because every render is about to go; a failed stop aborts the reset rather than
+  // deleting a render out from under a running container, which would leave it with no
+  // command that reaches it.
   try {
-    const stop = await stopApps(appbayHome, ["caddy", "traefik"]);
+    const stop = await stopApps(appbayHome, []);
     if (stop.failed > 0) throw new Error("an edge app did not stop");
   } catch (err) {
     console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; nothing was removed.`);

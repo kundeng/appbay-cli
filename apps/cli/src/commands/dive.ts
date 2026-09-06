@@ -20,7 +20,8 @@ function resolveImage(target: string): string {
       const services = compose?.services ?? {};
       for (const config of Object.values(services) as Array<Record<string, unknown>>) {
         if (config.image && typeof config.image === "string") {
-          return config.image;
+          // A service the compiler did not pin keeps compose's `${VAR:-default}`; the default is the image.
+          return config.image.replace(/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]+)\}$/, "$1");
         }
       }
     } catch { /* fall through */ }

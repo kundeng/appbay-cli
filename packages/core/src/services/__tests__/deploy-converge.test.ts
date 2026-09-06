@@ -36,7 +36,8 @@ function observerWith(answers: Array<Inspection<ComposePsRow[]>>): Observer {
 }
 const ok = (...rows: ComposePsRow[]): Inspection<ComposePsRow[]> => ({ kind: "ok", value: rows });
 const unknown = (reason: string): Inspection<ComposePsRow[]> => ({ kind: "unknown", reason });
-const compose: DockerComposeRunner = () => ({ exitCode: 0, output: "" });
+const composeCalls: string[][] = [];
+const compose: DockerComposeRunner = (subArgs) => { composeCalls.push(subArgs); return { exitCode: 0, output: "" }; };
 
 async function seedRender(): Promise<void> {
   await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "seed-id"))]) });
@@ -89,6 +90,12 @@ describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
     const result = await deploy({ appbayHome: home, targetApps: [APP, "typo"], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
     expect(result.apps).toEqual([]);
     expect(result.compileErrors).toEqual([{ appName: "typo", stage: "target", message: 'no installed app named "typo"' }]);
+  });
+
+  it("compose is told the project name: a `name:` in the upstream or COMPOSE_PROJECT_NAME cannot move it (S48 round 7)", async () => {
+    composeCalls.length = 0;
+    await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+    expect(composeCalls).toEqual([["-p", APP, "up", "-d"]]);
   });
 
   it("an empty target list deploys nothing, not everything", async () => {

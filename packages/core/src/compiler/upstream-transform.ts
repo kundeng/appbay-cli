@@ -117,15 +117,20 @@ function withIdentity(
   };
 }
 
-/** `withIdentity` over every service of a compose model that had no upstream transform. */
+/**
+ * `withIdentity` over every service of a compose model that had no upstream transform. A
+ * top-level `name:` is dropped: the compose project is the app's name, stated with `-p` at
+ * every compose call, and a render must not carry a second answer.
+ */
 export function applyIdentity(
   compose: Record<string, unknown>,
   namespace: string | undefined,
   appName: string,
 ): Record<string, unknown> {
   const services = (compose.services ?? {}) as Record<string, ServiceDef>;
+  const { name: _projectName, ...rest } = compose;
   return {
-    ...compose,
+    ...rest,
     services: Object.fromEntries(
       Object.entries(services).map(([name, svc]) => [name, withIdentity(svc, namespace, appName, name)]),
     ),

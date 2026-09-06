@@ -163,7 +163,7 @@ const migrate = new Command("migrate")
           }
         }
         const check = containerCompose(
-          ["run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+          ["-p", to, "run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
           render, resolved.env, appbayHome,
         );
         if (check.exitCode === 0) return null;
@@ -172,7 +172,7 @@ const migrate = new Command("migrate")
       stopStack: async (p) => {
         const render = renderFor(p);
         if (!existsSync(render)) return;
-        const down = containerCompose(["down"], render, undefined, appbayHome);
+        const down = containerCompose(["-p", p, "down"], render, undefined, appbayHome);
         if (down.exitCode !== 0) throw new Error(`compose down ${p}: ${down.output.trim()}`);
       },
       startStack: async (p) => {
