@@ -92,8 +92,8 @@ export const InstanceConfigSchema = z.object({
   home: z.string().optional(),
   /**
    * Project name, as `appbay init --project` recorded it. Display only: the compose project
-   * is the app directory name (compose derives it from the render's directory; nothing sets
-   * `-p`), and ingress hosts come from `domain`.
+   * is the app's name under compose's normalization (`composeProject`, stated with `-p`),
+   * and ingress hosts come from `domain`.
    */
   project: z.string().optional(),
 

@@ -7,7 +7,7 @@
  */
 import { Command } from "commander";
 import { requireRunningApp } from "../utils/docker.js";
-import { discoverApps, containerExec } from "@appbay/core";
+import { discoverApps, containerExec, composeProject } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { join } from "node:path";
@@ -84,7 +84,12 @@ export const pullCommand = new Command("pull")
     let pulled = 0;
     for (const app of apps) {
       const renderPath = join(rendersDir, app.name, "docker-compose.rendered.yml");
-      const target = existsSync(renderPath) ? renderPath : app.composePath;
+      if (!existsSync(renderPath)) {
+        console.log(`  ${app.name}... nothing to pull (not deployed; the render decides the images)`);
+        pulled++;
+        continue;
+      }
+      const target = renderPath;
 
       const pullable = pullableServices(target, app.composePath, app.appbayConfig?.builds);
       if (pullable === null) {
@@ -97,7 +102,7 @@ export const pullCommand = new Command("pull")
         continue;
       }
       console.log(`  ${app.name}...`);
-      const result = dockerCompose(["-p", app.name, "pull", ...pullable], target);
+      const result = dockerCompose(["-p", composeProject(app.name), "pull", ...pullable], target);
       if (result.exitCode === 0) {
         console.log(`    pulled`);
         pulled++;

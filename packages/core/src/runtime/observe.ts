@@ -13,6 +13,7 @@
 
 import type { Inspection } from "./container-runtime.js";
 import { apiInspectContainer, apiListContainers, apiNetworkExists, type ContainerSummary, type EngineOptions } from "./engine-api.js";
+import { composeProject } from "../compiler/identity.js";
 
 /** Result of one compose invocation (mutation). */
 export interface DockerComposeResult {
@@ -122,7 +123,7 @@ export function engineObserver(appbayHome?: string, socketPath?: string): Observ
   const options: EngineOptions = { appbayHome, socketPath };
   return {
     async project(project) {
-      const list = await apiListContainers({ labels: { [COMPOSE_PROJECT]: project } }, options);
+      const list = await apiListContainers({ labels: { [COMPOSE_PROJECT]: composeProject(project) } }, options);
       if (list.kind === "unknown") return list;
       return rowsFrom(list.value, options);
     },

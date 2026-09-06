@@ -2,7 +2,7 @@
  * `appbay size [app]` — show disk usage for apps.
  */
 import { Command } from "commander";
-import { discoverApps, apiDiskUsage } from "@appbay/core";
+import { discoverApps, apiDiskUsage, composeProject } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { formatBytes } from "../utils/formatting.js";
 import { spawnSync } from "node:child_process";
@@ -66,7 +66,7 @@ export const sizeCommand = new Command("size")
     for (const t of targets) {
       const defSize = getDirSize(t.dir);
       const renderSize = getDirSize(join(rendersDir, t.name));
-      const volSize = volumes === null ? "?" : formatBytes(volumes.get(t.name) ?? 0);
+      const volSize = volumes === null ? "?" : formatBytes(volumes.get(composeProject(t.name)) ?? 0);
       console.log(
         `  ${pad(t.name, 20)} ${pad(defSize, 12)} ${pad(renderSize, 12)} ${pad(volSize, 12)}`,
       );

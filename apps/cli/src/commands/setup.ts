@@ -344,7 +344,7 @@ async function resetSetup(): Promise<void> {
   // command that reaches it.
   try {
     const stop = await stopApps(appbayHome, []);
-    if (stop.failed > 0) throw new Error("an edge app did not stop");
+    if (stop.failed > 0) throw new Error("an app did not stop");
   } catch (err) {
     console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; nothing was removed.`);
     process.exit(1);
@@ -409,7 +409,7 @@ export const setupCommand = new Command("setup")
   .option("--ingress-provider <provider>", 'supported edge: "traefik" or "caddy"')
   .option("--yes", "non-interactive mode")
   .option("--status", "show setup status without running setup")
-  .option("--reset", "tear down system apps and remove generated configs")
+  .option("--reset", "stop every app, remove the generated configuration and renders, and keep app definitions and the vault")
   .action(async (options: {
     domain?: string;
     project?: string;

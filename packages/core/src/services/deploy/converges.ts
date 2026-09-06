@@ -14,7 +14,7 @@ import type { AppCompileResult } from "../../compiler/index.js";
 import { resolveSecretsForDeploy, extractSecretRefs } from "../../secrets/resolve-for-deploy.js";
 import { resolveIngressProvider } from "../../runtime/container-runtime.js";
 import { findCrashedServices, snapshotContainers, didConverge, isReady, type Observer } from "../../runtime/observe.js";
-import { APP_LABEL, shepherdTarget } from "../../compiler/identity.js";
+import { APP_LABEL, shepherdTarget, composeProject } from "../../compiler/identity.js";
 import type { ShepherdAction, ShepherdPhase } from "../../traits/types.js";
 import { parseEnvFile } from "../config-service.js";
 import { runShepherd } from "../../shepherd/run-shepherd.js";
@@ -204,9 +204,15 @@ function appChain({ app, refusal, dependsOn, waitReady }: PlannedApp): Converge[
       // The project name is stated, not derived from the directory: a top-level `name:` in
       // the upstream or COMPOSE_PROJECT_NAME in the app's .env would otherwise label the
       // containers under a name the observer never asks for (S48 round 7).
-      const dc = ctx.dockerCompose(["-p", name, "up", "-d"], composePath, state.env);
+      const dc = ctx.dockerCompose(["-p", composeProject(name), "up", "-d"], composePath, state.env);
       if (dc.exitCode !== 0) return diverged(dc.output);
       const after = await snapshotContainers(ctx.observer, name);
+      // Nothing under the app's project after a clean `up -d` is not a deployment: a render
+      // whose services are all behind profiles, or a project label that drifted, would
+      // otherwise fold to "already-running" over no container.
+      if (after.kind === "ok" && after.value.size === 0) {
+        return diverged(`compose started nothing for ${name}: no container carries its project label after up -d`);
+      }
       // `up -d` returning means "started", not "still running": read now, and once more after
       // the grace, because a bad config kills the process a moment after start.
       let crashed = await findCrashedServices(ctx.observer, name);

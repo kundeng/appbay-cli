@@ -96,6 +96,15 @@ describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
     composeCalls.length = 0;
     await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
     expect(composeCalls).toEqual([["-p", APP, "up", "-d"]]);
+    // A name compose would refuse as a -p value goes through the same normalization compose applied to the directory.
+    const { composeProject } = await import("../../compiler/identity.js");
+    expect(composeProject("Whoami.Two")).toBe("whoamitwo");
+  });
+
+  it("a clean up -d that left no container under the project is a failure, not 'already running' (S48 round 8)", async () => {
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok()]) });
+    expect(result.apps[0]?.status).toBe("failed");
+    expect(result.apps[0]?.error).toContain("started nothing");
   });
 
   it("an empty target list deploys nothing, not everything", async () => {

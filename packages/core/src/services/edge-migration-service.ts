@@ -169,16 +169,22 @@ export async function migrateEdge(opts: {
   const outgoingDir = join(opts.appbayHome, "etc", "apps", opts.from);
   const backupDir = join(opts.appbayHome, "var", "lib", "backups", `${opts.from}.pre-${opts.to}`);
   let backedUp = false;
-  try {
-    await stat(outgoingDir);
-    await rm(backupDir, { recursive: true, force: true });
-    await mkdir(join(opts.appbayHome, "var", "lib", "backups"), { recursive: true });
-    await cp(outgoingDir, backupDir, { recursive: true });
-    backedUp = true;
-    record("backup", `Backed up ${opts.from} configuration`, true, backupDir);
-  } catch {
+  const hasOutgoing = await stat(outgoingDir).then(() => true, () => false);
+  if (!hasOutgoing) {
     // No outgoing config is legitimate — a host may never have deployed the old edge.
     record("backup", `Backed up ${opts.from} configuration`, true, "nothing to back up");
+  } else {
+    try {
+      await rm(backupDir, { recursive: true, force: true });
+      await mkdir(join(opts.appbayHome, "var", "lib", "backups"), { recursive: true });
+      await cp(outgoingDir, backupDir, { recursive: true });
+      backedUp = true;
+      record("backup", `Backed up ${opts.from} configuration`, true, backupDir);
+    } catch (err) {
+      // A copy that failed is not a backup; nothing has been stopped yet, so stop here.
+      record("backup", `Backed up ${opts.from} configuration`, false, err instanceof Error ? err.message : String(err));
+      return fail();
+    }
   }
 
   // 4-6. Stop old, start new, check. Any failure rolls back.

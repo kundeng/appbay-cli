@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   transformUpstream,
   rewriteRelativePath,
-  type UpstreamTransformInput,
-} from "../upstream-transform.js";
+  type UpstreamTransformInput, applyIdentity } from "../upstream-transform.js";
 import type { ExposeEntry } from "../../schemas/appbay-yaml.js";
 
 // ---------------------------------------------------------------------------
@@ -890,5 +889,13 @@ describe("rewriteRelativePath", () => {
     );
 
     expect(result).toBe("./../../../../etc/apps/postgres/volumes/db");
+  });
+});
+
+describe("applyIdentity", () => {
+  it("drops a top-level name: the compose project is the app's name, stated with -p (S48 round 7)", () => {
+    const out = applyIdentity({ name: "fromfile", services: { web: { image: "x" } } }, undefined, "myapp");
+    expect(out.name).toBeUndefined();
+    expect(Object.keys(out.services as Record<string, unknown>)).toEqual(["web"]);
   });
 });

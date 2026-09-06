@@ -8,7 +8,7 @@
 import { Command } from "commander";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { discoverApps, deployOrder, loadProjects } from "@appbay/core";
+import { discoverApps, deployOrder, loadProjects, composeProject, containerExec } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
@@ -56,12 +56,13 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
   let failed = 0;
   for (const { app } of [...graph.order].reverse()) {
     const composePath = join(rendersDir, app.name, "docker-compose.rendered.yml");
-    if (!(await renderedComposeExists(composePath))) {
-      console.log(`  - ${pad(app.name, 14)} (no rendered compose, skipped)`);
-      continue;
-    }
+    const project = composeProject(app.name);
     console.log(`  Stopping ${app.name}...`);
-    const result = dockerCompose(["-p", app.name, "down"], composePath);
+    // With the project stated, the render is not needed to reach the containers: a project
+    // whose render is gone is stopped by name rather than skipped with its containers up.
+    const result = (await renderedComposeExists(composePath))
+      ? dockerCompose(["-p", project, "down"], composePath)
+      : containerExec(["compose", "-p", project, "down"], { appbayHome, timeout: 600_000, label: "compose down" });
     if (result.exitCode !== 0) {
       console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
       console.error(`    ${result.output}`);

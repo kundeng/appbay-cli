@@ -1,7 +1,7 @@
 /** Caddy Security local edge-identity administration. */
 import { Command } from "commander";
 import { randomBytes } from "node:crypto";
-import { EdgeIdentityStore, restartEdgeForIdentityChange, migrateEdge, deploy, writeRenderedOutput, resolveDeployEnv, containerCompose, findContainerByLabel, APP_LABEL, IngressProviderSchema, type IngressProvider, compileInstall } from "@appbay/core";
+import { EdgeIdentityStore, restartEdgeForIdentityChange, migrateEdge, deploy, writeRenderedOutput, resolveDeployEnv, containerCompose, findContainerByLabel, APP_LABEL, IngressProviderSchema, type IngressProvider, compileInstall, composeProject } from "@appbay/core";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { dockerCompose } from "../utils/docker.js";
@@ -163,7 +163,7 @@ const migrate = new Command("migrate")
           }
         }
         const check = containerCompose(
-          ["-p", to, "run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+          ["-p", composeProject(to), "run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
           render, resolved.env, appbayHome,
         );
         if (check.exitCode === 0) return null;
@@ -172,7 +172,7 @@ const migrate = new Command("migrate")
       stopStack: async (p) => {
         const render = renderFor(p);
         if (!existsSync(render)) return;
-        const down = containerCompose(["-p", p, "down"], render, undefined, appbayHome);
+        const down = containerCompose(["-p", composeProject(p), "down"], render, undefined, appbayHome);
         if (down.exitCode !== 0) throw new Error(`compose down ${p}: ${down.output.trim()}`);
       },
       startStack: async (p) => {

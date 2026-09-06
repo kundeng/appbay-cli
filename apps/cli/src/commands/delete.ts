@@ -2,6 +2,7 @@
  * `appbay delete <app>` — remove an app definition.
  */
 import { Command } from "commander";
+import { composeProject } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
 import { rm, stat } from "node:fs/promises";
@@ -42,7 +43,13 @@ export const deleteCommand = new Command("delete")
       await stat(renderCompose);
       console.log(`Stopping ${app}...`);
       const downArgs = options.keepVolumes ? ["down"] : ["down", "-v"];
-      dockerCompose(downArgs, renderCompose);
+      // The project is stated (S48 round 7); a down that failed leaves containers a deleted
+      // render can no longer reach, so the deletion stops here.
+      const down = dockerCompose(["-p", composeProject(app), ...downArgs], renderCompose);
+      if (down.exitCode !== 0) {
+        console.error(`Could not stop ${app}; nothing was deleted. ${down.output.trim()}`);
+        process.exit(1);
+      }
     } catch {
       // No rendered compose — app wasn't deployed
     }

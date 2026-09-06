@@ -12,7 +12,7 @@
 import { Command } from "commander";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { deploy, loadProjectVars, containerExec } from "@appbay/core";
+import { deploy, loadProjectVars, containerExec, composeProject } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { printDeployReport } from "../utils/deploy-report.js";
@@ -80,7 +80,7 @@ export const upCommand = new Command("up")
     if (!hasFailures && options.tail && apps.length > 0) {
       const appName = apps[0];
       const composePath = join(appbayHome, "var", "lib", "renders", appName, "docker-compose.rendered.yml");
-      const tail = containerExec(["compose", "-f", composePath, "-p", appName, "logs", "-f"], { appbayHome, stdio: "inherit" });
+      const tail = containerExec(["compose", "-f", composePath, "-p", composeProject(appName), "logs", "-f"], { appbayHome, stdio: "inherit" });
       if (tail.failedToStart) console.error(tail.output.trim());
     }
 

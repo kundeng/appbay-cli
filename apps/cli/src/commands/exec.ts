@@ -8,7 +8,7 @@ import { exitWithContainerResult } from "../utils/docker.js";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
-import { containerExec, SHARED_NETWORK } from "@appbay/core";
+import { containerExec, SHARED_NETWORK, composeProject } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 function renderedComposeOrExit(appbayHome: string, app: string): string {
@@ -42,7 +42,7 @@ function composeInteractive(verb: "exec" | "run", app: string, command: string[]
   const composePath = renderedComposeOrExit(appbayHome, app);
   const cmd = command.length > 0 ? command : ["/bin/sh"];
   const extra = verb === "run" ? ["--rm"] : [];
-  const result = containerExec(["compose", "-f", composePath, "-p", app, verb, ...extra, serviceOf(composePath, app), ...cmd], { appbayHome, stdio: "inherit" });
+  const result = containerExec(["compose", "-f", composePath, "-p", composeProject(app), verb, ...extra, serviceOf(composePath, app), ...cmd], { appbayHome, stdio: "inherit" });
   exitWithContainerResult(result);
 }
 

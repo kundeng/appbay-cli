@@ -121,7 +121,8 @@ round n:
 - [x] 2.4 review round 4, fixes
 - [x] 2.5 review round 5, fixes
 - [x] 2.6 review round 6, fixes
-- [x] 2.7 review round 7, fixes (round 8 pending)
+- [x] 2.7 review round 7, fixes
+- [x] 2.8 review round 8, fixes (round 9 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -275,3 +276,18 @@ predicate still unreachable.
 | R7.6 | LOW | several | the vanished-container `continue` untested (now tested); `dive` left `${VAR:-default}` for unpinned services (the default is taken); `logs`' header; spec rows R6.1/R6.5 overstated | fixed |
 | R7.7 | LOW | `observe.ts didConverge` | a container present before and gone after is not counted as a change, so `replicas` 2→1 reads "compose changed nothing" | recorded |
 | R7.8 | LOW | `route.ts` | the three-way edge lookup is written once per provider | recorded |
+
+**2026-09-06 — round 8.** The core region passed its confirming pass; the CLI region passed
+apart from one site; the diff reviewer found a HIGH in round 7's own fix.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R8.1 | REGRESSION HIGH | every `-p` site | `-p` hands compose the raw directory name, and compose validates a stated name where it normalized a derived one: `--as MyApp` or the legacy `<edge>.pre-<edge>` backup directories failed `up`, `down`, `pull`, `logs`, `exec` on Docker (Podman accepted them, so the runtimes diverged) | fixed: `composeProject()` in `identity.ts` applies compose's own normalization; every `-p` and the observer's label query use it, so the two cannot disagree; tests |
+| R8.2 | GAP MED | `discover.ts` | hosts that migrated before round 7 still carry `etc/apps/<edge>.pre-<edge>`, discovered as apps (present on the Podman guest) | fixed: discovery skips `*.pre-<name>` directories |
+| R8.3 | S1/Q5 MED | `delete.ts` | the one compose call for an app render round 7 missed, with its verdict discarded: a `COMPOSE_PROJECT_NAME` in `.env` made `delete` down nothing, then remove the render and print "Deleted" | fixed: `-p`, and a failed down stops the deletion |
+| R8.4 | LOW | `converges.ts` | a clean `up -d` that left no container under the project folded to "already-running" | fixed: a failure naming the project; test |
+| R8.5 | LOW | `edge-migration-service.ts` | a failed backup copy read as "nothing to back up" | fixed: a failed step, before anything stops |
+| R8.6 | LOW | `down.ts` | a running app whose render was gone was "skipped" with exit 0 | fixed: stopped by project name |
+| R8.7 | LOW | several | `pull` on a never-deployed app handed the source compose to the predicate; the reset's abort text and `--reset` help said "edge apps"; the `applyIdentity` `name:` drop untested (now tested); an `instance.ts` comment described the derived project | fixed |
+| R8.8 | LOW | `size.ts` | the Podman name-prefix fallback splits an app name containing `_` at the wrong place | recorded: names are the directory names; `composeProject` keeps `_`, so the split is the ceiling |
+| R8.9 | LOW | `converges.ts` readiness | one `unknown` mid-wait is unobservable at once, no retry to the deadline | recorded (R6.7) |

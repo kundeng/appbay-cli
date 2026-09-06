@@ -7,7 +7,7 @@
 
 import { Command } from "commander";
 import { join } from "node:path";
-import { discoverApps, containerSpawn } from "@appbay/core";
+import { discoverApps, containerSpawn, composeProject } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { resolveComposeFile } from "../utils/paths.js";
 
@@ -34,7 +34,7 @@ export const logsCommand = new Command("logs")
     }
 
     const composeFile = await resolveComposeFile(app, target.composePath, rendersDir);
-    const args = ["compose", "-f", composeFile, "-p", app, "logs"];
+    const args = ["compose", "-f", composeFile, "-p", composeProject(app), "logs"];
     if (options.follow) args.push("--follow");
     if (options.tail) args.push("--tail", options.tail);
     if (service) args.push(service);

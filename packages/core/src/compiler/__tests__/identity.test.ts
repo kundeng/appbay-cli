@@ -13,8 +13,7 @@ import {
   containerName,
   sharedNetworkAlias,
   internalNetworkName,
-  auxFileStem,
-} from "../identity.js";
+  auxFileStem, composeProject } from "../identity.js";
 
 describe("dnsSafe", () => {
   it("folds dots to hyphens — a dot is a DNS label separator", () => {
@@ -78,5 +77,15 @@ describe("a real namespace enters identity, DNS-folded", () => {
     for (const key of Object.keys(sim) as Array<keyof typeof sim>) {
       expect(sim[key]).not.toBe(prod[key]);
     }
+  });
+});
+
+describe("composeProject", () => {
+  it("is compose's own normalization of the directory name, so -p and the label agree", () => {
+    expect(composeProject("whoami")).toBe("whoami");
+    expect(composeProject("MyApp")).toBe("myapp");
+    expect(composeProject("traefik.pre-caddy")).toBe("traefikpre-caddy");
+    expect(composeProject("_leading")).toBe("leading");
+    expect(composeProject("...")).toBe("app");
   });
 });

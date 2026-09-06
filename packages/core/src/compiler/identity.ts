@@ -118,6 +118,18 @@ export const SHARED_NETWORK = "appbay_shared";
  * No trait sets `share` today; if one does, this must become the app's real container
  * (`containerName`), since `appbay.<app>` is not one (review ledger row 24).
  */
+/**
+ * The compose project name for an app: compose's own normalization of the directory name
+ * (lowercase; only `[a-z0-9_-]`; no leading `-` or `_`), which is what compose derived when
+ * nothing said `-p`. Stated with `-p` at every compose call and used for the observer's
+ * `com.docker.compose.project` query, so the two cannot disagree; a raw name with an
+ * uppercase letter or a dot is refused by Docker Compose as a `-p` value.
+ */
+export function composeProject(appName: string): string {
+  const normalized = appName.toLowerCase().replace(/[^a-z0-9_-]/g, "").replace(/^[-_]+/, "");
+  return normalized || "app";
+}
+
 export function shepherdTarget(appName: string): string {
   return `appbay.${appName}`;
 }
