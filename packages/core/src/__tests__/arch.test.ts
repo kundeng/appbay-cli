@@ -58,7 +58,7 @@ const RULES: Rule[] = [
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",
       "packages/core/src/secrets/resolve-for-deploy.ts": "2.1 (volume create)",
-      "packages/core/src/services/deploy-service.ts": "2.2/2.3",
+      "packages/core/src/services/deploy/route.ts": "2.2/2.3 (caddy exec in the edge)",
       "packages/core/src/services/edge-identity-service.ts": "2.4",
       "packages/core/src/shepherd/run-shepherd.ts": "2.1",
     },

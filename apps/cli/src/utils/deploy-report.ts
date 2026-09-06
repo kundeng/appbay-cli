@@ -23,7 +23,7 @@ for (const app of result.apps) {
   if (app.status === "deployed") {
     console.log(`  ${pad(app.appName, 14)} [plan: ${statusLabel}]${sysTag}`);
     console.log(
-      app.convergeAction === "started"
+      app.planStatus === "unchanged" && app.convergeAction === "started"
         ? `  Started ${app.appName} — the plan was unchanged, the container was not`
         : `  Started ${app.appName}`,
     );

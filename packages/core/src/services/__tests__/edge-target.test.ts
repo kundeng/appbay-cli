@@ -44,7 +44,7 @@ describe("the edge the deploy path targets is the edge the compiler names", () =
   it("the deploy path, the identity service and setup carry no literal edge name", () => {
     const root = join(__dirname, "..", "..", "..", "..", "..");
     for (const rel of [
-      "packages/core/src/services/deploy-service.ts",
+      "packages/core/src/services/deploy/route.ts",
       "packages/core/src/services/edge-identity-service.ts",
       "apps/cli/src/commands/setup.ts",
     ]) {
