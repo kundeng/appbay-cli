@@ -318,3 +318,13 @@ whoami --force` refused. Rocky: `appbay down` → all "(not deployed)", exit 0; 
 and the round-9 journeys in flight; their results are not recorded and are to be treated as
 not run. The handoff for the next agent is `docs/history/2026-09-06-s48-handoff.md`: exact
 next actions, the journey commands for both guests, what is waiting on Kun.
+
+**2026-09-06 — round 10, partial (after the stop notice).** The round-9 diff review and the
+CLI confirming pass arrived after the operator's stop; a core confirming pass had already
+passed at round 9. Taken before stopping, because it is destructive: `appbay delete ..
+--force` removed `etc/` and `var/lib/` in a scratch home (the name was used as a path;
+pre-existing; reproduced by the reviewer). `delete` now resolves its target through
+discovery and refuses a name nothing matches; the scratch-home test runs `delete ..
+--force` and checks `etc/system.yaml` survives. Its refusal remedy now names `up`, `down`,
+then `delete` (the `down` it named refused in the same state). The rest of both reports is
+in `docs/history/2026-09-06-s48-handoff.md` as the next agent's first list.

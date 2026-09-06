@@ -76,6 +76,10 @@ describe("commands against a scratch home", () => {
     const down = appbay(["down", "typo"]);
     expect(down.status).toBe(1);
     expect(down.stderr).toContain('no installed app named "typo"');
+    const traversal = appbay(["delete", "..", "--force"]);
+    expect(traversal.status).toBe(1);
+    expect(traversal.stderr).toContain('no installed app named ".."');
+    expect(existsSync(join(home, "etc", "system.yaml"))).toBe(true);
     const pull = appbay(["pull", "whoami", "typo"]);
     expect(pull.status).toBe(1);
     expect(pull.stderr).toContain('app "typo" not found');

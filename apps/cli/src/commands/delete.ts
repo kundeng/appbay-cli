@@ -2,7 +2,7 @@
  * `appbay delete <app>` — remove an app definition.
  */
 import { Command } from "commander";
-import { composeProject, engineObserver } from "@appbay/core";
+import { composeProject, engineObserver, discoverApps } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { join } from "node:path";
 import { rm, stat } from "node:fs/promises";
@@ -19,11 +19,12 @@ export const deleteCommand = new Command("delete")
     const appDir = join(appsDir, app);
     const rendersDir = join(home, "var/lib/renders", app);
 
-    // Check app exists
-    try {
-      await stat(appDir);
-    } catch {
-      console.error(`App "${app}" not found at ${appDir}`);
+    // The name is resolved through discovery, never used as a path: `delete .. --force` once
+    // removed etc/ and var/lib/ (S48 round 10). The app directory is the one discovery found.
+    const installed = await discoverApps({ appsDir });
+    const target = installed.find((a) => a.name === app);
+    if (!target) {
+      console.error(`  [${app}] target: no installed app named "${app}"`);
       process.exit(1);
     }
 
@@ -54,14 +55,14 @@ export const deleteCommand = new Command("delete")
       stopped = true;
     } catch {
       // No render. If the project still has containers, deleting the definition would leave
-      // them with nothing that reaches them; `appbay down <app>` stops them by name first.
+      // them with nothing that reaches them; `up` re-renders, then `down` stops this install's.
       const rows = await engineObserver(resolveAppbayHome()).project(app);
       if (rows.kind === "unknown") {
         console.error(`Could not ask the runtime whether ${app} runs (${rows.reason}); nothing was deleted.`);
         process.exit(1);
       }
       if (rows.value.length > 0) {
-        console.error(`${app} has running containers and no render; run: appbay down ${app}, then delete it.`);
+        console.error(`${app} has running containers and no render; run: appbay up ${app}, then appbay down ${app}, then delete it.`);
         process.exit(1);
       }
     }
