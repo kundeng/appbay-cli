@@ -25,12 +25,17 @@ import { containerBin } from "../runtime/container-runtime.js";
 import { shepherdTarget } from "../compiler/identity.js";
 
 /**
- * Writes files named on stdin, one `name=base64` per line, under /out. The names and the
+ * Writes files named on stdin, one `name base64` per line, under /out. The names and the
  * bytes never appear on the container binary's argv, where every process on the host could
  * read them for the life of the run.
+ *
+ * Space-separated, not `name=base64`: reading with `IFS==` treated the padding `=` of any
+ * value whose length is not a multiple of three as delimiters and dropped it, and busybox's
+ * `base64 -d` then failed with "truncated input" — two secrets in three, on every runtime.
+ * Names are restricted to `[A-Za-z0-9_.-]`, so a space cannot be part of one.
  */
 export const STDIN_FILE_WRITER =
-  'mkdir -p /out && while IFS== read -r name b64; do [ -n "$name" ] || continue; ' +
+  'mkdir -p /out && while read -r name b64; do [ -n "$name" ] || continue; ' +
   'printf %s "$b64" | base64 -d > "/out/$name" || exit 1; done';
 
 /** The stdin stream `STDIN_FILE_WRITER` reads. Names are restricted so they cannot escape /out. */
@@ -38,7 +43,7 @@ export function stdinFiles(files: Record<string, Buffer>): string {
   return Object.entries(files)
     .map(([name, bytes]) => {
       if (!/^[A-Za-z0-9_.-]+$/.test(name) || name === "." || name === "..") throw new Error(`secret file name not allowed: ${name}`);
-      return `${name}=${bytes.toString("base64")}`;
+      return `${name} ${bytes.toString("base64")}`;
     })
     .join("\n") + "\n";
 }

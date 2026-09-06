@@ -112,6 +112,17 @@ describe("planSystemBootstrap", () => {
     expect(createUser?.command).toContain("950");
   });
 
+  it("on a host with no runtime yet, the docker group grant is still planned (issue #8)", () => {
+    process.env.APPBAY_CONTAINER_RUNTIME = "docker";
+    const plan = planSystemBootstrap({ serviceUser: "svc-fresh-" + Date.now().toString(36), commandExists: () => false });
+    delete process.env.APPBAY_CONTAINER_RUNTIME;
+    expect(plan.find((a) => a.id === "install-runtime")?.wouldChange).toBe(true);
+    const grant = plan.find((a) => a.id === "docker-group");
+    expect(grant?.wouldChange).toBe(true);
+    expect(grant?.command.slice(0, 3)).toEqual(["usermod", "-aG", "docker"]);
+    expect(plan.find((a) => a.id === "enable-runtime")?.command).toContain("docker.service");
+  });
+
   it("operator mode creates no service account and owns the tree as the operator", () => {
     const plan = planSystemBootstrap({ owner: "operator" });
     const ids = plan.map((a) => a.id);

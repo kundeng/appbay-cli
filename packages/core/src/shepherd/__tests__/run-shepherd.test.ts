@@ -31,7 +31,7 @@ describe("runShepherd", () => {
     expect(argv.join(" ")).not.toContain("deadbeef");
     expect(argv.join(" ")).not.toContain(Buffer.from([1, 2, 3]).toString("base64"));
     expect(input).toBe(payload);
-    expect(input).toContain("seed=" + Buffer.from("deadbeef").toString("base64"));
+    expect(input).toContain("seed " + Buffer.from("deadbeef").toString("base64"));
   });
 
   it("does not add -i or an input when there is no payload", async () => {
@@ -45,12 +45,28 @@ describe("runShepherd", () => {
 
 describe("stdinFiles", () => {
   it("emits one name=base64 line per file", () => {
-    expect(stdinFiles({ a: Buffer.from("x"), "b.json": Buffer.from("{}") })).toBe("a=eA==\nb.json=e30=\n");
+    expect(stdinFiles({ a: Buffer.from("x"), "b.json": Buffer.from("{}") })).toBe("a eA==\nb.json e30=\n");
   });
 
   it("refuses a name that could leave /out", () => {
     expect(() => stdinFiles({ "../etc/passwd": Buffer.from("x") })).toThrow(/not allowed/);
     expect(() => stdinFiles({ "..": Buffer.from("x") })).toThrow(/not allowed/);
     expect(() => stdinFiles({ "a b": Buffer.from("x") })).toThrow(/not allowed/);
+  });
+});
+
+describe("STDIN_FILE_WRITER actually run on its payload", () => {
+  it("writes every file byte-for-byte, including values whose base64 is padded", async () => {
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { spawnSync } = await import("node:child_process");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const out = mkdtempSync(join(tmpdir(), "appbay-writer-"));
+    // `x` (one byte) pads to `eA==`; `{}` pads to `e30=`; the third needs no padding.
+    const files = { seed: Buffer.from("x"), "bundle.enc": Buffer.from("{}"), plain: Buffer.from("abc") };
+    const r = spawnSync("sh", ["-c", STDIN_FILE_WRITER.replaceAll("/out", out)], { input: stdinFiles(files), encoding: "utf-8" });
+    expect(r.status, r.stderr).toBe(0);
+    for (const [name, bytes] of Object.entries(files)) expect(readFileSync(join(out, name))).toEqual(bytes);
+    rmSync(out, { recursive: true, force: true });
   });
 });

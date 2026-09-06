@@ -4,25 +4,38 @@
  * These tests drive it with fakes for the four operations it delegates and pin the two
  * refusals and the rollback, which are the reasons it exists.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-vi.mock("node:child_process", async () => {
-  const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
-  return { ...actual, spawnSync: vi.fn() };
-});
-import { spawnSync } from "node:child_process";
 import { migrateEdge } from "../edge-migration-service.js";
 
-const mockedSpawn = vi.mocked(spawnSync);
 let home: string;
 
-/** What `ps --format {{.Names}}\t{{.Ports}}\t{{.Labels}}` answers. */
-function ps(lines: string, status = 0): void {
-  mockedSpawn.mockReturnValue({ status, stdout: lines, stderr: status === 0 ? "" : "no daemon", error: undefined } as never);
-}
+/** The Engine API's `/containers/json` answer for the port check, over a real unix socket. */
+interface Row { name: string; ports: number[]; labels?: Record<string, string> }
+let rows: Row[] = [];
+let sockDir: string; let sock: string; let server: Server;
+beforeAll(async () => {
+  sockDir = mkdtempSync(join(tmpdir(), "appbay-migrate-sock-"));
+  sock = join(sockDir, "engine.sock");
+  server = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(rows.map((r, i) => ({
+      Id: `id${String(i)}`, Names: [`/${r.name}`], State: "running", Status: "Up", Labels: r.labels ?? {},
+      Ports: r.ports.map((p) => ({ PrivatePort: p, PublicPort: p, Type: "tcp" })),
+    }))));
+  });
+  await new Promise<void>((r) => server.listen(sock, r));
+});
+afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); rmSync(sockDir, { recursive: true, force: true }); });
+
+/** What the runtime reports holding ports; `down` makes the socket unreachable. */
+function ps(...r: Row[]): void { rows = r; process.env.APPBAY_RUNTIME_SOCKET = sock; }
+function down(): void { process.env.APPBAY_RUNTIME_SOCKET = join(sockDir, "missing.sock"); }
+const traefikEdge = (...ports: number[]): Row => ({ name: "appbay.system.traefik.traefik", ports, labels: { "com.appbay.app": "traefik" } });
 
 function fakes(overrides: Partial<Parameters<typeof migrateEdge>[0]> = {}) {
   const calls: string[] = [];
@@ -49,23 +62,23 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await rm(home, { recursive: true, force: true });
-  mockedSpawn.mockReset();
+  delete process.env.APPBAY_RUNTIME_SOCKET;
   delete process.env.APPBAY_CONTAINER_RUNTIME;
 });
 
 describe("migrateEdge", () => {
   it("refuses when the ports cannot be inspected — it does not migrate blind", async () => {
-    ps("", 1);
+    down();
     const { opts, calls } = fakes();
     const r = await migrateEdge(opts);
     expect(r.migrated).toBe(false);
     expect(r.steps[0]).toMatchObject({ id: "ports", ok: false });
-    expect(r.steps[0]?.detail).toContain("no daemon");
+    expect(r.steps[0]?.detail).toContain("missing.sock");
     expect(calls).toEqual([]);
   });
 
   it("refuses when a foreign process holds an edge port", async () => {
-    ps("nginx\t0.0.0.0:80->80/tcp\tcom.docker.compose.project=other");
+    ps({ name: "nginx", ports: [80], labels: { "com.docker.compose.project": "other" } });
     const { opts, calls } = fakes();
     const r = await migrateEdge(opts);
     expect(r.migrated).toBe(false);
@@ -74,7 +87,7 @@ describe("migrateEdge", () => {
   });
 
   it("validates while the old edge still serves, backs up, then stops, starts and checks", async () => {
-    ps("appbay.system.traefik.traefik\t0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp\tcom.appbay.app=traefik");
+    ps(traefikEdge(80, 443));
     const { opts, calls } = fakes();
     const r = await migrateEdge(opts);
     expect(r.migrated).toBe(true);
@@ -85,7 +98,7 @@ describe("migrateEdge", () => {
   });
 
   it("restores the old edge when the new one is unhealthy", async () => {
-    ps("appbay.system.traefik.traefik\t0.0.0.0:80->80/tcp\tcom.appbay.app=traefik");
+    ps(traefikEdge(80));
     const { opts, calls } = fakes({ checkHealth: async () => "caddy exited 1" });
     const r = await migrateEdge(opts);
     expect(r.migrated).toBe(false);
@@ -96,7 +109,7 @@ describe("migrateEdge", () => {
   });
 
   it("does not stop anything when the candidate fails validation", async () => {
-    ps("appbay.system.traefik.traefik\t0.0.0.0:80->80/tcp\tcom.appbay.app=traefik");
+    ps(traefikEdge(80));
     const { opts, calls } = fakes({ validateCandidate: async () => "Caddyfile: unknown directive" });
     const r = await migrateEdge(opts);
     expect(r.migrated).toBe(false);

@@ -125,7 +125,7 @@ function detectDistro(): DistroInfo {
 }
 
 /** Whether a command exists on PATH. */
-function commandExists(cmd: string): boolean {
+function hostCommandExists(cmd: string): boolean {
   return spawnSync("which", [cmd], { stdio: "pipe" }).status === 0;
 }
 
@@ -238,7 +238,10 @@ export function planSystemBootstrap(opts?: {
   serviceUid?: number;
   groups?: string[];
   home?: string;
+  /** Host probe, replaceable by a test that plans against a host with no runtime yet. */
+  commandExists?: (cmd: string) => boolean;
 }): SystemAction[] {
+  const commandExists = opts?.commandExists ?? hostCommandExists;
   const owner = opts?.owner ?? "service";
   const serviceUser = opts?.serviceUser ?? DEFAULT_SERVICE_USER;
   const serviceUid = opts?.serviceUid ?? DEFAULT_SERVICE_UID;
@@ -257,7 +260,6 @@ export function planSystemBootstrap(opts?: {
 
   // Track state as it will be after each step, so later steps decide against
   // the post-bootstrap state rather than the raw current state.
-  let dockerWillExist = commandExists("docker");
   let svcWillExist = userExists(serviceUser);
 
   // 1. Container runtime.
@@ -497,7 +499,10 @@ export function planSystemBootstrap(opts?: {
           command: [],
         });
       }
-    } else if (svcWillExist && dockerWillExist && !userInGroup(serviceUser, "docker")) {
+    } else if (svcWillExist && runtime === "docker" && runtimeWillExist && !userInGroup(serviceUser, "docker")) {
+      // `runtimeWillExist`, the post-bootstrap state, not a probe for `docker` taken before the
+      // install step: on a fresh host that probe was false, this branch was skipped, and the
+      // service account could not reach the socket (issue #8, measured on Rocky 9.8).
       actions.push({
         id: "docker-group",
         label: `Add ${serviceUser} to docker group`,

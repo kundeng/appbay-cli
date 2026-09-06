@@ -60,7 +60,6 @@ const RULES: Rule[] = [
       "packages/core/src/secrets/resolve-for-deploy.ts": "2.1 (volume create)",
       "packages/core/src/services/deploy-service.ts": "2.2/2.3",
       "packages/core/src/services/edge-identity-service.ts": "2.4",
-      "packages/core/src/services/edge-migration-service.ts": "2.4",
       "packages/core/src/shepherd/run-shepherd.ts": "2.1",
     },
   },
@@ -75,7 +74,6 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/stats.ts": "2.4",
       "packages/core/src/compiler/builds.ts": "2.4",
       "packages/core/src/health/checks.ts": "2.4/2.5",
-      "packages/core/src/services/edge-migration-service.ts": "2.4",
     },
   },
   {

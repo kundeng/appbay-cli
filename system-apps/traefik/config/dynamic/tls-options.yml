@@ -2,7 +2,10 @@ tls:
   options:
     default:
       minVersion: VersionTLS12
-      sniStrict: true
+      # Not sniStrict: a local-TLD route (`appbay.local`, the seeded default) has no issued
+      # certificate and is served the default one; strict SNI rejected every such handshake
+      # with "unrecognized name", so the default install answered nothing over HTTPS.
+      # Routers still match on Host, so an unknown name reaches no service.
       cipherSuites:
         - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
         - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256

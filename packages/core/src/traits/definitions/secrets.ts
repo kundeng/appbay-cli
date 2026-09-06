@@ -246,7 +246,10 @@ export const secretsTraitDefinition: TraitDefinition<"secrets"> = {
         const volumes = (svc.volumes ?? []) as string[];
         volumes.push(`${volumeName}:${secretsDir}:ro`);
         const injectBinPath = `${input.context.appsDir.replace("/etc/apps", "/bin/appbay-inject")}`;
-        volumes.push(`${injectBinPath}:/appbay-inject:ro`);
+        // `z` relabels for SELinux: on an enforcing host (Fedora, RHEL) the container could not
+        // read the bind-mounted binary at all and exited 139 before the entrypoint ran; Docker
+        // accepts the option and ignores it where there is no SELinux. Measured on Podman 5.8.
+        volumes.push(`${injectBinPath}:/appbay-inject:ro,z`);
         svc.volumes = volumes;
 
         // Rewrite entrypoint to appbay-inject

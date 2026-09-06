@@ -258,7 +258,9 @@ const PROFILES: Record<ContainerRuntime, RuntimeProfile> = {
       "Check DOCKER_HOST and `docker context ls` — this shell is pointed at a different daemon",
     versionPattern: /Docker version ([0-9]+\.[0-9]+\.[0-9]+)/,
     composeBundled: true,
-    systemdUnit: "docker",
+    // The full unit name: `After=docker` is not a unit and systemd drops the ordering
+    // ("Failed to add dependency on docker, ignoring: Invalid argument").
+    systemdUnit: "docker.service",
     serviceAccountEnv: () => ({}),
     serviceAccountGrant: "unix-group",
     rhel: {

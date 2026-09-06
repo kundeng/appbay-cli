@@ -16,10 +16,10 @@
  * coexist. That is why this is a migration rather than an install.
  */
 
-import { spawnSync } from "node:child_process";
 import { cp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { containerBin , type Inspection } from "../runtime/container-runtime.js";
+import type { Inspection } from "../runtime/container-runtime.js";
+import { apiListContainers } from "../runtime/engine-api.js";
 import { APP_LABEL } from "../compiler/identity.js";
 import type { IngressProvider } from "../schemas/instance.js";
 
@@ -58,50 +58,24 @@ const EDGE_PORTS = [80, 443] as const;
  * So an unreported port conflict looks exactly like a healthy deploy followed by an edge
  * that is mysteriously absent. Detect it first and name the holder.
  */
-export function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string): Inspection<PortOwner[]> {
-  const runtime = containerBin(appbayHome);
+export async function inspectEdgePorts(outgoing: IngressProvider, appbayHome?: string): Promise<Inspection<PortOwner[]>> {
+  // Over the API, not `ps --format`: Docker renders `{{.Labels}}` as `k=v,...` and Podman as
+  // `map[k:v ...]`, so the text parser this replaced never recognised the outgoing edge on
+  // Podman and every migration there refused, blaming the edge it was replacing (issue #9).
+  //
+  // 🚨 LABELS, NOT THE NAME. Both system apps declare `namespace: system`, so the edge is
+  // `appbay.system.caddy.caddy`; a name prefix cannot answer "is this the outgoing edge"
+  // (identity.ts), APP_LABEL can.
+  const list = await apiListContainers({}, { appbayHome });
+  if (list.kind === "unknown") return list;
   const owners: PortOwner[] = [];
-
-  // Container holders first: the common case, and the only one we can name precisely.
-  //
-  // 🚨 LABELS, NOT THE NAME. Identifying the outgoing edge by a `appbay.${outgoing}.` name
-  // prefix was wrong the moment §4 landed: both system apps declare `namespace: system`, so
-  // the real container is `appbay.system.caddy.caddy` and the prefix never matched. The
-  // outgoing edge was therefore reported as a foreign holder of :80/:443 and step 1 of the
-  // migration aborted — every `--ingress-provider` switch refused, blaming a conflict with
-  // the very edge it was replacing.
-  //
-  // `identity.ts` already says why a name cannot answer this: `appbay.<app>.<service>` and
-  // `appbay.<ns>.<app>` have the same shape, so segment counting cannot disambiguate them
-  // either. APP_LABEL exists for exactly this question.
-  const ps = spawnSync(runtime, ["ps", "--format", "{{.Names}}\t{{.Ports}}\t{{.Labels}}"], {
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (ps.status !== 0) {
-    // A failed `ps` is not evidence that the ports are free (review 2026-09-05, F6).
-    return { kind: "unknown", reason: String(ps.stderr ?? "").trim() || `ps exited with code ${String(ps.status)}` };
-  }
-  const lines = String(ps.stdout).trim().split("\n").filter(Boolean);
-
   for (const port of EDGE_PORTS) {
-    let heldBy: string | null = null;
-    let isOutgoingEdge = false;
-    for (const line of lines) {
-      const [name, ports, labels] = line.split("\t");
-      // Match `:80->` and `:443->` specifically; `:8080->` must not match `:80`.
-      if (name && ports && new RegExp(`:${port}->`).test(ports)) {
-        heldBy = name;
-        // `{{.Labels}}` is a comma-separated `k=v` list. Match the whole pair so
-        // `com.appbay.app=caddy-old` cannot satisfy a search for `caddy`.
-        isOutgoingEdge = (labels ?? "")
-          .split(",")
-          .map((pair) => pair.trim())
-          .includes(`${APP_LABEL}=${outgoing}`);
-        break;
-      }
-    }
-    owners.push({ port, heldBy, isOutgoingEdge });
+    const holder = list.value.find((c) => c.State.toLowerCase() === "running" && (c.Ports ?? []).some((p) => p.PublicPort === port));
+    owners.push({
+      port,
+      heldBy: holder ? (holder.Names[0] ?? "").replace(/^\//, "") : null,
+      isOutgoingEdge: holder?.Labels?.[APP_LABEL] === outgoing,
+    });
   }
   return { kind: "ok", value: owners };
 }
@@ -159,7 +133,7 @@ export async function migrateEdge(opts: {
   }
 
   // 1. Port ownership — before anything is touched.
-  const inspected = inspectEdgePorts(opts.from, opts.appbayHome);
+  const inspected = await inspectEdgePorts(opts.from, opts.appbayHome);
   if (inspected.kind === "unknown") {
     record("ports", "Edge ports are available", false,
       `could not inspect the edge ports (${inspected.reason}); refusing to migrate blind`);

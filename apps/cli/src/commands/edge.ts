@@ -106,8 +106,21 @@ const migrate = new Command("migrate")
     const parsed = IngressProviderSchema.safeParse(options.to);
     if (!parsed.success) throw new Error(`--to must be "traefik" or "caddy", got "${options.to}"`);
     const to = parsed.data;
-    const from: IngressProvider = to === "caddy" ? "traefik" : "caddy";
     const appbayHome = resolveAppbayHome();
+    // The outgoing edge is the one observed running, not "the other one" and not the config:
+    // after `init --ingress-provider` the config names an edge that is not serving yet, and
+    // the old derivation reported "<other> is still serving" for whichever was asked.
+    const serving: IngressProvider[] = [];
+    for (const p of ["traefik", "caddy"] as const) {
+      const c = await findContainerByLabel(APP_LABEL, p, { appbayHome });
+      if (c.kind === "unknown") { console.error(`Could not ask the runtime which edge is serving: ${c.reason}`); process.exit(1); }
+      if (c.value?.running) serving.push(p);
+    }
+    if (serving.includes(to)) {
+      console.error(`${to} is already serving; nothing to migrate.`);
+      process.exit(1);
+    }
+    const from: IngressProvider = serving[0] ?? (to === "caddy" ? "traefik" : "caddy");
     const appsDir = join(appbayHome, "etc", "apps");
     const rendersDir = join(appbayHome, "var", "lib", "renders");
     const stateDir = join(appbayHome, "var", "lib", "state");

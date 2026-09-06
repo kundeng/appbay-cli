@@ -1,167 +1,80 @@
 /**
- * Who holds :80 and :443 — `inspectEdgePorts` / `blockingPortConflicts`.
+ * Who holds :80 and :443 — `inspectEdgePorts` / `blockingPortConflicts`, answered over the
+ * Engine API against a real unix-socket server (S41's harness).
  *
- * ⭐ WHY THESE TWO FUNCTIONS DESERVE TESTS MORE THAN THE MIGRATION AROUND THEM. They are the
- * only thing standing between "replace the edge" and "take the host's entire ingress down and
- * fail to bring it back". The module's own header says a bind failure surfaces as a container
- * that exits immediately, and `compose up -d` reports SUCCESS for that — it started the
- * container, it does not wait to see it stay up. So a missed conflict looks exactly like a
- * healthy deploy followed by an edge that is mysteriously absent.
- *
- * Two ways to be wrong, opposite costs:
- *   - miss a real holder  → the migration proceeds, the new edge cannot bind, ingress is gone
- *   - flag the outgoing edge → the migration refuses to run at all, forever
- *
- * The `:${port}->` matcher carries a documented hazard — ":8080->" must not read as port 80 —
- * that had no test. That is the kind of comment which is true until somebody "simplifies" it.
+ * ⭐ Two ways to be wrong, opposite costs: miss a real holder and the migration proceeds into
+ * a bind failure that `compose up -d` reports as success; flag the outgoing edge and the
+ * migration refuses to run at all, forever. The second is what the `ps --format` text parser
+ * did on Podman, whose `{{.Labels}}` renders as `map[k:v]`, not `k=v,` (issue #9).
  */
-
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-vi.mock("node:child_process", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("node:child_process")>()),
-  spawnSync: vi.fn(),
-}));
-
-import { spawnSync } from "node:child_process";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createServer, type Server } from "node:http";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { blockingPortConflicts, inspectEdgePorts } from "../edge-migration-service.js";
-import type { IngressProvider } from "../../schemas/instance.js";
 
-/** The owners list, or a thrown error when the runtime could not be asked. */
-function portOwners(outgoing: IngressProvider) {
-  const r = inspectEdgePorts(outgoing);
-  if (r.kind !== "ok") throw new Error(`unexpected unknown: ${r.reason}`);
+interface Fake { Names: string[]; State: string; Labels: Record<string, string>; Ports: Array<{ PrivatePort: number; PublicPort?: number; Type: string }> }
+let containers: Fake[] = [];
+let dir: string; let sock: string; let server: Server;
+
+beforeAll(async () => {
+  dir = mkdtempSync(join(tmpdir(), "appbay-ports-"));
+  sock = join(dir, "engine.sock");
+  server = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(containers.map((c, i) => ({ Id: `id${String(i)}`, Status: c.State === "running" ? "Up" : "Exited (0)", ...c }))));
+  });
+  await new Promise<void>((r) => server.listen(sock, r));
+  process.env.APPBAY_RUNTIME_SOCKET = sock;
+});
+afterAll(async () => { delete process.env.APPBAY_RUNTIME_SOCKET; await new Promise<void>((r) => server.close(() => r())); rmSync(dir, { recursive: true, force: true }); });
+
+const edge = (app: string, state = "running"): Fake => ({
+  Names: [`/appbay.system.${app}.${app}`], State: state, Labels: { "com.appbay.app": app, "com.appbay.namespace": "system" },
+  Ports: [{ PrivatePort: 80, PublicPort: 80, Type: "tcp" }, { PrivatePort: 443, PublicPort: 443, Type: "tcp" }, { PrivatePort: 443, Type: "udp" }],
+});
+
+async function owners(outgoing: "caddy" | "traefik") {
+  const r = await inspectEdgePorts(outgoing);
+  if (r.kind !== "ok") throw new Error(r.reason);
   return r.value;
 }
 
-const mockedSpawn = vi.mocked(spawnSync);
-
-/**
- * `docker ps --format "{{.Names}}\t{{.Ports}}\t{{.Labels}}"` output.
- *
- * ⚠️ Three columns, and the third is what identifies the outgoing edge. An earlier version of
- * this file passed two, with pre-§4 container names like `appbay.traefik.traefik` — so it
- * encoded the code's assumption rather than the system's reality and passed while the real
- * behaviour was broken. The deployed edge is `appbay.system.caddy.caddy`, because both system
- * apps declare `namespace: system`.
- */
-function ps(...lines: string[]) {
-  mockedSpawn.mockReturnValue({
-    status: 0,
-    stdout: lines.join("\n"),
-    stderr: "",
-    error: undefined,
-  } as never);
-}
-
-beforeEach(() => {
-  process.env.APPBAY_CONTAINER_RUNTIME = "docker";
-  mockedSpawn.mockReset();
-});
-
-afterEach(() => {
-  delete process.env.APPBAY_CONTAINER_RUNTIME;
-});
-
-describe("finding the holder", () => {
-  it("names the container holding each edge port", () => {
-    ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp\tcom.appbay.app=caddy");
-    const owners = portOwners("traefik");
-    expect(owners.map((o) => [o.port, o.heldBy])).toEqual([
-      [80, "appbay.system.caddy.caddy"],
-      [443, "appbay.system.caddy.caddy"],
+describe("inspectEdgePorts over the API", () => {
+  it("the outgoing edge holding both ports is expected, not a conflict, whatever its name", async () => {
+    containers = [edge("caddy")];
+    const o = await owners("caddy");
+    expect(o).toEqual([
+      { port: 80, heldBy: "appbay.system.caddy.caddy", isOutgoingEdge: true },
+      { port: 443, heldBy: "appbay.system.caddy.caddy", isOutgoingEdge: true },
     ]);
+    expect(blockingPortConflicts(o)).toEqual([]);
   });
 
-  it("reports a free port as unheld rather than guessing", () => {
-    ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp\tcom.appbay.app=caddy");
-    const owners = portOwners("traefik");
-    expect(owners.find((o) => o.port === 443)?.heldBy).toBeNull();
+  it("a foreign holder is a conflict named by its container", async () => {
+    containers = [{ Names: ["/nginx"], State: "running", Labels: {}, Ports: [{ PrivatePort: 80, PublicPort: 80, Type: "tcp" }] }];
+    const o = await owners("caddy");
+    expect(blockingPortConflicts(o)).toEqual([{ port: 80, heldBy: "nginx", isOutgoingEdge: false }]);
   });
 
-  it("is UNKNOWN when the runtime fails — a failed ps is not evidence the ports are free", () => {
-    // It used to report every port as unheld, and the migration went ahead onto a bound
-    // port (review 2026-09-05, F6). Now the caller has to refuse or ask again.
-    mockedSpawn.mockReturnValue({ status: 1, stdout: "", stderr: "no daemon", error: undefined } as never);
-    const r = inspectEdgePorts("traefik");
+  it("the other edge holding the ports is a conflict too: the label must equal the outgoing provider", async () => {
+    containers = [edge("traefik")];
+    expect(blockingPortConflicts(await owners("caddy"))).toHaveLength(2);
+  });
+
+  it(":8080 is not :80, and an exited container holds nothing", async () => {
+    containers = [
+      { Names: ["/dash"], State: "running", Labels: {}, Ports: [{ PrivatePort: 80, PublicPort: 8080, Type: "tcp" }] },
+      edge("caddy", "exited"),
+    ];
+    expect((await owners("caddy")).every((p) => p.heldBy === null)).toBe(true);
+  });
+
+  it("an unreachable socket is unknown, never 'free'", async () => {
+    process.env.APPBAY_RUNTIME_SOCKET = join(dir, "missing.sock");
+    const r = await inspectEdgePorts("caddy");
+    process.env.APPBAY_RUNTIME_SOCKET = sock;
     expect(r.kind).toBe("unknown");
-    if (r.kind === "unknown") expect(r.reason).toContain("no daemon");
-  });
-});
-
-describe("🚨 the port matcher", () => {
-  it("does not read :8080 as :80", () => {
-    // The documented hazard. A dev container on 8080 must not look like it holds the edge
-    // port — that would refuse every migration on a host that has one.
-    ps("some-dev-thing\t0.0.0.0:8080->80/tcp\t");
-    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
-  });
-
-  it("does not read :180 or :8443 as :80 or :443 either", () => {
-    ps("a\t0.0.0.0:180->80/tcp\t", "b\t0.0.0.0:8443->443/tcp\t");
-    expect(portOwners("traefik").every((o) => o.heldBy === null)).toBe(true);
-  });
-
-  it("matches the HOST port, not the container port", () => {
-    // `0.0.0.0:9000->80/tcp` publishes 9000 on the host. The edge needs host :80.
-    ps("x\t0.0.0.0:9000->80/tcp\t");
-    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBeNull();
-  });
-
-  it("still matches when the port list has an IPv6 entry alongside", () => {
-    ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp, :::80->80/tcp\tcom.appbay.app=caddy");
-    expect(portOwners("traefik").find((o) => o.port === 80)?.heldBy).toBe(
-      "appbay.system.caddy.caddy",
-    );
-  });
-});
-
-describe("🚨 telling the outgoing edge apart from a real conflict", () => {
-  it("🚨 the edge being replaced is NOT a conflict — identified by LABEL", () => {
-    // It is the thing being stopped. Flagging it made every migration impossible, which is
-    // exactly what the old `appbay.${outgoing}.` name prefix did once §4 put the namespace in
-    // the container name.
-    ps(
-      "appbay.system.traefik.traefik\t0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp\tcom.appbay.app=traefik,com.appbay.namespace=system",
-    );
-    const owners = portOwners("traefik");
-    expect(owners.every((o) => o.isOutgoingEdge)).toBe(true);
-    expect(blockingPortConflicts(owners)).toEqual([]);
-  });
-
-  it("🚨 the OTHER edge holding the ports IS a conflict", () => {
-    // Migrating traefik -> caddy while caddy already holds :80 means something is already
-    // there that this migration did not put there.
-    ps("appbay.system.caddy.caddy\t0.0.0.0:80->80/tcp\tcom.appbay.app=caddy");
-    const blocking = blockingPortConflicts(portOwners("traefik"));
-    expect(blocking.map((o) => o.port)).toEqual([80]);
-    expect(blocking[0]?.heldBy).toBe("appbay.system.caddy.caddy");
-  });
-
-  it("an unrelated container is a conflict", () => {
-    ps("nginx-from-last-year\t0.0.0.0:443->443/tcp\t");
-    const blocking = blockingPortConflicts(portOwners("caddy"));
-    expect(blocking.map((o) => o.heldBy)).toEqual(["nginx-from-last-year"]);
-  });
-
-  it("a LABEL that merely starts with the same letters is a conflict, not the edge", () => {
-    // Matching the whole `k=v` pair is what makes this safe; a prefix test on the label value
-    // would wave `com.appbay.app=traefik-old` through as "the edge we are replacing".
-    ps("appbay.system.traefik-old.x\t0.0.0.0:80->80/tcp\tcom.appbay.app=traefik-old");
-    const owners = portOwners("traefik");
-    expect(owners.find((o) => o.port === 80)?.isOutgoingEdge).toBe(false);
-    expect(blockingPortConflicts(owners)).toHaveLength(1);
-  });
-
-  it("🚨 an unlabelled container is never mistaken for the edge", () => {
-    // Pre-§4 containers, and anything not deployed by appbay, carry no label. Treating a
-    // missing label as a match would silently stop a stranger's container.
-    ps("appbay.traefik.traefik\t0.0.0.0:80->80/tcp\t");
-    expect(portOwners("traefik").find((o) => o.port === 80)?.isOutgoingEdge).toBe(false);
-  });
-
-  it("nothing held is nothing blocking", () => {
-    ps();
-    expect(blockingPortConflicts(portOwners("traefik"))).toEqual([]);
   });
 });

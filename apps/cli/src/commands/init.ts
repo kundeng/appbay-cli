@@ -1150,7 +1150,7 @@ export const initCommand = new Command("init")
           // Key on reality instead: is some OTHER edge holding the ports right now?
           {
             const previous: IngressProvider = ingressProvider === "caddy" ? "traefik" : "caddy";
-            const inspected = inspectEdgePorts(previous, appbayHome);
+            const inspected = await inspectEdgePorts(previous, appbayHome);
             if (inspected.kind === "unknown") {
               console.log("");
               console.log(`  ⚠️  Could not inspect the edge ports (${inspected.reason}); check whether the ${previous} edge is still running before deploying ${ingressProvider}.`);
