@@ -92,7 +92,7 @@ fi
 # ⚠️ An earlier version of this ran the same init AS ROOT, where nothing fails and no
 # message prints, and reported the absence of the message as the defect. The defect was
 # real; that run was not evidence of it.
-S58H="${WORKDIR:-/home/ubuntu}/appbay-s58-preflight"
+S58H=/home/ubuntu/appbay-s58-preflight   # the rootless user's home on the multipass VM; not WORKDIR, which is the root shell's
 su ubuntu -c "rm -rf $S58H"
 su ubuntu -c "APPBAY_HOME=$S58H appbay init --container-runtime podman --project s58 --domain s58.local --yes" >/tmp/j-r3-init.log 2>&1
 ROOTLESS_STORE="$(su ubuntu -c 'podman info --format "{{.Store.GraphRoot}}"' 2>/dev/null)"

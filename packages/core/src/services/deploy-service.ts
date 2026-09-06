@@ -1,6 +1,6 @@
 /**
- * Deploy service: `appbay up`, `appbay apply` and the edge migration call `deploy()` with
- * their own compose runner and observer.
+ * Deploy service: `appbay up`, `appbay apply`, `appbay restart` and the edge migration call
+ * `deploy()` with their own compose runner and observer.
  *
  * The deploy is a chain of converges per app (deploy/converges.ts), walked in the order
  * `deployOrder` gives with one skip rule (deploy/converge.ts), and the report is folded
@@ -81,12 +81,13 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     targetApps = collectionApps;
   }
 
-  // Every app has a `.env`, empty if it declares nothing: compose and the render copy read it.
-  try {
-    for (const app of await discoverApps({ appsDir })) {
-      await writeFile(join(appsDir, app.name, ".env"), "", { flag: "a" });
-    }
-  } catch { /* Non-fatal */ }
+  // Every installed app, whether or not it is a target: the projects they declare are the
+  // ones `after:` may name, and each has a `.env`, empty if it declares nothing, because
+  // compose and the render copy read it.
+  const installed = await discoverApps({ appsDir }).catch(() => []);
+  for (const app of installed) {
+    await writeFile(join(appsDir, app.name, ".env"), "", { flag: "a" }).catch(() => undefined);
+  }
 
   const projectVars = options.projectVars ?? await loadProjectVars(appbayHome);
   let compileResult: CompileResult;
@@ -126,15 +127,27 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   if (projectsFile.error) {
     return emptyDeployResult([...compileErrors, { stage: "projects", message: projectsFile.error }], warnings);
   }
-  const graph = deployOrder(compileResult.apps, projectsFile.config.projects);
+  const graph = deployOrder(
+    compileResult.apps,
+    projectsFile.config.projects,
+    installed.map((a) => a.appbayConfig?.project ?? "default"),
+  );
   if (graph.errors.length > 0) {
     return emptyDeployResult([...compileErrors, ...graph.errors.map((message) => ({ stage: "projects", message }))], warnings);
   }
 
   const appsWithCompileErrors = new Set(compileResult.errors.map((e) => e.appName).filter((n): n is string => Boolean(n)));
+  const refusalOf = (app: (typeof graph.order)[number]): string | undefined => {
+    if (appsWithCompileErrors.has(app.appName)) {
+      return "not deployed: its configuration did not compile (see the errors above). " +
+        "Deploying it would start a container that cannot serve its declared routes.";
+    }
+    if (app.plan.status === "removed") return "not deployed: the compile produced no services for it";
+    return undefined;
+  };
   const chain = planConverges(graph.order.map((app) => ({
     app,
-    compileFailed: appsWithCompileErrors.has(app.appName),
+    refusal: refusalOf(app),
     dependsOn: graph.dependsOn.get(app.appName) ?? new Set<string>(),
     waitReady: dependentsOf(app.appName, graph.dependsOn).size > 0,
   })));
@@ -148,7 +161,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   };
   const verdicts = await runConverges(chain, ctx);
   return foldDeployResult(
-    graph.order.map((a) => ({ appName: a.appName, planStatus: a.plan.status as PlanStatus })),
+    graph.order.map((a) => ({ appName: a.appName, planStatus: (a.plan.status === "removed" ? "changed" : a.plan.status) as PlanStatus })),
     verdicts,
     { compileErrors, warnings: warnings.length > 0 ? warnings : undefined },
   );

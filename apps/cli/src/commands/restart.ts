@@ -47,7 +47,7 @@ export const restartCommand = new Command("restart")
       }
     }
     if (result.apps.length === 0) {
-      console.log(result.compileErrors.length > 0 ? "" : "No apps found to start.");
+      if (result.compileErrors.length === 0) console.log("No apps found to start.");
       process.exit(result.compileErrors.length > 0 || stopFailed > 0 ? 1 : 0);
     }
 

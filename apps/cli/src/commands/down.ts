@@ -22,6 +22,8 @@ async function renderedComposeExists(composePath: string): Promise<boolean> {
 }
 
 interface StopResult {
+  /** Apps the install holds, before any filter. */
+  found: number;
   stopped: number;
   failed: number;
   /** The requested names no app directory carries. */
@@ -46,6 +48,7 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
   const graph = deployOrder(
     targets.map((a) => ({ appName: a.name, project: a.appbayConfig?.project ?? "default", app: a })),
     projects.config.projects,
+    discovered.map((a) => a.appbayConfig?.project ?? "default"),
   );
   if (graph.errors.length > 0) throw new Error(graph.errors.join("\n"));
 
@@ -68,7 +71,7 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
       stopped++;
     }
   }
-  return { stopped, failed, unknown };
+  return { found: discovered.length, stopped, failed, unknown };
 }
 
 export const downCommand = new Command("down")
@@ -85,7 +88,7 @@ export const downCommand = new Command("down")
       process.exit(1);
     }
     for (const name of result.unknown) console.warn(`  Warning: app "${name}" not found`);
-    if (result.stopped + result.failed === 0 && result.unknown.length === apps.length && apps.length > 0) {
+    if (result.found === 0 || (apps.length > 0 && result.unknown.length === apps.length)) {
       console.log("No apps found to stop.");
     }
     console.log(`\n${result.stopped} stopped`);

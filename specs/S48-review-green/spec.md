@@ -113,7 +113,7 @@ round n:
 - [x] 1.7 CLI container spawns through `runtime/`; arch rule scope widened
 - [x] 1.8 `docker.ts` comment
 - [x] 1.9 knip's unused exported types
-- [ ] 2.1 review round 1, fixes
+- [x] 2.1 review round 1, fixes
 - [ ] 2.2 review round 2, fixes; further rounds until clean
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
@@ -126,3 +126,33 @@ green, knip: 12 unused exported types and one unused docs file.
 Traefik scaffold writes three files through `bash -c "cat > <path> << 'EOF' …"` with the
 path interpolated (ledger row 43); held for the round-1 reviewer of that region and fixed
 after.
+
+**2026-09-06 — round 1.** Three reviewers (core deploy path; CLI commands; the S47+S48
+diff). Every finding was read against the file before it was acted on.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R1.1 | Q1/S1 HIGH | `boot-order.ts:142` | `appbay up web` refused when `after:` names a project only an app outside the target set declares | fixed: `deployOrder` takes the installed apps' projects; `deploy()` and `stopApps` pass them; test |
+| R1.2 | S1/Q1 HIGH | `converges.ts` project link, `report.ts` | a readiness timeout left a running, unrouted container reported as a plain failure (the #5 shape, reintroduced by the reorder) | fixed: reason `not-ready`, the fold marks it a partial converge; tests |
+| R1.3 | REGRESSION HIGH | `converges.ts` upstream edges | a dependency whose route failed no longer blocked its dependents (F2 reversed silently) | fixed: the upstream edge is the dependency's project and route; test |
+| R1.4 | Q1 HIGH | `install.ts:135,145,151` | `install --as` validated and named the catalog name, not the installed one | fixed |
+| R1.5 | Q5 HIGH | `install.ts`, `up.ts`, `setup.ts` | three ways to re-invoke `appbay`, one of them a bare PATH lookup whose ENOENT was swallowed | fixed: `utils/self.ts`, the error printed |
+| R1.6 | Q1 HIGH | `size.ts:16-27` | the VOLUMES column could never populate on Docker (rejected template, wrong name match) | fixed: one `/system/df` read over the socket, summed by compose project label |
+| R1.7 | Q3 HIGH | `setup.ts:124,143,196` | three files written through `bash -c "cat > <path> << EOF"` with the path interpolated | fixed: `node:fs`; `run()` (no callers) deleted (ledger 43) |
+| R1.8 | S1 HIGH | `tunnel.ts:18-20` | the tunnel target was `localhost:<port>` from inside the cloudflared container | fixed: `http://<service>:<port>` |
+| R1.9 | Q1/S7 MED | `converges.ts` readiness probe | an unobservable probe was folded into a timeout | fixed: `unobservable(reason)`; test |
+| R1.10 | Q5 MED | `converge.ts:64` | a throwing link discarded every verdict and the report | fixed: caught into `diverged`; test |
+| R1.11 | S5/Q6 MED | `converges.ts`, `route.ts` | on traefik the route file was written at render, before the upstream existed | fixed: route files (both providers) are written by the route link after the edge is seen; test |
+| R1.12 | Q1 MED | `stats.ts`, `pull.ts`, `update.ts` | exit codes dropped; a dead `renderPath \|\| composePath`; `--version` after replace unchecked; `--system-only` a second image list | fixed: exit codes; `existsSync` fallback; the new binary must run; system images pulled through the install's own renders |
+| R1.13 | S5 MED | `models.ts:31-45` | `docker port` text and a Go template parsed in a command file | fixed: `containerEndpoint` in `runtime/observe.ts` over the API |
+| R1.14 | shape 3 MED | `arch.test.ts` | the spawn rule exempted the files most likely to regress | fixed: a second rule with no exemptions; it found `resolve-for-deploy`, `route.ts`, `edge-identity-service`, `run-shepherd` still spawning the binary; all four now go through `runtime/` |
+| R1.15 | S3/S7 MED | `setup.ts` | Docker named where the runtime may be Podman; `info` without timeout; child output grepped for "already"/"No apps found" | fixed: the profile's name; 10 s timeouts; exit codes only, and the edge observed by label after its deploy |
+| R1.16 | LOW | several | shepherd `share` fallback to a name that never existed; `shepherdErrors` flattened; `plan.status` cast hid `removed`; caddy exec without timeout; a half-written candidate on EACCES; stale comments and dead code in `up`, `docker.ts`, `appbay-home.ts`, `server.ts`, `container-runtime.ts`, `compile.ts`; `down` lost "No apps found to stop." | fixed |
+| R1.17 | LOW | `route.ts` | Caddy's stdout is returned verbatim into `error`; may echo a directive | accepted: the adapter names the line and directive, not values; `edge.ts` already filters its own copy |
+| R1.18 | GAP LOW | spec 1.6 | "the compose file is rewritten on an unchanged plan" has no test | dismissed: an unchanged plan means the bytes on disk already equal the render, so the rewrite is a no-op by definition; the `.env` copy is the observable part and is tested |
+| R1.19 | DRIFT LOW | `s28-journey-rootful-podman.sh:95` | `WORKDIR` substituted into a rootless user's home inside a heredoc the variable never reaches | reverted to the literal with a comment |
+| R1.20 | INFO | `deploy-report.ts` | `shepherdErrors` had no reader | fixed: printed under the app |
+
+Not taken from round 1: `builds.ts` still spawns the container binary through a local `bin`
+(six sites in the build path, listed in the first arch rule; no journey here exercises the
+build) — carried to S49 as a task beside the config loader.

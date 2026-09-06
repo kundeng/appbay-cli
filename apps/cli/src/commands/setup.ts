@@ -10,11 +10,13 @@
 
 import { Command } from "commander";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
+import { cliRuntimeProfile } from "../utils/docker.js";
+import { selfBinary } from "../utils/self.js";
 import { ask } from "../utils/prompt.js";
 import {
   resolveIngressProvider,
@@ -30,13 +32,6 @@ import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, AP
 
 function step(n: number, total: number, msg: string): void {
   console.log(`\n  [${n}/${total}] ${msg}`);
-}
-
-function run(cmd: string, args: string[], opts?: { silent?: boolean }): boolean {
-  const result = spawnSync(cmd, args, {
-    stdio: opts?.silent ? ["pipe", "pipe", "pipe"] : ["pipe", "inherit", "inherit"],
-  });
-  return result.status === 0;
 }
 
 function detectPlatform(): { os: string; docker: string } {
@@ -57,11 +52,11 @@ function detectPlatform(): { os: string; docker: string } {
 }
 
 function validateDocker(): boolean {
-  return containerExec(["info"], { appbayHome: resolveAppbayHome() }).exitCode === 0;
+  return containerExec(["info"], { appbayHome: resolveAppbayHome(), timeout: 10_000 }).exitCode === 0;
 }
 
 function validateCompose(): boolean {
-  return containerExec(["compose", "version"], { appbayHome: resolveAppbayHome() }).exitCode === 0;
+  return containerExec(["compose", "version"], { appbayHome: resolveAppbayHome(), timeout: 10_000 }).exitCode === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,8 +81,7 @@ function scaffoldTraefikConfig(
   // Each artifact below decides for itself whether it needs writing.
   const staticConfigExists = existsSync(join(configDir, "traefik.yml"));
 
-  // Create directories
-  spawnSync("mkdir", ["-p", dynamicDir]);
+  mkdirSync(dynamicDir, { recursive: true });
 
   // Static config
   const staticConfig: Record<string, unknown> = {
@@ -120,14 +114,13 @@ function scaffoldTraefikConfig(
   // seeded one from `appbay init` is already correct. Only the TLS material below is
   // unconditional, because that is what was silently missing.
   if (!staticConfigExists) {
-    const staticYaml = stringifyYaml(staticConfig);
-    spawnSync("bash", ["-c", `cat > "${join(configDir, "traefik.yml")}" << 'EOF'\n${staticYaml}EOF`]);
+    writeFileSync(join(configDir, "traefik.yml"), stringifyYaml(staticConfig));
   }
 
   // Create acme.json with correct permissions
   const acmePath = join(configDir, "acme.json");
-  spawnSync("touch", [acmePath]);
-  spawnSync("chmod", ["600", acmePath]);
+  writeFileSync(acmePath, "", { flag: "a" });
+  chmodSync(acmePath, 0o600);
 
   // Default redirect middleware (HTTP → HTTPS)
   const redirectConfig = {
@@ -139,8 +132,7 @@ function scaffoldTraefikConfig(
       },
     },
   };
-  const redirectYaml = stringifyYaml(redirectConfig);
-  spawnSync("bash", ["-c", `cat > "${join(dynamicDir, "redirect.yml")}" << 'EOF'\n${redirectYaml}EOF`]);
+  writeFileSync(join(dynamicDir, "redirect.yml"), stringifyYaml(redirectConfig));
 
   // Generate self-signed wildcard cert for local domains
   const isLocalDomain = /\.(local|lan|internal|test|localhost)$/i.test(opts.domain);
@@ -148,7 +140,7 @@ function scaffoldTraefikConfig(
     const certsDir = join(traefikDir, "certs");
     const certFile = join(certsDir, "local.crt");
     const keyFile = join(certsDir, "local.key");
-    spawnSync("mkdir", ["-p", certsDir]);
+    mkdirSync(certsDir, { recursive: true });
 
     // ⚠️ The certs directory is a bind-mount target. If the edge container started
     // before setup ran, Docker created this path as root:root, and `openssl` writing
@@ -192,8 +184,7 @@ function scaffoldTraefikConfig(
         },
       },
     };
-    const tlsYaml = stringifyYaml(tlsConfig);
-    spawnSync("bash", ["-c", `cat > "${join(dynamicDir, "tls-default.yml")}" << 'EOF'\n${tlsYaml}EOF`]);
+    writeFileSync(join(dynamicDir, "tls-default.yml"), stringifyYaml(tlsConfig));
   }
 }
 
@@ -422,16 +413,17 @@ export const setupCommand = new Command("setup")
     const platform = detectPlatform();
     console.log(`    Platform: ${platform.os} (${platform.docker})`);
 
+    const runtimeName = cliRuntimeProfile().displayName;
     if (!validateDocker()) {
-      console.error("\n  ERROR: Docker is not accessible.");
-      console.error("  Make sure Docker is installed and running.");
+      console.error(`\n  ERROR: ${runtimeName} is not accessible.`);
+      console.error(`  Make sure ${runtimeName} is installed and running.`);
       process.exit(1);
     }
-    console.log("    Docker: accessible");
+    console.log(`    ${runtimeName}: accessible`);
 
     if (!validateCompose()) {
-      console.error("\n  ERROR: Docker Compose v2 not found.");
-      console.error("  Appbay requires `docker compose` (v2 plugin).");
+      console.error(`\n  ERROR: ${runtimeName} compose is not available.`);
+      console.error("  Appbay requires the compose v2 plugin (`docker compose` / `podman compose`).");
       process.exit(1);
     }
     console.log("    Compose: available");
@@ -469,12 +461,7 @@ export const setupCommand = new Command("setup")
     // ── Step 3: Run init (scaffold + network + system apps + catalog) ──────
     step(3, totalSteps, "Initializing...");
 
-    // Find the appbay binary path — process.argv[0] is unreliable in bun-compiled binaries
-    const binaryPath = (() => {
-      const which = spawnSync("which", ["appbay"], { stdio: "pipe", encoding: "utf-8" });
-      if (which.status === 0) return which.stdout.trim();
-      return process.execPath; // fallback
-    })();
+    const binaryPath = selfBinary();
 
     const initArgs = ["init", "--project", projectName, "--domain", domain, "--yes"];
     if (options.ingressProvider) initArgs.push("--ingress-provider", options.ingressProvider);
@@ -483,14 +470,13 @@ export const setupCommand = new Command("setup")
       env: process.env,
     });
 
+    // `init` is idempotent on an initialised home (it reports the existing project config
+    // and continues), so a non-zero exit is a failure and nothing in its text is parsed.
     if (initResult.status !== 0) {
-      const output = initResult.stdout ? String(initResult.stdout) : "";
       const stderr = initResult.stderr ? String(initResult.stderr) : "";
-      if (!output.includes("already") && !output.includes("exist")) {
-        console.error(`    Init failed: ${stderr || "unknown error"}`);
-        console.error("    Run 'appbay init' separately to diagnose.");
-        process.exit(1);
-      }
+      console.error(`    Init failed: ${stderr || "unknown error"}`);
+      console.error("    Run 'appbay init' separately to diagnose.");
+      process.exit(1);
     }
     console.log("    Scaffold ready.");
 
@@ -570,12 +556,19 @@ export const setupCommand = new Command("setup")
       env: process.env,
       encoding: "utf-8",
     });
-    if (deployResult.status !== 0 || String(deployResult.stdout).includes("No apps found to deploy")) {
+    if (deployResult.status !== 0) {
       console.error(`\n  Setup failed during ${ingressProvider} deployment.`);
       console.error(String(deployResult.stderr || deployResult.stdout || "unknown deployment error").trim());
       process.exit(1);
     }
     process.stdout.write(String(deployResult.stdout));
+    // The deploy's exit code says it ran; the edge running is what setup promised.
+    const edgeUp = await findContainerByLabel(APP_LABEL, ingressProvider, { appbayHome });
+    if (edgeUp.kind === "unknown" || !edgeUp.value?.running) {
+      const why = edgeUp.kind === "unknown" ? edgeUp.reason : edgeUp.value ? `it is ${edgeUp.value.state}` : "no container carries its label";
+      console.error(`\n  Setup failed: the ${ingressProvider} edge is not running after its deploy (${why}).`);
+      process.exit(1);
+    }
 
     if (ingressProvider === "traefik") {
         console.log("    Waiting for Traefik health...");

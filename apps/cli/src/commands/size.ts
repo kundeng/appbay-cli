@@ -2,8 +2,9 @@
  * `appbay size [app]` — show disk usage for apps.
  */
 import { Command } from "commander";
-import { discoverApps, containerExec } from "@appbay/core";
+import { discoverApps, apiDiskUsage } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
+import { formatBytes } from "../utils/formatting.js";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -13,17 +14,17 @@ function getDirSize(dir: string): string {
   return (result.stdout as string).trim().split("\t")[0] || "—";
 }
 
-function getVolumeSize(name: string): string {
-  const result = containerExec(
-    ["system", "df", "-v", "--format", "{{.Name}}\t{{.Size}}"],
-    { appbayHome: resolveAppbayHome(), timeout: 15_000 },
-  );
-  if (result.exitCode !== 0) return "—";
-  const line = result.output
-    .trim()
-    .split("\n")
-    .find((l) => l.startsWith(name + "\t") || l.startsWith(name + " "));
-  return line?.split("\t")[1] || "—";
+/** Volume bytes per compose project, from one `/system/df` read; null when the runtime could not be asked. */
+async function volumeBytesByProject(appbayHome: string): Promise<Map<string, number> | null> {
+  const usage = await apiDiskUsage({ appbayHome });
+  if (usage.kind === "unknown") return null;
+  const totals = new Map<string, number>();
+  for (const v of usage.value.Volumes ?? []) {
+    const project = v.Labels?.["com.docker.compose.project"];
+    if (!project) continue;
+    totals.set(project, (totals.get(project) ?? 0) + (v.UsageData?.Size ?? 0));
+  }
+  return totals;
 }
 
 export const sizeCommand = new Command("size")
@@ -56,10 +57,12 @@ export const sizeCommand = new Command("size")
       `  ${pad("---", 20)} ${pad("----------", 12)} ${pad("--------", 12)} ${pad("-------", 12)}`,
     );
 
+    const volumes = await volumeBytesByProject(home);
+    if (volumes === null) console.log("  (volumes: the runtime could not be asked)\n");
     for (const t of targets) {
       const defSize = getDirSize(t.dir);
       const renderSize = getDirSize(join(rendersDir, t.name));
-      const volSize = getVolumeSize(t.name);
+      const volSize = volumes === null ? "?" : formatBytes(volumes.get(t.name) ?? 0);
       console.log(
         `  ${pad(t.name, 20)} ${pad(defSize, 12)} ${pad(renderSize, 12)} ${pad(volSize, 12)}`,
       );

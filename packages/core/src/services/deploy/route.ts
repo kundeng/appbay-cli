@@ -1,8 +1,10 @@
 /**
  * The edge route: the one converge that talks to a process other than compose. Caddy
  * validates and reloads; traefik watches a directory, so the file on disk is the install and
- * the observation is that a running traefik exists to read it. Writing the file with no
- * edge is not a route (review 2026-09-05, F1).
+ * the observation is that a running traefik exists to read it. On both providers the route
+ * files are written here, after the upstream is up and the edge is seen running: a fragment
+ * written at render time pointed traefik at a container that had not started, and writing
+ * the file with no edge is not a route (review 2026-09-05, F1).
  *
  * The edge is found by its label, never by a literal name: the namespace enters every
  * generated name (identity.ts), and a literal went stale the day the system apps were
@@ -10,15 +12,30 @@
  */
 import { join, dirname } from "node:path";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 import type { AppCompileResult } from "../../compiler/index.js";
-import { containerBin, resolveIngressProvider } from "../../runtime/container-runtime.js";
+import { containerExec, resolveIngressProvider } from "../../runtime/container-runtime.js";
 import { findContainerByLabel, engineObserver, type Observer } from "../../runtime/observe.js";
 import { APP_LABEL } from "../../compiler/identity.js";
+
+type RouteFile = { path: string; content: string };
 
 export function isCaddyConfigPath(path: string): boolean {
   return path.startsWith("etc/apps/caddy/config/dynamic/") ||
     path.startsWith("etc/apps/caddy/config/security/policies/");
+}
+
+/** An auxiliary file that is an edge route or policy, on either provider: installed by this module, not by the render. */
+export function isRouteFilePath(path: string): boolean {
+  return isCaddyConfigPath(path) || path.startsWith("etc/apps/traefik/config/dynamic/");
+}
+
+/** Write the route files under APPBAY_HOME; the caller decides when. Throws on a failed write. */
+async function writeRouteFiles(files: RouteFile[], appbayHome: string): Promise<void> {
+  for (const aux of files) {
+    const path = join(appbayHome, aux.path);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, aux.content, "utf-8");
+  }
 }
 
 /**
@@ -30,6 +47,8 @@ export function isCaddyConfigPath(path: string): boolean {
  * rejected". Caddy was never asked. A check that could not run must not return a verdict.
  */
 type CaddyCommandStatus = "ok" | "rejected" | "unavailable";
+
+const CADDY_EXEC_TIMEOUT_MS = 60_000;
 
 async function runCaddyCommand(
   appbayHome: string,
@@ -52,15 +71,15 @@ async function runCaddyCommand(
       detail: `the Caddy edge container "${edge.value.name}" exists but is ${edge.value.state}`,
     };
   }
-  const result = spawnSync(containerBin(appbayHome), ["exec", edge.value.name, "caddy", ...args], {
-    stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
+  const result = containerExec(["exec", edge.value.name, "caddy", ...args], {
+    appbayHome, stdio: ["pipe", "pipe", "pipe"], timeout: CADDY_EXEC_TIMEOUT_MS, label: "caddy exec",
   });
-  const detail = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-  return { status: result.status === 0 ? "ok" : "rejected", detail };
+  if (result.failedToStart) return { status: "unavailable", detail: `could not exec into the edge: ${result.output}` };
+  return { status: result.exitCode === 0 ? "ok" : "rejected", detail: result.output.trim() };
 }
 
 /** The shape every route install answers with, on either provider. */
-export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavailable"; detail?: string }
+export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavailable" | "write-failed"; detail?: string }
 
 /**
  * Install manifest-derived Caddy routes/policies, validate the complete imported config,
@@ -79,8 +98,19 @@ export async function installCaddyConfig(
   for (const aux of files) {
     const path = join(appbayHome, aux.path);
     previous.set(path, await readFile(path, "utf-8").catch(() => null));
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, aux.content, "utf-8");
+  }
+  const restore = async () => {
+    for (const [path, content] of previous) {
+      if (content === null) await unlink(path).catch(() => undefined);
+      else await writeFile(path, content, "utf-8");
+    }
+  };
+
+  try {
+    await writeRouteFiles(files, appbayHome);
+  } catch (err) {
+    await restore();
+    return { ok: false, reason: "write-failed", detail: err instanceof Error ? err.message : String(err) };
   }
 
   const caddyfile = ["--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"];
@@ -90,10 +120,7 @@ export async function installCaddyConfig(
     if (activation.status === "ok") return { ok: true };
   }
 
-  for (const [path, content] of previous) {
-    if (content === null) await unlink(path).catch(() => undefined);
-    else await writeFile(path, content, "utf-8");
-  }
+  await restore();
   // A reload is only attempted when there is a Caddy to reload; on `unavailable` it would be
   // a second no-op against a container that does not exist.
   if (activation.status === "rejected") {
@@ -128,6 +155,11 @@ export async function installRoute(
   if (!edge.value.running) {
     return { ok: false, reason: "unavailable", detail: `the ${provider} edge container "${edge.value.name}" exists but is ${edge.value.state}` };
   }
+  try {
+    await writeRouteFiles(files, appbayHome);
+  } catch (err) {
+    return { ok: false, reason: "write-failed", detail: err instanceof Error ? err.message : String(err) };
+  }
   return { ok: true };
 }
 
@@ -143,6 +175,9 @@ export function describeRouteFailure(
       `was never installed (${install.detail}). ${appName}'s own container is up, but it is ` +
       `not reachable through the edge. Deploy the edge first: \`appbay up ${provider}\`.`
     );
+  }
+  if (install.reason === "write-failed") {
+    return `edge routes NOT installed — the route files could not be written: ${install.detail}. ${appName}'s own container is up, but it is not reachable through the edge.`;
   }
   return `${provider} rejected the generated configuration; generated files rolled back: ${install.detail}`;
 }

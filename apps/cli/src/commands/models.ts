@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { runningAppContainer } from "../utils/docker.js";
-import { containerExec } from "@appbay/core";
+import { containerEndpoint } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { pad } from "../utils/formatting.js";
+import { pad, formatBytes } from "../utils/formatting.js";
 
 interface OllamaModel {
   name: string;
@@ -26,32 +26,11 @@ async function getOllamaUrl(): Promise<string> {
   const container = found.kind === "ok" && found.value?.running ? found.value.name : null;
   if (!container) return "http://localhost:11434";
 
-  // Try host port mapping first
-  const appbayHome = resolveAppbayHome();
-  const port = containerExec(["port", container, "11434"], { appbayHome, timeout: 5_000 });
-  if (port.exitCode === 0 && port.output) {
-    const match = port.output.trim().match(/:(\d+)/);
-    if (match) return `http://localhost:${match[1]}`;
-  }
-
-  // Fall back to container IP on the appbay_shared network
-  const ip = containerExec(
-    ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", container],
-    { appbayHome, timeout: 5_000 },
-  );
-  if (ip.exitCode === 0 && ip.output) {
-    const addr = ip.output.trim().split(" ").filter(Boolean)[0];
-    if (addr) return `http://${addr}:11434`;
-  }
-
+  const where = await containerEndpoint(container, 11434, resolveAppbayHome());
+  if (where.kind === "ok" && where.value) return `http://${where.value}`;
   return "http://localhost:11434";
 }
 
-function formatSize(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
-  return `${bytes} B`;
-}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -105,12 +84,12 @@ async function listModels(options: { json?: boolean }): Promise<void> {
 
   for (const m of models) {
     console.log(
-      `${pad(m.name, nameW)}${pad(formatSize(m.size), sizeW)}${pad(m.details?.parameter_size ?? "-", paramW)}${pad(m.details?.quantization_level ?? "-", quantW)}${pad(timeAgo(m.modified_at), modifiedW)}`,
+      `${pad(m.name, nameW)}${pad(formatBytes(m.size), sizeW)}${pad(m.details?.parameter_size ?? "-", paramW)}${pad(m.details?.quantization_level ?? "-", quantW)}${pad(timeAgo(m.modified_at), modifiedW)}`,
     );
   }
 
   const totalSize = models.reduce((sum, m) => sum + m.size, 0);
-  console.log(`\n${models.length} model(s), ${formatSize(totalSize)} total`);
+  console.log(`\n${models.length} model(s), ${formatBytes(totalSize)} total`);
 }
 
 async function removeModel(name: string): Promise<void> {

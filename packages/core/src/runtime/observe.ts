@@ -232,3 +232,18 @@ export async function isReady(observer: Observer, project: string): Promise<Insp
     .map((r) => `${r.service} is ${r.state}${r.health ? ` (${r.health})` : ""}`);
   return { kind: "ok", value: { ready: waiting.length === 0, detail: waiting.join(", ") } };
 }
+
+/**
+ * Where a container's port answers from this host: the published host port when there is
+ * one, else the container's address on any of its networks. Null when neither exists.
+ */
+export async function containerEndpoint(container: string, port: number, appbayHome?: string): Promise<Inspection<string | null>> {
+  const { apiInspectContainer } = await import("./engine-api.js");
+  const r = await apiInspectContainer(container, { appbayHome });
+  if (r.kind === "unknown") return r;
+  const net = r.value?.NetworkSettings;
+  const published = net?.Ports?.[`${String(port)}/tcp`]?.[0]?.HostPort;
+  if (published) return { kind: "ok", value: `localhost:${published}` };
+  const ip = Object.values(net?.Networks ?? {}).map((n) => n.IPAddress).find((a) => a);
+  return { kind: "ok", value: ip ? `${ip}:${String(port)}` : null };
+}

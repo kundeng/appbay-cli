@@ -74,7 +74,38 @@ describe("readiness gating", () => {
     const db = r.apps.find((a) => a.appName === "db")!;
     const web = r.apps.find((a) => a.appName === "web")!;
     expect(db.error).toMatch(/not ready within \d+s: db is running \(starting\)/);
+    // db's container is up and never became ready: a partial converge, counted as one (S48).
+    expect(db.containerStartedWithoutRoutes).toBe(true);
+    expect(r.startedButUnrouted).toBe(1);
     expect(web.error).toContain("skipped: depends on db, which did not become ready");
+    expect(log).not.toContain("web:up");
+  });
+
+  it("a readiness probe the runtime cannot answer is unobservable, not a timeout (S48)", async () => {
+    const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
+    const project = observer.project;
+    let asks = 0;
+    // before, up, after, crash check answer; the readiness probe (the fourth ask) does not.
+    observer.project = async (app) => app === "db" && ++asks > 3 ? { kind: "unknown", reason: "socket closed" } : project(app);
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 10_000, sleep: noSleep, crashGraceMs: 0 });
+    const db = r.apps.find((a) => a.appName === "db")!;
+    expect(db).toMatchObject({ status: "unchanged", convergeAction: "unknown", unknownReason: "socket closed" });
+    expect(db.error).toBeUndefined();
+    expect(log).not.toContain("web:up");
+  });
+
+  it("a dependency whose edge route did not land blocks its dependent: every failure blocks (F2, S48)", async () => {
+    // db declares an ingress route; no edge is running, so its route link diverges after its
+    // project converged. web must not start over it.
+    await writeFile(join(home, "etc", "apps", "db", "appbay.yaml"), "project: data\ntraits:\n  - type: ingress\n    host: db.example.test\n    port: 80\n    service: db\n");
+    const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 10_000, sleep: noSleep, crashGraceMs: 0 });
+    const db = r.apps.find((a) => a.appName === "db")!;
+    const web = r.apps.find((a) => a.appName === "web")!;
+    expect(r.compileErrors).toEqual([]);
+    expect(db).toMatchObject({ status: "failed", containerStartedWithoutRoutes: true });
+    expect(web.error).toContain("depends on db, which did not become ready");
+    expect(log).toContain("db:up");
     expect(log).not.toContain("web:up");
   });
 

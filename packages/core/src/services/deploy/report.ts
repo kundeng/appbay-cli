@@ -28,11 +28,12 @@ export interface AppDeployResult {
   /** Why the runtime could not be read, when `convergeAction` is "unknown". */
   unknownReason?: string;
   /**
-   * The app's container is up but its edge routes did not land — it is running and
-   * unreachable. A partial converge, not a total failure (appbay-cli#5).
+   * The app's container is up and it is not reachable: its edge route did not land, or it
+   * never became ready. A partial converge, not a total failure (appbay-cli#5).
    */
   containerStartedWithoutRoutes?: boolean;
   error?: string;
+  /** Post-deploy shepherd actions that failed, one entry per action; the app still deployed. */
   shepherdErrors?: string[];
 }
 
@@ -43,9 +44,9 @@ export interface DeployResult {
   unchanged: number;
   failed: number;
   /**
-   * Apps whose own container is running but whose edge routes did NOT land — a PARTIAL
-   * converge. Counted separately because neither `deployed` nor `failed` is honest on its
-   * own: the app is up, and it is unreachable (appbay-cli#5).
+   * Apps whose own container is running but which are NOT reachable — a PARTIAL converge.
+   * Counted separately because neither `deployed` nor `failed` is honest on its own: the
+   * app is up, and it is unreachable (appbay-cli#5).
    */
   startedButUnrouted: number;
   compileErrors: Array<{ appName?: string; stage: string; message: string }>;
@@ -63,13 +64,15 @@ export function emptyDeployResult(compileErrors: DeployResult["compileErrors"] =
  * One app's row. The verdicts are read in chain order and the first that is not
  * `converged` decides:
  *
- * | first non-converged                                   | status      | carries                                   |
- * |-------------------------------------------------------|-------------|-------------------------------------------|
- * | none                                                  | see below   | convergeAction, unknownReason              |
- * | compile, render, secrets, shepherd:pre, project: diverged | failed  | error = detail                             |
- * | project: unobservable                                 | unchanged   | convergeAction unknown, unknownReason      |
- * | route: diverged                                       | failed      | error, containerStartedWithoutRoutes       |
- * | shepherd:post: diverged                               | as "none"   | shepherdErrors                             |
+ * | first non-converged                                       | status    | carries                                   |
+ * |-----------------------------------------------------------|-----------|-------------------------------------------|
+ * | none                                                      | see below | convergeAction, unknownReason              |
+ * | compile, render, secrets, shepherd:pre: diverged          | failed    | error = detail                             |
+ * | project: diverged, reason not-ready                       | failed    | error, containerStartedWithoutRoutes       |
+ * | project: diverged, any other reason                       | failed    | error = detail                             |
+ * | project: unobservable                                     | unchanged | convergeAction unknown, unknownReason      |
+ * | route: diverged                                           | failed    | error, containerStartedWithoutRoutes       |
+ * | shepherd:post: diverged                                   | as "none" | shepherdErrors                             |
  *
  * With nothing diverged, a new or changed plan is `deployed`: the converge was the point.
  * An unchanged plan is `deployed` only when compose started something (appbay-cli#4), and
@@ -85,8 +88,8 @@ export function foldApp(appName: string, planStatus: PlanStatus, verdicts: Map<s
   for (const kind of CHAIN) {
     const v = verdicts.get(convergeId(appName, kind));
     if (v === undefined || v.kind === "converged") continue;
-    if (kind === "shepherd:post") {
-      row.shepherdErrors = [v.kind === "diverged" ? v.detail : v.reason];
+    if (kind === "shepherd:post" && v.kind === "diverged") {
+      row.shepherdErrors = v.errors ?? [v.detail];
       continue;
     }
     if (kind === "project" && v.kind === "unobservable") {
@@ -96,7 +99,9 @@ export function foldApp(appName: string, planStatus: PlanStatus, verdicts: Map<s
     }
     row.status = "failed";
     row.error = v.kind === "diverged" ? v.detail : v.reason;
-    if (kind === "route") row.containerStartedWithoutRoutes = true;
+    if (kind === "route" || (kind === "project" && v.kind === "diverged" && v.reason === "not-ready")) {
+      row.containerStartedWithoutRoutes = true;
+    }
     return row;
   }
   const started = project?.kind === "converged" && project.action === "started";

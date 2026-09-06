@@ -27,7 +27,7 @@ export const statsCommand = new Command("stats")
 
     args.push(...containers);
 
-    containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" });
+    process.exit(containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" }).exitCode);
   });
 
 export const smiCommand = new Command("smi")

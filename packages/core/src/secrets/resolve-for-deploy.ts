@@ -21,7 +21,7 @@ import { SopsSecretProvider } from "./providers/sops.js";
 import { VaultSecretProvider } from "./providers/vault.js";
 import { KeePassSecretProvider } from "./providers/keepass.js";
 import { runShepherd } from "../shepherd/run-shepherd.js";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerExec } from "../runtime/container-runtime.js";
 import { shepherdTarget } from "../compiler/identity.js";
 
 /**
@@ -203,7 +203,6 @@ export async function writeEncryptedBundle(
   store?: SecretStore,
 ): Promise<BundleWriteResult> {
   const { randomBytes: rb } = await import("node:crypto");
-  const { spawnSync } = await import("node:child_process");
   const secretStore = store ?? createSecretStore();
   const volumeName = `appbay-secrets-${appName}`;
   const errors: BundleWriteResult["errors"] = [];
@@ -235,7 +234,7 @@ export async function writeEncryptedBundle(
   const encrypted = encryptBundle(plaintext, key);
 
   // Create volume
-  spawnSync(containerBin(), ["volume", "create", volumeName], { stdio: "pipe" });
+  containerExec(["volume", "create", volumeName], { stdio: "pipe", label: "volume create" });
 
   // Write all three files via a single shepherd container
   const seedHex = seed.toString("hex");
@@ -314,8 +313,7 @@ export async function resolveWrapperFileSecrets(
   }
 
   // Ensure the external volume exists
-  const { spawnSync } = await import("node:child_process");
-  spawnSync(containerBin(), ["volume", "create", volumeName], { stdio: "pipe" });
+  containerExec(["volume", "create", volumeName], { stdio: "pipe", label: "volume create" });
 
   const result = await runShepherd({
     target: shepherdTarget(appName),

@@ -2,9 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
 import { EdgeIdentityDocumentSchema, type EdgeIdentityDocument, type EdgeUser } from "../schemas/edge-identities.js";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerBin, containerExec } from "../runtime/container-runtime.js";
 import { findContainerByLabel } from "../runtime/observe.js";
 import { APP_LABEL } from "../compiler/identity.js";
 
@@ -140,10 +139,7 @@ export class EdgeIdentityStore {
 export async function restartEdgeForIdentityChange(): Promise<boolean> {
   const edge = await runningEdge();
   if (!edge) return false;
-  const result = spawnSync(containerBin(), ["restart", edge], {
-    stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8",
-  });
-  return result.status === 0;
+  return containerExec(["restart", edge], { stdio: ["ignore", "pipe", "pipe"], label: "edge restart" }).exitCode === 0;
 }
 
 /** The running Caddy edge, by label — a literal name went stale when the system apps were namespaced. */
@@ -163,11 +159,11 @@ async function claimIdentityStoreOwnership(): Promise<boolean> {
   if (uid === undefined || gid === undefined) return false;
   const edge = await runningEdge();
   if (!edge) return false;
-  const result = spawnSync(containerBin(), [
+  const result = containerExec([
     "exec", "--user", "0", edge, "sh", "-c",
     `chown ${uid}:${gid} /etc/caddy/security/users.json && chmod 600 /etc/caddy/security/users.json`,
-  ], { stdio: ["ignore", "pipe", "pipe"], encoding: "utf-8" });
-  return result.status === 0;
+  ], { stdio: ["ignore", "pipe", "pipe"], label: "identity store chown" });
+  return result.exitCode === 0;
 }
 
 function toRole(role: string) {
@@ -182,24 +178,18 @@ function passwordRecord(hash: string, createdAt: string) {
 }
 function hashPassword(password: string): string {
   const image = process.env.APPBAY_CADDY_IMAGE || DEFAULT_CADDY_SECURITY_IMAGE;
-  const bin = containerBin();
-  const result = spawnSync(bin, ["run", "--rm", "-i", "--entrypoint", "caddy", image,
+  const result = containerExec(["run", "--rm", "-i", "--entrypoint", "caddy", image,
     "hash-password", "--algorithm", "bcrypt", "--bcrypt-cost", "10"], {
-    input: `${password}\n`, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+    input: `${password}\n`, stdio: ["pipe", "pipe", "pipe"], label: "caddy hash-password",
   });
-  // ⚠️ A FAILED SPAWN SETS `.error`, NOT `.stderr`. When the binary is missing entirely,
-  // status is null and stderr is null, so the old message read
-  //     Caddy password hashing failed: null
-  // which names neither the binary nor the reason. Measured on a Fedora host where core had
-  // resolved the runtime to "docker" and only podman was installed — the operator was shown
-  // "null" for what was simply ENOENT. Report the spawn error, and the binary, first.
-  if (result.error) {
-    throw new Error(
-      `Caddy password hashing failed: could not run "${bin}" — ${result.error.message}`,
-    );
+  // A binary that is missing is named as such (measured on a Fedora host where core had
+  // resolved the runtime to "docker" and only podman was installed: the old message was
+  // "Caddy password hashing failed: null").
+  if (result.failedToStart) {
+    throw new Error(`Caddy password hashing failed: could not run "${containerBin()}" — ${result.output}`);
   }
-  if (result.status !== 0) throw new Error(`Caddy password hashing failed: ${String(result.stderr).trim()}`);
-  const hash = String(result.stdout).trim();
+  if (result.exitCode !== 0) throw new Error(`Caddy password hashing failed: ${result.output.trim()}`);
+  const hash = result.output.trim();
   if (!/^\$2[aby]\$10\$/.test(hash)) throw new Error("Caddy returned an unexpected password hash.");
   return hash;
 }

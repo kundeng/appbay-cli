@@ -16,20 +16,11 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { readSystemConfig, SYSTEM_CONFIG_FILE } from "./system-config.js";
-import { explainHome, resolveHome, readUserPointer, type HomeTier } from "@appbay/core";
+import { explainHome, resolveHome, type HomeTier } from "@appbay/core";
 
 /** Path to the persisted home-directory config (outside APPBAY_HOME itself). */
 const CONFIG_DIR = join(homedir(), ".config", "appbay");
 export const CONFIG_FILE = join(CONFIG_DIR, "home");
-
-/**
- * Read the persisted Appbay home path saved by `appbay init`.
- *
- * Returns null if no config has been saved yet.
- */
-function readSavedAppbayHome(): string | null {
-  return readUserPointer(CONFIG_FILE);
-}
 
 /** What `saveAppbayHome` did. */
 export type SaveHomeResult =
@@ -83,30 +74,7 @@ export function clearSavedAppbayHome(pointer: string = CONFIG_FILE): boolean {
   return true;
 }
 
-/**
- * Which tier of {@link resolveAppbayHome} supplied the answer.
- *
- * `env` and `system` both OUTRANK `saved`, which is why they matter to callers:
- * writing `~/.config/appbay/home` while either is present changes nothing that
- * the next command will observe.
- */
-/**
- * `APPBAY_HOME` exactly as the CLI was STARTED with — captured before anything synthesises it.
- *
- * 🚨 `index.ts` sets `process.env.APPBAY_HOME = resolveAppbayHome()` when it is absent, so
- * that core (which reads the env var directly) agrees with the CLI about the home. Correct,
- * and it destroys the distinction every caller downstream needs: by the time a command's
- * action runs, the variable is ALWAYS set, and "the operator exported it" is indistinguishable
- * from "we resolved it from ~/.config/appbay/home".
- *
- * `appbay init` branched on `process.env.APPBAY_HOME` before checking `--dir`, so once a
- * saved home existed the env branch always won and **`--dir` was silently ignored** —
- * `appbay init --dir /tmp/x` initialised the saved home and never created `/tmp/x`. The
- * consuming project's converge passes `--dir` (`provision-appbay.yml:687`).
- *
- * This module is imported by `index.ts`, so its top level runs BEFORE that assignment.
- */
-
+/** Every tier of the home resolution and the winner, as `appbay home --explain` prints it. */
 type HomeExplanation = ReturnType<typeof explainHome>;
 
 /** Every tier and the winner, over this CLI's two pointer files. */

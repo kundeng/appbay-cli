@@ -132,22 +132,25 @@ export const installCommand = new Command("install")
       if (options.validate !== false) {
         try {
           const { spawnSync } = await import("node:child_process");
-          const validated = spawnSync("appbay", ["validate", name], {
+          const { selfBinary } = await import("../utils/self.js");
+          const validated = spawnSync(selfBinary(), ["validate", installAs], {
             stdio: "inherit",
             env: { ...process.env, APPBAY_HOME: home },
           });
+          if (validated.error) throw validated.error;
           if (validated.status !== 0) throw new Error(`validate exited ${String(validated.status)}`);
-        } catch {
+        } catch (err) {
+          console.error(`\nvalidation could not run: ${err instanceof Error ? err.message : String(err)}`);
           // The files are on disk, and that is all "installed" can honestly mean here: the
           // manifest does not compile on this install, so it is not ready to deploy.
           console.error(
             `\nInstalled to ${result.appDir}, but validation FAILED — see above. ` +
-            `Fix the manifest (or re-run appbay init with the provider it needs), then: appbay up ${name}`,
+            `Fix the manifest (or re-run appbay init with the provider it needs), then: appbay up ${installAs}`,
           );
           process.exit(1);
         }
       }
 
-      console.log(`\nReady to deploy: appbay up ${name}`);
+      console.log(`\nReady to deploy: appbay up ${installAs}`);
     },
   );

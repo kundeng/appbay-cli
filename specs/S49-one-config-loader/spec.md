@@ -72,6 +72,7 @@ devtime only (`update`) may stay CLI-side behind the same schema type.
 - [ ] 1.2 `config print`
 - [ ] 1.3 the two env writes removed
 - [ ] 1.4 eslint; first-run findings fixed or justified
+- [ ] 1.5 `compiler/builds.ts`: its six spawns of the container binary through `runtime/` (the last file the first arch rule lists)
 
 ## Log
 

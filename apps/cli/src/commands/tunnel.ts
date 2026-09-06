@@ -14,8 +14,10 @@ function getAppUrl(app: string): string | null {
     const config = parseYaml(readFileSync(appbayYaml, "utf-8"));
     const traits = config?.traits ?? [];
     for (const t of traits) {
-      if (t.type === "ingress" && t.host && t.port) {
-        return `http://localhost:${t.port}`;
+      // cloudflared runs in its own container on the shared network: the upstream is the
+      // service by name, never localhost, which would be cloudflared itself.
+      if (t.type === "ingress" && t.service && t.port) {
+        return `http://${t.service}:${t.port}`;
       }
     }
   } catch { /* ignore parse errors */ }

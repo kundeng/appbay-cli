@@ -12,19 +12,12 @@ import { createWriteStream, renameSync, chmodSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { VERSION, compareSemver, containerExec } from "@appbay/core";
+import { VERSION, compareSemver, containerCompose, discoverApps, isSystemApp } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 const REPO = "kundeng/appbay-cli";
 const BINARY_NAME = "appbay";
 
-/** System app images pulled by --system-only. */
-const SYSTEM_IMAGES = [
-  "traefik:v3.4",
-  "traefik/whoami:latest",
-  "ollama/ollama:latest",
-  "ghcr.io/open-webui/open-webui:main",
-];
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -180,24 +173,39 @@ async function selfUpdate(): Promise<void> {
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
   });
+  if (verResult.error || verResult.status !== 0) {
+    throw new Error(`the new binary at ${selfPath} did not run: ${verResult.error?.message ?? (verResult.stderr as string) ?? `exit ${String(verResult.status)}`}`);
+  }
   const newVersion = ((verResult.stdout as string) || "").trim();
 
   console.log(`  Updated: ${newVersion}`);
   console.log(`\nAppbay updated to ${latestTag} successfully.`);
 }
 
-async function pullSystemImages(): Promise<void> {
+/** Pull the images of the installed system apps through their rendered compose files; the number that failed. */
+async function pullSystemImages(): Promise<number> {
+  const appbayHome = resolveAppbayHome();
+  const rendered = (await discoverApps({ appsDir: join(appbayHome, "etc", "apps") }))
+    .filter((a) => isSystemApp(a.name))
+    .map((a) => ({ name: a.name, render: join(appbayHome, "var", "lib", "renders", a.name, "docker-compose.rendered.yml") }))
+    .filter((a) => existsSync(a.render));
+  if (rendered.length === 0) {
+    console.log("No deployed system apps to pull for.");
+    return 0;
+  }
   console.log("Pulling system app images...\n");
-
-  for (const img of SYSTEM_IMAGES) {
-    process.stdout.write(`  ${img}...`);
-    const pull = containerExec(["pull", img], { appbayHome: resolveAppbayHome(), stdio: "pipe" });
+  let failed = 0;
+  for (const app of rendered) {
+    process.stdout.write(`  ${app.name}...`);
+    const pull = containerCompose(["pull"], app.render, undefined, appbayHome);
     if (pull.exitCode === 0) {
       process.stdout.write(" done\n");
     } else {
+      failed++;
       process.stdout.write(` FAILED (${pull.output.trim().split("\n").pop()})\n`);
     }
   }
+  return failed;
 }
 
 /* ── Command ───────────────────────────────────────────────────────────────── */
@@ -214,17 +222,18 @@ export const updateCommand = new Command("update")
       }
 
       if (options.systemOnly) {
-        await pullSystemImages();
+        const failed = await pullSystemImages();
+        if (failed > 0) {
+          console.error(`\n${String(failed)} image pull(s) failed.`);
+          process.exit(1);
+        }
         return;
       }
 
       // Default: self-update CLI, then offer to pull images
       await selfUpdate();
 
-      const answer = process.env.CI ? "n" : undefined;
-      if (answer !== "n") {
-        console.log("\nPull system images too? (appbay update --system-only)");
-      }
+      console.log("\nTo pull the system app images as well: appbay update --system-only");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`\nUpdate failed: ${msg}`);

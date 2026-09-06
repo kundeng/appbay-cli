@@ -12,15 +12,11 @@
 import { Command } from "commander";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import {
-  deploy,
-  loadProjectVars,
-  isSystemApp,
-  containerExec,
-} from "@appbay/core";
+import { deploy, loadProjectVars, containerExec } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { printDeployReport } from "../utils/deploy-report.js";
+import { selfBinary } from "../utils/self.js";
 
 export const upCommand = new Command("up")
   .description("Compile and deploy selected apps")
@@ -85,12 +81,12 @@ export const upCommand = new Command("up")
 
     if (!hasFailures && options.open && apps.length === 1) {
       const appName = apps[0]!;
-      spawnSync("appbay", ["open", appName], { stdio: "inherit" });
+      spawnSync(selfBinary(), ["open", appName], { stdio: "inherit" });
     }
 
     if (!hasFailures && options.tail && apps.length > 0) {
       const appName = apps[0];
-      const composePath = join(resolveAppbayHome(), "var", "lib", "renders", appName, "docker-compose.rendered.yml");
+      const composePath = join(appbayHome, "var", "lib", "renders", appName, "docker-compose.rendered.yml");
       containerExec(["compose", "-f", composePath, "logs", "-f"], { appbayHome, stdio: "inherit" });
     }
 

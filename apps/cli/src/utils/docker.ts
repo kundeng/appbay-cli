@@ -44,13 +44,6 @@ export function cliContainerBin(): string {
 /**
  * Run a `docker compose` command against a specific compose file.
  *
- * @param args - Arguments to pass after `docker compose -f <file>` (e.g., ["up", "-d"]).
- * @param composePath - Absolute path to the rendered compose file.
- * @returns Structured result with exit code and output.
- */
-/**
- * Run a `docker compose` command against a specific compose file.
- *
  * @param args - Arguments after `docker compose -f <file>` (e.g., ["up", "-d"]).
  * @param composePath - Absolute path to the rendered compose file.
  * @param extraEnv - Additional environment variables to inject into the docker
@@ -72,8 +65,8 @@ export function dockerCompose(
  * Runtime profile for CLI reporting — display name, install URL, start hint, and the
  * one `info --format` template that differs between runtimes.
  *
- * Same home-resolution reasoning as cliContainerBin(): the CLI honours
- * ~/.config/appbay/home, core does not, so CLI callers must come through here.
+ * Same home-resolution reasoning as cliContainerBin(): the CLI's home resolver consults the
+ * CLI-side system config as well as core's tiers, so CLI callers come through here.
  */
 export function cliRuntimeProfile(): RuntimeProfile {
   return runtimeProfile(resolveAppbayHome());

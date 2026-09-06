@@ -11,8 +11,8 @@
  * are declared in appbay.yaml and emitted by the hooks trait.
  */
 
-import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from "node:child_process";
-import { containerBin } from "../runtime/container-runtime.js";
+import type { SpawnSyncOptionsWithStringEncoding, SpawnSyncReturns } from "node:child_process";
+import { containerSpawnSync } from "../runtime/container-runtime.js";
 
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ export async function runShepherd(
   // The payload, when there is one, travels on stdin. Anything on argv is readable by every
   // process on the host for the life of the run, which made the encrypted secret bundle
   // moot: its seed rode beside it on the same command line (review 2026-09-05, ledger 25).
-  const run = options.exec ?? ((argv, spawn) => spawnSync(containerBin(), argv, spawn));
+  const run = options.exec ?? ((argv, spawn) => containerSpawnSync(argv, spawn));
   const argv = options.stdin !== undefined ? ["run", "--rm", "-i", ...args.slice(2)] : args;
   const result = run(argv, {
     encoding: "utf-8",

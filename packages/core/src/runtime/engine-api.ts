@@ -72,8 +72,28 @@ const ContainerDetail = z.object({
     Health: z.object({ Status: z.string() }).optional(),
   }),
   Config: z.object({ Image: z.string().optional() }).optional(),
+  NetworkSettings: z.object({
+    Networks: z.record(z.object({ IPAddress: z.string().optional() })).nullable().optional(),
+    Ports: z.record(z.array(z.object({ HostIp: z.string().optional(), HostPort: z.string() })).nullable()).nullable().optional(),
+  }).optional(),
 });
 export type ContainerDetail = z.infer<typeof ContainerDetail>;
+
+const DiskUsage = z.object({
+  Volumes: z.array(z.object({
+    Name: z.string(),
+    Labels: z.record(z.string()).nullable().optional(),
+    UsageData: z.object({ Size: z.number() }).nullable().optional(),
+  })).nullable().optional(),
+});
+export type DiskUsage = z.infer<typeof DiskUsage>;
+
+/** `GET /system/df`: what the runtime's store holds; the volumes carry their compose project label. */
+export async function apiDiskUsage(options: EngineOptions = {}): Promise<Inspection<DiskUsage>> {
+  const r = await engineGet("/system/df", DiskUsage, options);
+  if (r.kind === "unknown") return r;
+  return { kind: "ok", value: r.value ?? {} };
+}
 
 /** `GET /_ping`: the runtime answers "OK" as text, not JSON. */
 export async function apiPing(options: EngineOptions = {}): Promise<Inspection<true>> {

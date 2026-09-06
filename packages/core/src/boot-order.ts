@@ -125,11 +125,22 @@ export interface DeployOrder<T extends OrderableApp> {
  * The order apps start in: system apps first in boot order, then every edge that
  * `projects.yaml` declares, expanded to app level. A cycle or an unknown project is an error
  * naming the apps involved, returned before anything runs; there is no weaker order.
+ *
+ * `apps` may be a subset of the install (`appbay up web`). A project named in `after:` is
+ * known when `projects.yaml` defines it, an app in `apps` declares it, or an installed app
+ * outside the subset declares it (`installedProjects`); only a name none of them carries is
+ * an error. Edges are drawn only between apps in `apps`: an operator who asks for one app
+ * does not wait on the ones they did not ask for.
  */
-export function deployOrder<T extends OrderableApp>(apps: T[], projects: ProjectOrder = {}): DeployOrder<T> {
+export function deployOrder<T extends OrderableApp>(
+  apps: T[],
+  projects: ProjectOrder = {},
+  installedProjects: Iterable<string> = [],
+): DeployOrder<T> {
   const errors: string[] = [];
   const byProject = new Map<string, T[]>();
   for (const app of apps) byProject.set(app.project, [...(byProject.get(app.project) ?? []), app]);
+  const known = new Set([...byProject.keys(), ...installedProjects]);
 
   const dependsOn = new Map<string, Set<string>>(apps.map((a) => [a.appName, new Set<string>()]));
   const systemNames = apps.filter((a) => isSystemApp(a.appName)).map((a) => a.appName);
@@ -139,7 +150,7 @@ export function deployOrder<T extends OrderableApp>(apps: T[], projects: Project
   }
   for (const [name, spec] of Object.entries(projects)) {
     for (const before of spec.after) {
-      if (!(before in projects) && !byProject.has(before)) {
+      if (!(before in projects) && !known.has(before)) {
         errors.push(`project "${name}" is declared after "${before}", which no app declares and projects.yaml does not define`);
         continue;
       }

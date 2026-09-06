@@ -78,7 +78,8 @@ describe("what compose did is recorded on every plan status (S47)", () => {
   it("the render's .env is a copy of the app's on an unchanged plan too", async () => {
     await seedRender();
     await writeFile(join(home, "etc", "apps", APP, ".env"), "ROTATED=1\n");
-    await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "seed-id"))]) });
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "seed-id"))]) });
+    expect(result.apps[0]?.planStatus).toBe("unchanged");
     expect(await readFile(join(home, "var", "lib", "renders", APP, ".env"), "utf-8")).toBe("ROTATED=1\n");
   });
 });

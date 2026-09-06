@@ -22,8 +22,7 @@
  *   3. `docker`                          — default, preserves prior behaviour
  */
 
-import { spawn, spawnSync, type ChildProcess, type SpawnOptions, type SpawnSyncOptions } from "node:child_process";
-import { join } from "node:path";
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions, type SpawnSyncOptions, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from "node:child_process";
 import {
   loadInstanceConfig,
   ContainerRuntimeSchema,
@@ -305,6 +304,8 @@ export interface ContainerResult {
   exitCode: number;
   /** stdout on success, stderr or the spawn error message on failure. */
   output: string;
+  /** The child never ran (binary missing, timeout, signal): `output` is the spawn error, not the child's. */
+  failedToStart?: boolean;
 }
 
 /** Options accepted by the container helpers. */
@@ -341,7 +342,7 @@ export function containerExec(
   });
 
   if (result.error) {
-    return { exitCode: 1, output: result.error.message };
+    return { exitCode: 1, output: result.error.message, failedToStart: true };
   }
   if (result.status !== 0) {
     return {
@@ -352,6 +353,19 @@ export function containerExec(
     };
   }
   return { exitCode: 0, output: (result.stdout as string | null) ?? "" };
+}
+
+/**
+ * The raw synchronous spawn of the container binary, for the one caller that needs the
+ * whole `SpawnSyncReturns` (the shepherd reads `error.code` for its timeout and stdin for
+ * its payload). Everything else uses `containerExec`.
+ */
+export function containerSpawnSync(
+  args: string[],
+  options: SpawnSyncOptionsWithStringEncoding,
+  appbayHome?: string,
+): SpawnSyncReturns<string> {
+  return spawnSync(containerBin(appbayHome), args, options);
 }
 
 /**

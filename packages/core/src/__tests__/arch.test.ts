@@ -63,14 +63,18 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/update.ts": "sudo mv of the new binary; the binary's own --version",
       "apps/cli/src/commands/up.ts": "re-invokes appbay for --open",
       "apps/cli/src/commands/install.ts": "re-invokes appbay validate after an install",
+      "apps/cli/src/utils/self.ts": "which appbay, to find the binary to re-invoke",
     },
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",
-      "packages/core/src/secrets/resolve-for-deploy.ts": "2.1 (volume create)",
-      "packages/core/src/services/deploy/route.ts": "2.2/2.3 (caddy exec in the edge)",
-      "packages/core/src/services/edge-identity-service.ts": "2.4",
-      "packages/core/src/shepherd/run-shepherd.ts": "2.1",
     },
+  },
+  {
+    name: "nothing outside runtime/ spawns the container binary, by any name",
+    pattern: /\bspawn(?:Sync)?\(\s*(?:(?:cli)?containerBin\(|"(?:docker|podman)")/,
+    owners: ["packages/core/src/runtime/"],
+    exempt: {},
+    allowed: {},
   },
   {
     name: "Go-template parsing of runtime output lives in runtime/",
@@ -79,7 +83,6 @@ const RULES: Rule[] = [
     exempt: {},
     allowed: {
       "apps/cli/src/commands/setup.ts": "2.4",
-      "apps/cli/src/commands/size.ts": "2.4",
       "apps/cli/src/commands/stats.ts": "2.4",
       "packages/core/src/compiler/builds.ts": "2.4",
       "packages/core/src/health/checks.ts": "2.4/2.5",

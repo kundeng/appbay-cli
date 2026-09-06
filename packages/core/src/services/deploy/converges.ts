@@ -8,7 +8,7 @@
  * unchanged artifact says nothing about whether the container it describes still exists
  * (appbay-cli#4).
  */
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { readFile, writeFile, mkdir, copyFile, chmod } from "node:fs/promises";
 import type { AppCompileResult } from "../../compiler/index.js";
 import { resolveSecretsForDeploy, extractSecretRefs } from "../../secrets/resolve-for-deploy.js";
@@ -17,7 +17,7 @@ import { findCrashedServices, snapshotContainers, didConverge, isReady, type Obs
 import { APP_LABEL, shepherdTarget } from "../../compiler/identity.js";
 import type { ShepherdAction, ShepherdPhase } from "../../traits/types.js";
 import { parseEnvFile } from "../config-service.js";
-import { isCaddyConfigPath, installRoute, describeRouteFailure } from "./route.js";
+import { isRouteFilePath, installRoute, describeRouteFailure } from "./route.js";
 import { convergeId, converged, diverged, unobservable, type Converge, type ConvergeAction, type ConvergeKind, type DeployContext } from "./converge.js";
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ import { convergeId, converged, diverged, unobservable, type Converge, type Conv
 /**
  * Write rendered compile output to the renders directory. Auxiliary file paths are
  * resolved relative to APPBAY_HOME; edge route and policy files are not written here but
- * installed transactionally once the upstream is running (route.ts).
+ * installed once the upstream is running and the edge is seen (route.ts).
  */
 export async function writeRenderedOutput(
   app: AppCompileResult,
@@ -41,12 +41,9 @@ export async function writeRenderedOutput(
   await writeFile(composePath, app.rendered, "utf-8");
 
   for (const aux of app.auxiliaryFiles) {
-    if (isCaddyConfigPath(aux.path)) continue;
+    if (isRouteFilePath(aux.path)) continue;
     const auxPath = join(appbayHome, aux.path);
-    const auxDir = auxPath.substring(0, auxPath.lastIndexOf("/"));
-    if (auxDir) {
-      await mkdir(auxDir, { recursive: true });
-    }
+    await mkdir(dirname(auxPath), { recursive: true });
     await writeFile(auxPath, aux.content, "utf-8");
     if (auxPath.endsWith(".sh")) await chmod(auxPath, 0o755);
   }
@@ -92,6 +89,7 @@ export async function resolveDeployEnv(
   return { env };
 }
 
+/** Run the actions of one phase; the errors, one per failed action, in order. */
 async function runShepherdActions(
   actions: ShepherdAction[],
   phase: ShepherdPhase,
@@ -104,11 +102,18 @@ async function runShepherdActions(
         await action.run(ctx);
       } else if (action.image) {
         const { runShepherd } = await import("../../shepherd/run-shepherd.js");
-        // The namespace-sharing target is the app's real container, found by label; the
-        // literal `appbay.<app>` was never a container's name (ledger row 24).
-        const found = action.share ? await ctx.observer.findByLabel(APP_LABEL, ctx.appName) : null;
+        // A namespace-sharing action needs the app's real container, found by label; the
+        // literal `appbay.<app>` was never a container's name (ledger row 24), so an action
+        // that would have run against it is refused with the lookup's answer instead.
+        let target = shepherdTarget(ctx.appName);
+        if (action.share) {
+          const found = await ctx.observer.findByLabel(APP_LABEL, ctx.appName);
+          if (found.kind === "unknown") { errors.push(`${action.label}: could not find the app's container to share with (${found.reason})`); continue; }
+          if (found.value === null) { errors.push(`${action.label}: no running container carries ${APP_LABEL}=${ctx.appName} to share with`); continue; }
+          target = found.value.name;
+        }
         const result = await runShepherd({
-          target: found?.kind === "ok" && found.value ? found.value.name : shepherdTarget(ctx.appName),
+          target,
           image: action.image,
           command: action.command,
           share: action.share,
@@ -132,8 +137,8 @@ async function runShepherdActions(
 /** What the planner knows about one app beyond its compile output. */
 interface PlannedApp {
   app: AppCompileResult;
-  /** The compiler reported an error for this app: it is refused, not deployed half-configured. */
-  compileFailed: boolean;
+  /** Why the app is refused before anything runs (a compile error, an empty render); undefined when it deploys. */
+  refusal?: string;
   /** Apps that must be ready before this one starts (`deployOrder`). */
   dependsOn: ReadonlySet<string>;
   /** Something starts after this app: its project waits, bounded, until it is ready. */
@@ -145,9 +150,11 @@ export function planConverges(apps: readonly PlannedApp[]): Converge[] {
   return apps.flatMap(appChain);
 }
 
-function appChain({ app, compileFailed, dependsOn, waitReady }: PlannedApp): Converge[] {
+function appChain({ app, refusal, dependsOn, waitReady }: PlannedApp): Converge[] {
   const name = app.appName;
-  const upstream = [...dependsOn].map((d) => convergeId(d, "project"));
+  // A dependency is ready when its project converged and its route landed: every failure of
+  // an app blocks its dependents, whatever failed (review 2026-09-06, F2).
+  const upstream = [...dependsOn].flatMap((d) => [convergeId(d, "project"), convergeId(d, "route")]);
   const link = (kind: ConvergeKind, after: ConvergeKind | null, run: Converge["run"]): Converge =>
     ({ id: convergeId(name, kind), app: name, kind, dependsOn: after === null ? upstream : [convergeId(name, after)], run });
 
@@ -155,15 +162,12 @@ function appChain({ app, compileFailed, dependsOn, waitReady }: PlannedApp): Con
   // trait that failed to resolve produced a running container with no route, healthy in
   // every listing and unreachable (issue #60, journey 7). Scoped to the failing app; its
   // neighbours still deploy.
-  if (compileFailed) {
-    return [link("compile", null, async () => diverged(
-      "not deployed: its configuration did not compile (see the errors above). " +
-      "Deploying it would start a container that cannot serve its declared routes.",
-    ))];
+  if (refusal !== undefined) {
+    return [link("compile", null, async () => diverged(refusal))];
   }
 
-  // Shared by the links that run after `secrets`: the env the compose child and the
-  // shepherd actions see.
+  // Filled by the `secrets` link and read by the links after it. Sound only because links
+  // run in chain order and each one is gated on the previous one's verdict (runConverges).
   const state = { env: {} as Record<string, string> };
 
   return [
@@ -190,7 +194,7 @@ function appChain({ app, compileFailed, dependsOn, waitReady }: PlannedApp): Con
 
     link("shepherd:pre", "secrets", async (ctx) => {
       const errors = await runShepherdActions(app.shepherdActions ?? [], "pre-deploy", { appName: name, appbayHome: ctx.appbayHome, secretEnv: state.env, observer: ctx.observer });
-      return errors.length > 0 ? diverged(`Pre-deploy shepherd failed: ${errors.join("; ")}`) : converged();
+      return errors.length > 0 ? diverged(`Pre-deploy shepherd failed: ${errors.join("; ")}`, undefined, errors) : converged();
     }),
 
     link("project", "shepherd:pre", async (ctx) => {
@@ -216,13 +220,15 @@ function appChain({ app, compileFailed, dependsOn, waitReady }: PlannedApp): Con
       let last = "";
       for (;;) {
         const probe = await isReady(ctx.observer, name);
-        if (probe.kind === "unknown") { last = `could not ask compose (${probe.reason})`; break; }
+        if (probe.kind === "unknown") return unobservable(probe.reason);
         if (probe.value.ready) return verdict;
         last = probe.value.detail;
         if (Date.now() >= deadline) break;
         await ctx.sleep(2000);
       }
-      return diverged(`not ready within ${String(Math.round(ctx.readinessTimeoutMs / 1000))}s: ${last}`);
+      // The container is up (compose returned 0, nothing crashed) and never became ready: a
+      // partial converge, reported as one.
+      return diverged(`not ready within ${String(Math.round(ctx.readinessTimeoutMs / 1000))}s: ${last}`, "not-ready");
     }),
 
     link("route", "project", async (ctx) => {
@@ -233,7 +239,7 @@ function appChain({ app, compileFailed, dependsOn, waitReady }: PlannedApp): Con
 
     link("shepherd:post", "route", async (ctx) => {
       const errors = await runShepherdActions(app.shepherdActions ?? [], "post-deploy", { appName: name, appbayHome: ctx.appbayHome, secretEnv: state.env, observer: ctx.observer });
-      return errors.length > 0 ? diverged(errors.join("; ")) : converged();
+      return errors.length > 0 ? diverged(errors.join("; "), undefined, errors) : converged();
     }),
   ];
 }

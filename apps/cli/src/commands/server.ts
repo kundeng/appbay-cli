@@ -29,11 +29,6 @@ import {
   
 } from "@appbay/core";
 
-/** Container name used by the server compose stack. */
-
-/** Docker network shared across all appbay apps. */
-
-/** URL the server listens on. */
 export { resolveRuntimeSocket, runtimeSocketFor };
 
 const SERVER_URL = "http://localhost:3000";
@@ -72,7 +67,11 @@ async function getServerInfo(): Promise<{ running: boolean; unknown?: string; up
  */
 async function ensureNetwork(): Promise<void> {
   const exists = await networkExists(SHARED_NETWORK, resolveAppbayHome());
-  if (exists.kind === "ok" && !exists.value) {
+  if (exists.kind === "unknown") {
+    console.error(`Could not ask the runtime whether ${SHARED_NETWORK} exists: ${exists.reason}`);
+    return;
+  }
+  if (!exists.value) {
     const created = containerExec(["network", "create", SHARED_NETWORK], { appbayHome: resolveAppbayHome(), label: "network create" });
     if (created.exitCode !== 0) console.error(`Could not create ${SHARED_NETWORK}: ${created.output.trim()}`);
   }

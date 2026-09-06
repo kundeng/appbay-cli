@@ -29,6 +29,17 @@ describe("foldApp: the first non-converged link decides", () => {
     expect(row.error).toBeUndefined();
   });
 
+  it("a project that never became ready is a partial converge too: up, unreachable", () => {
+    const row = foldApp(APP, "unchanged", allBut("project", diverged("not ready within 90s: db is running (starting)", "not-ready")));
+    expect(row).toMatchObject({ status: "failed", containerStartedWithoutRoutes: true });
+    expect(row.error).toContain("not ready within");
+  });
+
+  it("a project whose snapshots could not be read but whose crash check was clean is unchanged, with the reason", () => {
+    const row = foldApp(APP, "unchanged", allBut("route", converged(), converged("unknown", "socket flaked")));
+    expect(row).toMatchObject({ status: "unchanged", convergeAction: "unknown", unknownReason: "socket flaked" });
+  });
+
   it("a route that did not land after a converged project is a partial converge", () => {
     const row = foldApp(APP, "changed", allBut("route", diverged("edge not running", "unavailable"), converged("started")));
     expect(row).toMatchObject({ status: "failed", error: "edge not running", containerStartedWithoutRoutes: true });
@@ -40,9 +51,9 @@ describe("foldApp: the first non-converged link decides", () => {
     expect(foldApp(APP, "new", allBut("shepherd:pre", diverged("Pre-deploy shepherd failed: x")))).toMatchObject({ status: "failed", error: "Pre-deploy shepherd failed: x" });
   });
 
-  it("a post-shepherd failure is recorded and does not fail the app", () => {
-    const row = foldApp(APP, "new", allBut("shepherd:post", diverged("hook: exit 1")));
-    expect(row).toMatchObject({ status: "deployed", shepherdErrors: ["hook: exit 1"] });
+  it("a post-shepherd failure is recorded, one entry per action, and does not fail the app", () => {
+    const row = foldApp(APP, "new", allBut("shepherd:post", diverged("a: exit 1; b: exit 2", undefined, ["a: exit 1", "b: exit 2"])));
+    expect(row).toMatchObject({ status: "deployed", shepherdErrors: ["a: exit 1", "b: exit 2"] });
   });
 
   it("an app that only has a compile verdict failed at compile", () => {
@@ -90,6 +101,18 @@ describe("runConverges: the one skip rule", () => {
     const out = await runConverges([link("web", "render", [convergeId("db", "project")], converged(), ran)], ctx);
     expect(out.get(convergeId("web", "render"))).toMatchObject({ detail: "skipped: depends on db, which did not become ready" });
     expect(ran).toEqual([]);
+  });
+
+  it("a link that throws diverges with the message; the verdicts already taken survive", async () => {
+    const ran: string[] = [];
+    const out = await runConverges([
+      link("db", "project", [], converged("started"), ran),
+      { id: convergeId("web", "render"), app: "web", kind: "render", dependsOn: [], run: async () => { throw new Error("EACCES: /etc/apps"); } },
+      link("web", "project", [convergeId("web", "render")], converged(), ran),
+    ], ctx);
+    expect(out.get(convergeId("db", "project"))).toEqual(converged("started"));
+    expect(out.get(convergeId("web", "render"))).toEqual(diverged("EACCES: /etc/apps"));
+    expect(out.get(convergeId("web", "project"))).toMatchObject({ reason: "skipped" });
   });
 
   it("within an app, a failed link skips the rest of the chain and names the link", async () => {

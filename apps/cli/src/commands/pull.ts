@@ -11,6 +11,7 @@ import { discoverApps, containerExec } from "@appbay/core";
 import { resolveAppbayHome, resolveAppsDir } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 function looksLikeModel(name: string): boolean {
   if (name.includes("/")) return false;
@@ -77,8 +78,7 @@ export const pullCommand = new Command("pull")
     let pulled = 0;
     for (const app of apps) {
       const renderPath = join(rendersDir, app.name, "docker-compose.rendered.yml");
-      const composePath = app.composePath;
-      const target = renderPath || composePath;
+      const target = existsSync(renderPath) ? renderPath : app.composePath;
 
       console.log(`  ${app.name}...`);
       const result = dockerCompose(["pull"], target);
@@ -91,4 +91,5 @@ export const pullCommand = new Command("pull")
     }
 
     console.log(`\n${pulled} pulled`);
+    process.exit(pulled === apps.length ? 0 : 1);
   });

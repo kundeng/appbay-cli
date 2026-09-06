@@ -630,9 +630,6 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         appName: app.name,
         appsDir,
         runtimeFacts,
-        // appsDir is $APPBAY_HOME/etc/apps, so the installation root is two levels up.
-        // Resolved per app rather than threaded through every call site; the resolver
-        // caches per home path, so this is one file read for the whole compile.
         ingressProvider: resolveIngressProvider(appbayHome),
         domain: nsValues.DOMAIN,
       },

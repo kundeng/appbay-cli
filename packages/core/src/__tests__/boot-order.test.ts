@@ -136,6 +136,11 @@ describe("deployOrder — projects.yaml expanded to app edges", async () => {
 
   it("refuses an `after` that names a project nothing declares", () => {
     const r = deployOrder([app("a", "x")], { x: { after: ["ghost"] } });
+    expect(r.errors.join("\n")).toContain("ghost");
+    // `appbay up a` with project y declared by an installed app outside the target set is not a ghost (S48).
+    const partial = deployOrder([app("a", "x")], { x: { after: ["y"] } }, ["y"]);
+    expect(partial.errors).toEqual([]);
+    expect(partial.order.map((o) => o.appName)).toEqual(["a"]);
     expect(r.errors[0]).toContain('"ghost"');
   });
 });
