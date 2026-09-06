@@ -15,7 +15,7 @@ import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { selfBinary } from "../utils/self.js";
+import { selfInvocation } from "../utils/self.js";
 import { stopApps } from "./down.js";
 import { ask } from "../utils/prompt.js";
 import {
@@ -23,7 +23,7 @@ import {
   resolveAcmeDnsProvider,
   clearContainerRuntimeCache,
   type AcmeDnsProvider,
-  SHARED_NETWORK, checkNetwork, runtimeProfile } from "@appbay/core";
+  SHARED_NETWORK, checkNetwork, runtimeProfile, containerBin } from "@appbay/core";
 import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists, containerExec } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
@@ -334,10 +334,19 @@ async function resetSetup(): Promise<void> {
   // Stop the edge apps through the one stop path, from the render each was started from; a
   // failed stop aborts the reset rather than deleting the renders out from under a running
   // container, which would leave it with no command that reaches it.
-  const stop = await stopApps(appbayHome, ["caddy", "traefik"]);
-  if (stop.failed > 0) {
-    console.error("  Reset aborted: an edge app did not stop; nothing was removed.");
+  try {
+    const stop = await stopApps(appbayHome, ["caddy", "traefik"]);
+    if (stop.failed > 0) throw new Error("an edge app did not stop");
+  } catch (err) {
+    console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; nothing was removed.`);
     process.exit(1);
+  }
+  // A render that is already gone is skipped by stopApps; the edge itself may still run.
+  for (const provider of ["caddy", "traefik"]) {
+    if (await edgeIsRunning(provider)) {
+      console.error(`  Reset aborted: the ${provider} edge is still running and its render is not here to stop it. Stop it by hand (\`${containerBin(appbayHome)} ps\`), then re-run.`);
+      process.exit(1);
+    }
   }
   if (existsSync(join(appbayHome, "docker-compose.server.yml"))) {
     const server = containerExec(["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], { appbayHome, cwd: appbayHome, timeout: 120_000 });
@@ -469,11 +478,12 @@ export const setupCommand = new Command("setup")
     // ── Step 3: Run init (scaffold + network + system apps + catalog) ──────
     step(3, totalSteps, "Initializing...");
 
-    const binaryPath = selfBinary();
+    const self = selfInvocation();
+    const binaryPath = self.bin;
 
     const initArgs = ["init", "--project", projectName, "--domain", domain, "--yes"];
     if (options.ingressProvider) initArgs.push("--ingress-provider", options.ingressProvider);
-    const initResult = spawnSync(binaryPath, initArgs, {
+    const initResult = spawnSync(binaryPath, [...self.args, ...initArgs], {
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
     });
@@ -497,7 +507,7 @@ export const setupCommand = new Command("setup")
     step(4, totalSteps, "Initializing secrets vault...");
 
     const vaultArgs = ["secrets", "init"];
-    const vaultResult = spawnSync(binaryPath, vaultArgs, {
+    const vaultResult = spawnSync(binaryPath, [...self.args, ...vaultArgs], {
       stdio: isInteractive ? "inherit" : ["pipe", "pipe", "pipe"],
       env: process.env,
     });
@@ -559,7 +569,7 @@ export const setupCommand = new Command("setup")
     step(6, totalSteps, `Deploying ${ingressProvider}...`);
     const edgeUsersPath = join(appbayHome, "etc", "apps", "caddy", "config", "security", "users.json");
     const firstCaddyStart = ingressProvider === "caddy" && !existsSync(edgeUsersPath);
-    const deployResult = spawnSync(binaryPath, ["up", ingressProvider], {
+    const deployResult = spawnSync(binaryPath, [...self.args, "up", ingressProvider], {
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
       encoding: "utf-8",
@@ -606,7 +616,7 @@ export const setupCommand = new Command("setup")
           // same name. They are separate credential domains and are never synchronized.
           // Rotating this one does not touch `appbay admin`.
           console.log("    Rotating the generated bootstrap EDGE administrator password...");
-          const reset = spawnSync(binaryPath, ["edge", "users", "reset-password", "admin", "--generate", "--reveal"], {
+          const reset = spawnSync(binaryPath, [...self.args, "edge", "users", "reset-password", "admin", "--generate", "--reveal"], {
             stdio: ["pipe", "pipe", "pipe"], env: process.env, encoding: "utf-8",
           });
           if (reset.status !== 0) {

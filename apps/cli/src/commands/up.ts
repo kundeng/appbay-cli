@@ -16,7 +16,7 @@ import { deploy, loadProjectVars, containerExec } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { printDeployReport } from "../utils/deploy-report.js";
-import { selfBinary } from "../utils/self.js";
+import { selfInvocation } from "../utils/self.js";
 
 export const upCommand = new Command("up")
   .description("Compile and deploy selected apps")
@@ -81,7 +81,8 @@ export const upCommand = new Command("up")
 
     if (!hasFailures && options.open && apps.length === 1) {
       const appName = apps[0]!;
-      spawnSync(selfBinary(), ["open", appName], { stdio: "inherit" });
+      const self = selfInvocation();
+      spawnSync(self.bin, [...self.args, "open", appName], { stdio: "inherit" });
     }
 
     if (!hasFailures && options.tail && apps.length > 0) {

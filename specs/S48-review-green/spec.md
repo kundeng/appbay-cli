@@ -116,7 +116,8 @@ round n:
 - [x] 1.8 `docker.ts` comment
 - [x] 1.9 knip's unused exported types
 - [x] 2.1 review round 1, fixes
-- [x] 2.2 review round 2, fixes (round 3 pending)
+- [x] 2.2 review round 2, fixes
+- [x] 2.3 review round 3, fixes (round 4 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -183,3 +184,24 @@ Round 1's fixes had introduced four defects; every finding was read against the 
 | R2.17 | LOW | several | `edge.ts` `startStack` ignored compile errors; `server.ts` "within 30s" understated; stale headers in `docker.ts` and its test; `observe.ts` dynamic import; `resolve-for-deploy` comments and an unchecked `volume create`; a redundant cast; `in` on a plain object; the shepherd share lookup accepting a stopped container; the traefik path not restoring a half-written candidate; `install` conflating "could not run" with "failed"; a journey's `secrets set` without `APPBAY_HOME`; two doc lines describing the render as the writer of edge fragments; the spec's `stopApps` shape | fixed |
 | R2.18 | Q6 LOW | `converges.ts` | `shepherd:post` depends on `route`, so a post-deploy hook is skipped when the edge is down | left for Kun: a design question, recorded here |
 | R2.19 | INFO | new code paths without a test | `containerEndpoint`, `apiDiskUsage`, `containerSpawnSync`, `write-failed`, the `removed` refusal, `stopApps.found`, setup's post-deploy edge check, update's pull loop | recorded as untested; the two runtime readers were verified by hand on Docker 29 and Podman 5.8 by the reviewer |
+
+**2026-09-06 — round 3.** Three fresh reviewers. One HIGH and eight MEDIUM, five of them
+consequences of round-2 fixes.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R3.1 | Q1 HIGH | `edge-identity-service.ts:139` | after round 2's 30 s timeout, a failed or timed-out edge restart returned the same `false` as "not running", and the CLI printed the benign message | fixed: three answers (`restarted`, `not-running`, `{failed}`); `edge users` exits 1 naming the failure and the command to run |
+| R3.2 | Q1/S1 MED | `deploy-service.ts`, `compile.ts:262` | an unknown target app was dropped silently: `appbay up typo` exited 0 with "No apps found" | fixed: named as a `target`-stage error in `deploy()`, one site for every caller; test |
+| R3.3 | Q1/S7 MED | `health/checks.ts` DNS probe | a probe that never ran or timed out was reported as a failed lookup with "recreate the network" | fixed: `unknown` with the reason |
+| R3.4 | Q1 MED | `route.ts` | the compensating reload's verdict was discarded and the timeout sentence claimed it succeeded | fixed: the reload's answer is part of the detail; the sentence no longer claims it; test |
+| R3.5 | shape 3 MED | `arch.test.ts` | the no-exemption rule missed an aliased spawner (`spawnSync: ss`) and `Bun.spawn` | fixed: both forms matched; a `runtime` local too |
+| R3.6 | S1 MED | `apply.ts` | `--yes` handed only changed-plan apps to `deploy()`, so a gone container behind an unchanged render read as "up to date" (the #4 shape) | fixed: every compiled target is converged; the plan is the preview |
+| R3.7 | Q1 MED | `self.ts` | under `bun run` (dev) `process.execPath` is bun, so `setup` spawned `bun init` | fixed: `selfInvocation()` returns the pair `{bin, args}`; `update` refuses to self-update from bun |
+| R3.8 | Q5 MED | `update.ts` | the running binary was replaced before the new one was verified; a bad asset bricked the host | fixed: the old binary is kept as `.appbay.old` until `--version` runs, restored on failure |
+| R3.9 | S1 MED | `exec.ts` | `compose exec <app>` used the app name as the service name | fixed: the service is read from the render (the one on the shared network, else the only one) |
+| R3.10 | REGRESSION MED | `setup.ts --reset` | `stopApps` skips an app whose render is gone, so the reset proceeded with the edge running | fixed: a running edge with no render aborts the reset; `stopApps` throws are caught |
+| R3.11 | LOW | several | ENOBUFS labelled "never ran"; a compile error counted twice in the summary; a 2xx non-JSON engine body threw; two dead boot-order helpers and their ten tests; stale comments in `boot-order`, `run-shepherd`, `container-runtime` (the twin of the deleted wrapper claim); dynamic imports where static ones do; a stale exempt entry; the test header round 2 said it fixed; "Docker" in `info` and a `server` hint | fixed |
+| R3.12 | LOW | `checks.ts:503,654` | `sudo -n <bin> …` spawns the binary through sudo; the rule matches neither | recorded: a host-tool spawn of the binary by design; S49 1.5 |
+| R3.13 | LOW | `converges.ts` | `shepherd:post` depends on `route` (R2.18) | still Kun's |
+
+Not pinned by a test after this round (recorded, not claimed): the edge restart's three answers, the DNS probe's unknown, the `update` restore path, `apply --yes` over unchanged plans, `exec`'s service choice, setup's reset abort, `selfInvocation` under bun. The rest of the round-3 fixes carry a test or the arch rule.

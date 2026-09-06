@@ -72,15 +72,7 @@ function instanceConfig(appbayHome?: string): InstanceConfig {
   return config;
 }
 
-/**
- * Resolve APPBAY_HOME the way core already does elsewhere.
- *
- * ⚠️ Deliberately simpler than the CLI's `resolveAppbayHome`, which also consults
- * `~/.config/appbay/home`. Core cannot import from apps/cli, and duplicating the
- * saved-path lookup here would create a second resolver free to disagree with the
- * first. CLI callers should pass their resolved home explicitly; this fallback
- * exists for core-internal callers that have no home in hand.
- */
+/** The home for a caller that has none in hand: the same four tiers the CLI resolves. */
 function defaultAppbayHome(): string {
   return resolveHome();
 }
@@ -344,8 +336,10 @@ export function containerExec(
   });
 
   if (result.error) {
-    const timedOut = (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT";
-    return { exitCode: 1, output: result.error.message, ...(timedOut ? { timedOut: true } : { failedToStart: true }) };
+    const code = (result.error as NodeJS.ErrnoException).code;
+    // ENOBUFS (maxBuffer exceeded) is a child that ran and said too much: neither flag.
+    const flag = code === "ETIMEDOUT" ? { timedOut: true } : code === "ENOBUFS" ? {} : { failedToStart: true };
+    return { exitCode: 1, output: result.error.message, ...flag };
   }
   if (result.status !== 0) {
     return {

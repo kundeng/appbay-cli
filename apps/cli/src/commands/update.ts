@@ -8,12 +8,12 @@
  */
 import { Command } from "commander";
 import { spawnSync } from "node:child_process";
-import { createWriteStream, renameSync, chmodSync, existsSync } from "node:fs";
+import { createWriteStream, renameSync, chmodSync, existsSync, unlinkSync, readFileSync, copyFileSync } from "node:fs";
+import { selfInvocation } from "../utils/self.js";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { VERSION, compareSemver, containerCompose, discoverApps, isSystemApp } from "@appbay/core";
-import { readFileSync, copyFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
@@ -93,34 +93,49 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
 }
 
 /** Atomically replace the running binary with newBin. Falls back to sudo. */
-function replaceBinary(newBin: string, target: string): void {
+/**
+ * Put `newBin` at `target`, keeping the previous binary beside it as `.appbay.old` until the
+ * caller has seen the new one run. Returns `restore`, which puts the old binary back, and
+ * `commit`, which removes it. Copy then rename: rename(2) is atomic within one filesystem
+ * and safe while the current binary runs; a rename from the temp directory fails with EXDEV
+ * on a host whose /tmp is its own filesystem. Without write access the same steps run
+ * through sudo.
+ */
+function replaceBinary(newBin: string, target: string): { restore: () => void; commit: () => void } {
   chmodSync(newBin, 0o755);
   const targetDir = dirname(target);
   const tmpTarget = join(targetDir, `.${BINARY_NAME}.new`);
+  const oldTarget = join(targetDir, `.${BINARY_NAME}.old`);
 
+  const sudo = (...argv: string[]): void => {
+    const r = spawnSync("sudo", argv, { stdio: "inherit" });
+    if (r.status !== 0) throw new Error(`sudo ${argv.join(" ")} failed`);
+  };
   try {
-    // Copy into the target's own directory, then rename over it: rename(2) is atomic within
-    // one filesystem and safe while the current binary runs; a rename from the temp
-    // directory would fail with EXDEV on any host whose /tmp is its own filesystem.
     copyFileSync(newBin, tmpTarget);
     chmodSync(tmpTarget, 0o755);
+    renameSync(target, oldTarget);
     renameSync(tmpTarget, target);
+    return {
+      restore: () => { renameSync(oldTarget, target); },
+      commit: () => { try { unlinkSync(oldTarget); } catch { /* already gone */ } },
+    };
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
+    try { unlinkSync(tmpTarget); } catch { /* not written */ }
     if (code !== "EACCES" && code !== "EPERM") throw err;
-    // No write access; try via sudo
     try {
-      const mv = spawnSync("sudo", ["mv", newBin, target], { stdio: "inherit" });
-      const chmod = mv.status === 0
-        ? spawnSync("sudo", ["chmod", "755", target], { stdio: "inherit" })
-        : mv;
-      if (mv.status !== 0 || chmod.status !== 0) throw new Error("sudo command failed");
+      sudo("mv", target, oldTarget);
+      sudo("mv", newBin, target);
+      sudo("chmod", "755", target);
     } catch (sudoErr) {
       const msg = sudoErr instanceof Error ? sudoErr.message : String(sudoErr);
-      throw new Error(
-        `Cannot write to ${target}. Set APPBAY_INSTALL_DIR to a writable directory, or run with sudo.\n${msg}`,
-      );
+      throw new Error(`Cannot write to ${target}. Set APPBAY_INSTALL_DIR to a writable directory, or run with sudo.\n${msg}`);
     }
+    return {
+      restore: () => { sudo("mv", oldTarget, target); },
+      commit: () => { spawnSync("sudo", ["rm", "-f", oldTarget], { stdio: "ignore" }); },
+    };
   }
 }
 
@@ -145,7 +160,9 @@ async function checkForUpdates(): Promise<void> {
 async function selfUpdate(): Promise<void> {
   console.log(`Current version: ${VERSION}\n`);
 
-  // Determine where this binary lives
+  // The compiled binary is `process.execPath`; under `bun run` that is bun, and replacing it
+  // would be a different program's update.
+  if (selfInvocation().args.length > 0) throw new Error("self-update runs from the compiled appbay binary, not from `bun run`.");
   const selfPath = process.execPath;
   if (!existsSync(selfPath)) {
     throw new Error(`Cannot locate running binary at: ${selfPath}`);
@@ -172,16 +189,20 @@ async function selfUpdate(): Promise<void> {
   const tmpBin = await downloadToTemp(downloadUrl, "");
 
   console.log(`  Installing to ${selfPath}...`);
-  replaceBinary(tmpBin, selfPath);
+  const replaced = replaceBinary(tmpBin, selfPath);
 
-  // Verify
+  // The new binary must run before the old one is let go of.
   const verResult = spawnSync(selfPath, ["--version"], {
     encoding: "utf-8",
     stdio: ["pipe", "pipe", "pipe"],
+    timeout: 30_000,
   });
   if (verResult.error || verResult.status !== 0) {
-    throw new Error(`the new binary at ${selfPath} did not run: ${verResult.error?.message ?? (verResult.stderr as string) ?? `exit ${String(verResult.status)}`}`);
+    replaced.restore();
+    const why = verResult.error?.message || (verResult.stderr as string) || `exit ${String(verResult.status)}`;
+    throw new Error(`the new binary at ${selfPath} did not run (${why}); the previous binary was put back.`);
   }
+  replaced.commit();
   const newVersion = ((verResult.stdout as string) || "").trim();
 
   console.log(`  Updated: ${newVersion}`);

@@ -1,4 +1,6 @@
 import { Command } from "commander";
+import { spawnSync } from "node:child_process";
+import { selfInvocation } from "../utils/self.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { catalogGet, catalogInstall } from "@appbay/core";
 import { createInterface } from "node:readline";
@@ -131,9 +133,8 @@ export const installCommand = new Command("install")
       // Post-install validation
       if (options.validate !== false) {
         try {
-          const { spawnSync } = await import("node:child_process");
-          const { selfBinary } = await import("../utils/self.js");
-          const validated = spawnSync(selfBinary(), ["validate", installAs], {
+          const self = selfInvocation();
+          const validated = spawnSync(self.bin, [...self.args, "validate", installAs], {
             stdio: "inherit",
             env: { ...process.env, APPBAY_HOME: home },
           });

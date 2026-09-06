@@ -17,6 +17,7 @@ import { findCrashedServices, snapshotContainers, didConverge, isReady, type Obs
 import { APP_LABEL, shepherdTarget } from "../../compiler/identity.js";
 import type { ShepherdAction, ShepherdPhase } from "../../traits/types.js";
 import { parseEnvFile } from "../config-service.js";
+import { runShepherd } from "../../shepherd/run-shepherd.js";
 import { isRouteFilePath, installRoute, describeRouteFailure } from "./route.js";
 import { convergeId, converged, diverged, unobservable, type Converge, type ConvergeAction, type ConvergeKind, type DeployContext } from "./converge.js";
 
@@ -101,7 +102,6 @@ async function runShepherdActions(
       if (action.run) {
         await action.run(ctx);
       } else if (action.image) {
-        const { runShepherd } = await import("../../shepherd/run-shepherd.js");
         // A namespace-sharing action needs the app's real container, found by label; the
         // literal `appbay.<app>` was never a container's name (ledger row 24), so an action
         // that would have run against it is refused with the lookup's answer instead.

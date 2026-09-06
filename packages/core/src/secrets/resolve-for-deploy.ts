@@ -22,6 +22,7 @@ import { VaultSecretProvider } from "./providers/vault.js";
 import { KeePassSecretProvider } from "./providers/keepass.js";
 import { runShepherd } from "../shepherd/run-shepherd.js";
 import { containerExec } from "../runtime/container-runtime.js";
+import { createHmac, createCipheriv, randomBytes as rb } from "node:crypto";
 import { shepherdTarget } from "../compiler/identity.js";
 
 /**
@@ -170,7 +171,6 @@ interface BundleWriteResult {
 }
 
 function deriveKey(seed: Buffer, appName: string): Buffer {
-  const { createHmac } = require("node:crypto") as typeof import("node:crypto");
   // HKDF extract
   const ikm = Buffer.concat([seed, Buffer.from(appName)]);
   const prk = createHmac("sha256", Buffer.from(HKDF_SALT)).update(ikm).digest();
@@ -181,7 +181,6 @@ function deriveKey(seed: Buffer, appName: string): Buffer {
 }
 
 function encryptBundle(plaintext: Buffer, key: Buffer): Buffer {
-  const { createCipheriv, randomBytes: rb } = require("node:crypto") as typeof import("node:crypto");
   const nonce = rb(12);
   const cipher = createCipheriv("aes-256-gcm", key, nonce);
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
@@ -202,7 +201,6 @@ export async function writeEncryptedBundle(
   mapping: Record<string, Record<string, string>>,
   store?: SecretStore,
 ): Promise<BundleWriteResult> {
-  const { randomBytes: rb } = await import("node:crypto");
   const secretStore = store ?? createSecretStore();
   const volumeName = `appbay-secrets-${appName}`;
   const errors: BundleWriteResult["errors"] = [];

@@ -63,7 +63,6 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/update.ts": "sudo mv of the new binary; the binary's own --version",
       "apps/cli/src/commands/up.ts": "re-invokes appbay for --open",
       "apps/cli/src/commands/install.ts": "re-invokes appbay validate after an install",
-      "apps/cli/src/utils/self.ts": "which appbay, to find the binary to re-invoke",
     },
     allowed: {
       "packages/core/src/compiler/builds.ts": "2.1/2.4",
@@ -71,7 +70,7 @@ const RULES: Rule[] = [
   },
   {
     name: "nothing outside runtime/ spawns the container binary, by any name",
-    pattern: /\b(?:spawn|spawnSync|execFileSync|execSync|tryExec)\(\s*(?:(?:bin|binary)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(/,
+    pattern: /\b(?:spawn|spawnSync|execFileSync|execSync|tryExec)\(\s*(?:(?:bin|binary|runtime)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(|\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync)\s*(?:as|:)\s*\w+\s*[,}]|\bBun\.spawn(?:Sync)?\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {},
     allowed: {

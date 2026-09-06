@@ -9,8 +9,8 @@
  *   - traefik: supported ingress-only edge
  *   - caddy: supported integrated ingress and Caddy Security edge
  *
- * This is a CLI concern, not a compiler concern. The compiler treats all apps
- * equally; the CLI shepherds them in the right order.
+ * The compiler treats all apps equally; core's `deploy()` orders them through
+ * `deployOrder` below, and `appbay down` stops them in the reverse.
  */
 
 /**
@@ -37,70 +37,6 @@ const SYSTEM_APP_SET = new Set<string>(SYSTEM_APP_BOOT_ORDER);
  */
 export function isSystemApp(appName: string): boolean {
   return SYSTEM_APP_SET.has(appName);
-}
-
-/**
- * Partition a list of app names into system apps (ordered) and user apps.
- *
- * System apps are returned in boot order (regardless of input order).
- * User apps are returned in their original order.
- *
- * @param appNames - App names to partition.
- * @returns `{ system, user }` — system apps in boot order, user apps in original order.
- */
-export function partitionByBootOrder(appNames: string[]): {
-  system: string[];
-  user: string[];
-} {
-  const userApps: string[] = [];
-  const systemAppsPresent = new Set<string>();
-
-  for (const name of appNames) {
-    if (SYSTEM_APP_SET.has(name)) {
-      systemAppsPresent.add(name);
-    } else {
-      userApps.push(name);
-    }
-  }
-
-  // Return system apps in fixed boot order (only those that are present).
-  const systemApps = SYSTEM_APP_BOOT_ORDER.filter((name) =>
-    systemAppsPresent.has(name),
-  );
-
-  return { system: [...systemApps], user: userApps };
-}
-
-/**
- * Sort compiled app results into deployment order: system apps first
- * (in boot order), then user apps.
- *
- * @param apps - Compiled app results (with `.appName` property).
- * @returns New array sorted by deployment order.
- */
-export function sortByDeployOrder<T extends { appName: string }>(
-  apps: T[],
-): T[] {
-  const byName = new Map(apps.map((a) => [a.appName, a]));
-  const result: T[] = [];
-
-  // System apps in boot order.
-  for (const name of SYSTEM_APP_BOOT_ORDER) {
-    const app = byName.get(name);
-    if (app) {
-      result.push(app);
-      byName.delete(name);
-    }
-  }
-
-  // Remaining (user) apps in original order.
-  for (const app of apps) {
-    if (byName.has(app.appName)) {
-      result.push(app);
-    }
-  }
-
-  return result;
 }
 
 /** What `deployOrder` needs to know about an app. */

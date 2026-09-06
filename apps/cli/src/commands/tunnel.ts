@@ -30,7 +30,7 @@ function upstreamUrl(app: string): string | null {
       const containerPort = typeof first === "string" ? first.split("/")[0]?.split(":").pop() : typeof first === "object" && first ? String((first as { target?: number }).target ?? "") : "";
       const port = ingressPort ?? (containerPort ? Number(containerPort) : undefined);
       if (port) return `http://${alias}:${String(port)}`;
-      return `http://${svc === alias ? svc : alias}`;
+      return `http://${alias}`;
     }
   } catch { /* an unreadable render is "cannot determine" below */ }
   return null;

@@ -66,7 +66,7 @@ const createUser = new Command("create")
     });
     console.log(`Created edge user: ${user.username}`);
     if (generated && options.reveal) console.log(`  Password: ${password}`);
-    console.log((await restartEdgeForIdentityChange()) ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
+    await reportEdgeRestart();
   });
 
 const resetPassword = new Command("reset-password")
@@ -81,8 +81,17 @@ const resetPassword = new Command("reset-password")
     await new EdgeIdentityStore(resolveAppbayHome()).resetPassword(username, password);
     console.log(`Reset edge-user password: ${username}`);
     if (generated && options.reveal) console.log(`  Password: ${password}`);
-    console.log((await restartEdgeForIdentityChange()) ? "  Caddy restarted to load the identity store." : "  Caddy is not running; the identity will load on next start.");
+    await reportEdgeRestart();
   });
+
+/** Restart the edge so the identity change takes effect, and say what happened; a failed restart exits 1. */
+async function reportEdgeRestart(): Promise<void> {
+  const restart = await restartEdgeForIdentityChange(resolveAppbayHome());
+  if (restart === "restarted") { console.log("  Caddy restarted to load the identity store."); return; }
+  if (restart === "not-running") { console.log("  Caddy is not running; the identity will load on next start."); return; }
+  console.error(`  Caddy did NOT restart (${restart.failed}); the identity is on disk but Caddy will not authenticate it until it restarts. Run: appbay restart caddy`);
+  process.exit(1);
+}
 
 const users = new Command("users").description("Manage users who sign in to your DEPLOYED APPS (not to AppBay itself)")
   .addCommand(listUsers).addCommand(createUser).addCommand(resetPassword);

@@ -84,6 +84,14 @@ describe("what compose did is recorded on every plan status (S47)", () => {
   });
 });
 
+describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
+  it("names the unknown app and deploys nothing", async () => {
+    const result = await deploy({ appbayHome: home, targetApps: [APP, "typo"], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+    expect(result.apps).toEqual([]);
+    expect(result.compileErrors).toEqual([{ appName: "typo", stage: "target", message: 'no installed app named "typo"' }]);
+  });
+});
+
 describe("🚨 a service that starts and immediately dies is NOT a success", () => {
   it("is reported as failed, not deployed", async () => {
     const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("exited", "id-1", 1))]) });

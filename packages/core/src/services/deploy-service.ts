@@ -89,6 +89,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     await writeFile(join(appsDir, app.name, ".env"), "", { flag: "a" }).catch(() => undefined);
   }
 
+  const missing = (targetApps ?? []).filter((name) => !installed.some((a) => a.name === name));
+  if (missing.length > 0) {
+    return emptyDeployResult(missing.map((name) => ({ appName: name, stage: "target", message: `no installed app named "${name}"` })));
+  }
+
   const projectVars = options.projectVars ?? await loadProjectVars(appbayHome);
   let compileResult: CompileResult;
   try {

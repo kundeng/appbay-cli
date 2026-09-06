@@ -6,8 +6,9 @@
 import { Command } from "commander";
 import { exitWithContainerResult } from "../utils/docker.js";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
-import { containerExec } from "@appbay/core";
+import { existsSync, readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
+import { containerExec, SHARED_NETWORK } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 function renderedComposeOrExit(appbayHome: string, app: string): string {
@@ -19,12 +20,29 @@ function renderedComposeOrExit(appbayHome: string, app: string): string {
   return composePath;
 }
 
+/**
+ * The compose service to address: the render keeps the upstream's service names, which are
+ * not the app's name. The service on the shared network (the one the edge routes to) wins;
+ * a single-service render needs no choice; otherwise the app name is the last guess.
+ */
+function serviceOf(composePath: string, app: string): string {
+  try {
+    const compose = parseYaml(readFileSync(composePath, "utf-8")) as { services?: Record<string, { networks?: Record<string, unknown> }> };
+    const names = Object.keys(compose.services ?? {});
+    if (names.includes(app)) return app;
+    const shared = names.find((n) => compose.services?.[n]?.networks && SHARED_NETWORK in (compose.services[n]!.networks ?? {}));
+    return shared ?? (names.length === 1 ? names[0]! : app);
+  } catch {
+    return app;
+  }
+}
+
 function composeInteractive(verb: "exec" | "run", app: string, command: string[]): never {
   const appbayHome = resolveAppbayHome();
   const composePath = renderedComposeOrExit(appbayHome, app);
   const cmd = command.length > 0 ? command : ["/bin/sh"];
   const extra = verb === "run" ? ["--rm"] : [];
-  const result = containerExec(["compose", "-f", composePath, verb, ...extra, app, ...cmd], { appbayHome, stdio: "inherit" });
+  const result = containerExec(["compose", "-f", composePath, verb, ...extra, serviceOf(composePath, app), ...cmd], { appbayHome, stdio: "inherit" });
   exitWithContainerResult(result);
 }
 

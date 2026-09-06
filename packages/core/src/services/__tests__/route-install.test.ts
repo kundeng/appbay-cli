@@ -9,6 +9,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { installRoute } from "../deploy-service.js";
+import { describeRouteFailure } from "../deploy/route.js";
 import type { ContainerMatch, Observer } from "../../runtime/observe.js";
 import type { Inspection } from "../../runtime/container-runtime.js";
 
@@ -60,5 +61,22 @@ describe("installRoute on traefik", () => {
     const r = await installRoute({ auxiliaryFiles: [] }, home, edge({ kind: "ok", value: null }, () => { asked = true; }));
     expect(r).toEqual({ ok: true });
     expect(asked).toBe(false);
+  });
+});
+
+describe("describeRouteFailure names what is wrong, per reason", () => {
+  it("unavailable: the edge, and the command that deploys it", () => {
+    const text = describeRouteFailure("whoami", { ok: false, reason: "unavailable", detail: "no container carries the label" }, "caddy");
+    expect(text).toContain("edge is not running");
+    expect(text).toContain("appbay up caddy");
+  });
+  it("timeout: Caddy was asked and did not answer; no claim about a reload it did not observe", () => {
+    const text = describeRouteFailure("whoami", { ok: false, reason: "timeout", detail: "caddy validate did not answer within 60 s; the previous configuration could NOT be reloaded (…)" }, "caddy");
+    expect(text).toContain("did not answer");
+    expect(text).not.toMatch(/previous configuration reloaded\./);
+  });
+  it("write-failed and rejected each say so", () => {
+    expect(describeRouteFailure("whoami", { ok: false, reason: "write-failed", detail: "EACCES" }, "traefik")).toContain("could not be written");
+    expect(describeRouteFailure("whoami", { ok: false, reason: "rejected", detail: "line 3: unknown directive" }, "caddy")).toContain("rejected the generated configuration");
   });
 });

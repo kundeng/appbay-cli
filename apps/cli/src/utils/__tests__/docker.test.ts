@@ -1,32 +1,10 @@
 /**
- * Unit tests for CLI docker utilities.
+ * Unit tests for the CLI's compose wrapper.
  *
- * `dockerCompose(args, composePath)` shells out to `docker compose -f <file>`.
- * Three return paths:
- *   1. `result.error` is set (spawn failure) → exitCode 1, error message
- *   2. Exit status is non-zero → exitCode from status, output from stderr
- *      - status === null (signal kill) → exitCode falls back to 1
- *      - stderr is empty → generic fallback message
- *   3. Success (status === 0) → exitCode 0, stdout
- *
- * `discoverRunningApps()` runs two `docker ps` commands and parses their output.
- * Same parsing logic as apps/web/src/server/docker-utils.ts — tested here for
- * the CLI's own copy.
- *
- * Coverage:
- *   dockerCompose()
- *   - spawn error (result.error set) → exitCode 1 + error message
- *   - non-zero exit with stderr → exitCode from status, stderr as output
- *   - non-zero exit with empty stderr → generic fallback message
- *   - status null (signal kill) → exitCode 1 (via ?? 1)
- *   - success → exitCode 0, stdout as output
- *
- *   discoverRunningApps()
- *   - Docker unavailable (throws) → empty Set
- *   - name signal parses appbay.<name>[.*] lines
- *   - label signal parses compose project names
- *   - non-zero name signal exit → ignored
- *   - deduplication across signals
+ * `dockerCompose(args, composePath)` delegates to core's `containerCompose`; the result shape
+ * `{exitCode, output}` has three paths: a spawn failure (exitCode 1, the error message), a
+ * non-zero exit (the status, or 1 on a signal; stderr, or a generic message when empty), and
+ * success (0, stdout).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

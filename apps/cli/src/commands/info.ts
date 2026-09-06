@@ -19,7 +19,7 @@ import { readdir } from "node:fs/promises";
 import { platform, arch, release } from "node:os";
 import { VERSION } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { tryExec, versions } from "@appbay/core";
+import { tryExec, versions, runtimeProfile } from "@appbay/core";
 
 /** Run a host tool (uname, sw_vers, …), returning a fallback string on failure. */
 function tryExecOrFallback(command: string, args: string[], fallback = "not available"): string {
@@ -57,7 +57,7 @@ export const infoCommand = new Command("info")
     console.log("Appbay System Info\n");
     console.log(`  Appbay version:  ${VERSION}`);
     console.log(`  OS:              ${platform()} ${arch()} (${release()})`);
-    console.log(`  Docker:          ${dockerVersion}`);
+    console.log(`  ${(runtimeProfile(resolveAppbayHome()).displayName + ":").padEnd(17)}${dockerVersion}`);
     console.log(`  Compose:         ${composeVersion}`);
     console.log(`  GPU:             ${gpuInfo}`);
     console.log(`  APPBAY_HOME:     ${appbayHome}`);

@@ -29,7 +29,7 @@ function emptyIdentityDocument(): EdgeIdentityDocument {
 export class EdgeIdentityStore {
   readonly path: string;
   constructor(
-    appbayHome: string,
+    private readonly appbayHome: string,
     private readonly passwordHasher: (password: string) => string = hashPassword,
   ) {
     this.path = join(appbayHome, EDGE_USERS_RELATIVE_PATH);
@@ -53,7 +53,7 @@ export class EdgeIdentityStore {
       // have started first.
       if (code === "ENOENT") return emptyIdentityDocument();
 
-      if (code !== "EACCES" || !(await claimIdentityStoreOwnership())) {
+      if (code !== "EACCES" || !(await claimIdentityStoreOwnership(this.appbayHome))) {
         throw new Error(`Caddy Security identity store is unavailable at ${this.path}: ${String(error)}`);
       }
       raw = await readFile(this.path, "utf-8").catch((retryError: unknown) => {
@@ -133,18 +133,23 @@ export class EdgeIdentityStore {
  * Route manifest changes do NOT come through here — those use the deploy service's
  * zero-downtime validate/reload path. Restarting is reserved for identity writes.
  *
- * Returns false when the edge is not running, which is not an error: the store is read at
- * startup, so an edge that is down will load the change when it next starts.
+ * Three answers, because two of them used to share `false`: `not-running` is not an error
+ * (the store is read at startup, so an edge that is down loads the change when it next
+ * starts); a restart that failed or timed out is, and the caller says so, since the file on
+ * disk and the identities Caddy authenticates against have diverged until the next restart.
  */
-export async function restartEdgeForIdentityChange(): Promise<boolean> {
-  const edge = await runningEdge();
-  if (!edge) return false;
-  return containerExec(["restart", edge], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "edge restart" }).exitCode === 0;
+export type EdgeRestart = "restarted" | "not-running" | { failed: string };
+
+export async function restartEdgeForIdentityChange(appbayHome?: string): Promise<EdgeRestart> {
+  const edge = await runningEdge(appbayHome);
+  if (!edge) return "not-running";
+  const result = containerExec(["restart", edge], { appbayHome, stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "edge restart" });
+  return result.exitCode === 0 ? "restarted" : { failed: result.output.trim() || `exit ${String(result.exitCode)}` };
 }
 
 /** The running Caddy edge, by label — a literal name went stale when the system apps were namespaced. */
-async function runningEdge(): Promise<string | null> {
-  const edge = await findContainerByLabel(APP_LABEL, "caddy");
+async function runningEdge(appbayHome?: string): Promise<string | null> {
+  const edge = await findContainerByLabel(APP_LABEL, "caddy", { appbayHome });
   return edge.kind === "ok" && edge.value?.running ? edge.value.name : null;
 }
 
@@ -153,16 +158,16 @@ async function runningEdge(): Promise<string | null> {
  * invoking AppBay operator; Caddy continues to read it as container root. No recursive chown
  * is used, so unrelated edge configuration ownership is untouched.
  */
-async function claimIdentityStoreOwnership(): Promise<boolean> {
+async function claimIdentityStoreOwnership(appbayHome: string): Promise<boolean> {
   const uid = process.getuid?.();
   const gid = process.getgid?.();
   if (uid === undefined || gid === undefined) return false;
-  const edge = await runningEdge();
+  const edge = await runningEdge(appbayHome);
   if (!edge) return false;
   const result = containerExec([
     "exec", "--user", "0", edge, "sh", "-c",
     `chown ${uid}:${gid} /etc/caddy/security/users.json && chmod 600 /etc/caddy/security/users.json`,
-  ], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "identity store chown" });
+  ], { appbayHome, stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "identity store chown" });
   return result.exitCode === 0;
 }
 

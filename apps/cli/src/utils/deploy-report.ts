@@ -54,7 +54,9 @@ export function printDeployReport(result: DeployResult): { hasFailures: boolean 
   // Compile and deploy failures are counted separately because they fail at different
   // stages and are fixed in different places: a compile error is a bad appbay.yaml or
   // overlay, a deploy failure is the runtime refusing the rendered file.
-  const errorCount = result.failed + result.compileErrors.length;
+  // A compile error for an app that also has a `failed` row is one error, not two.
+  const rowNames = new Set(result.apps.map((a) => a.appName));
+  const errorCount = result.failed + result.compileErrors.filter((e) => !e.appName || !rowNames.has(e.appName)).length;
   console.log(
     `\n${result.deployed} deployed, ${result.unchanged} unchanged, ${errorCount} error(s)`,
   );

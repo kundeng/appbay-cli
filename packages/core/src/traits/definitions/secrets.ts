@@ -23,7 +23,7 @@ import type {
   TraitTransformOutput,
   ShepherdAction,
 } from "../types.js";
-import { containerBin, containerExec } from "../../runtime/container-runtime.js";
+import { containerExec } from "../../runtime/container-runtime.js";
 
 // ---------------------------------------------------------------------------
 // Trait Definition

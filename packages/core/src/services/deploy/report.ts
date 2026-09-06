@@ -4,7 +4,7 @@
  * step has to take back; the readiness wait used to decrement one.
  */
 import { isSystemApp } from "../../boot-order.js";
-import { CHAIN, convergeId, type Verdict } from "./converge.js";
+import { CHAIN, convergeId, type ConvergeAction, type Verdict } from "./converge.js";
 
 export type PlanStatus = "new" | "changed" | "unchanged";
 
@@ -24,7 +24,7 @@ export interface AppDeployResult {
    * not be asked, in which case the honest answer is that we do not know. Absent when the
    * project converge never ran.
    */
-  convergeAction?: "started" | "already-running" | "unknown";
+  convergeAction?: ConvergeAction;
   /** Why the runtime could not be read, when `convergeAction` is "unknown". */
   unknownReason?: string;
   /**

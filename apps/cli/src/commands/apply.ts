@@ -44,15 +44,18 @@ export const applyCommand = new Command("apply")
     const changed = result.apps.filter(a => a.plan.status === "new" || a.plan.status === "changed");
     const unchanged = result.apps.filter(a => a.plan.status === "unchanged");
 
+    // The plan is a verdict about the rendered files. An unchanged render says nothing about
+    // whether its container still runs (appbay-cli#4), so with --yes every compiled app is
+    // handed to deploy(), which converges it and reports what compose did.
     if (changed.length === 0) {
-      console.log("No changes detected. All apps are up to date.");
-      if (unchanged.length > 0) {
-        console.log(`  ${unchanged.length} app(s) unchanged`);
+      console.log(`No plan changes; ${String(unchanged.length)} app(s) have an unchanged render.`);
+      if (!options.yes || options.dryRun) {
+        if (!options.dryRun) console.log("Use --yes to converge them anyway (a container that is gone is started).");
+        return;
       }
-      return;
+    } else {
+      console.log(`Plan: ${changed.length} change(s), ${unchanged.length} unchanged\n`);
     }
-
-    console.log(`Plan: ${changed.length} change(s), ${unchanged.length} unchanged\n`);
 
     for (const app of changed) {
       const label = app.plan.status === "new" ? "NEW" : "CHANGED";
@@ -83,7 +86,7 @@ export const applyCommand = new Command("apply")
     console.log("Applying...\n");
     const deployResult = await deploy({
       appbayHome: resolveAppbayHome(),
-      targetApps: changed.map((a) => a.appName),
+      targetApps: result.apps.map((a) => a.appName),
       namespace: options.namespace,
       projectVars: await loadProjectVars(resolveAppbayHome()),
       dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),

@@ -40,9 +40,11 @@ describe("foldApp: the first non-converged link decides", () => {
     expect(row).toMatchObject({ status: "unchanged", convergeAction: "unknown", unknownReason: "socket flaked" });
   });
 
-  it("a route that did not land after a converged project is a partial converge", () => {
+  it("a route that did not land after a converged project is a partial converge, whatever the reason", () => {
     const row = foldApp(APP, "changed", allBut("route", diverged("edge not running", "unavailable"), converged("started")));
     expect(row).toMatchObject({ status: "failed", error: "edge not running", containerStartedWithoutRoutes: true });
+    const timedOut = foldApp(APP, "changed", allBut("route", diverged("caddy validate did not answer within 60 s", "timeout"), converged("started")));
+    expect(timedOut).toMatchObject({ status: "failed", containerStartedWithoutRoutes: true });
   });
 
   it("a render, secrets or pre-shepherd failure is a plain failure carrying the detail", () => {

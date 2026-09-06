@@ -19,7 +19,9 @@ import { Command } from "commander";
 import { stat } from "node:fs/promises";
 import { resolveAppbayHome, resolveServerCompose } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
-import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK, apiInspectContainer, resolveRuntimeSocket, runtimeSocketFor } from "@appbay/core";
+import { tryExec, isRunning, networkExists, containerExec, SERVER_CONTAINER, SHARED_NETWORK, apiInspectContainer, resolveRuntimeSocket, runtimeSocketFor,
+  containerBin,
+} from "@appbay/core";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -238,7 +240,7 @@ const startCommand = new Command("start")
       }
     } else {
       console.log(`\nServer started but the health check did not pass after ${String(HEALTH_MAX_RETRIES)} attempts.`);
-      console.log(`Check logs: docker compose -f "${composePath}" logs`);
+      console.log(`Check logs: ${containerBin(resolveAppbayHome())} compose -f "${composePath}" logs`);
       process.exit(1);
     }
   });

@@ -264,7 +264,8 @@ export async function compile(options: CompileOptions): Promise<CompileResult> {
     discovered = discovered.filter((app) => requested.has(app.name));
   }
 
-  // If no apps found, return empty result with informational error.
+  // Nothing to compile: an empty result. A requested name nothing matches is the caller's
+  // to report (deploy() names it); the compiler has no app to attach an error to.
   if (discovered.length === 0) {
     return { apps: [], errors, warnings };
   }

@@ -129,15 +129,16 @@ export async function installCaddyConfig(
   await restore();
   // A reload is only attempted when there is a Caddy to reload; on `unavailable` it would be
   // a second no-op against a container that does not exist. After a timeout Caddy may be
-  // serving the candidate while the disk holds the previous files, so the reload is tried.
+  // serving the candidate while the disk holds the previous files, so the reload is tried,
+  // and its answer is part of the report: "rolled back" is a claim about Caddy, not the disk.
+  let detail = activation.detail || "Caddy rejected the generated configuration.";
   if (activation.status !== "unavailable") {
-    await runCaddyCommand(appbayHome, ["reload", ...caddyfile], observer);
+    const reload = await runCaddyCommand(appbayHome, ["reload", ...caddyfile], observer);
+    detail += reload.status === "ok"
+      ? "; the previous configuration was reloaded"
+      : `; the previous configuration could NOT be reloaded (${reload.detail})`;
   }
-  return {
-    ok: false,
-    reason: activation.status,
-    detail: activation.detail || "Caddy rejected the generated configuration.",
-  };
+  return { ok: false, reason: activation.status, detail };
 }
 
 /** Install the app's edge route on whichever provider fronts this install, and observe the edge before saying so. */
@@ -186,7 +187,7 @@ export function describeRouteFailure(
     );
   }
   if (install.reason === "timeout") {
-    return `edge routes NOT installed — ${install.detail}; the generated files were rolled back and the previous configuration reloaded. ${appName}'s own container is up, but it is not reachable through the edge until the edge answers.`;
+    return `edge routes NOT installed — ${install.detail}; the generated files were rolled back. ${appName}'s own container is up, but it is not reachable through the edge until the edge answers.`;
   }
   if (install.reason === "write-failed") {
     return `edge routes NOT installed — the route files could not be written: ${install.detail}. ${appName}'s own container is up, but it is not reachable through the edge.`;

@@ -46,7 +46,9 @@ async function engineGet<T>(path: string, schema: z.ZodType<T>, options: EngineO
   if (reply.status < 200 || reply.status >= 300) {
     return { kind: "unknown", reason: `${path} answered ${String(reply.status)}: ${reply.body.trim().slice(0, 200)}` };
   }
-  const parsed = schema.safeParse(JSON.parse(reply.body));
+  let body: unknown;
+  try { body = JSON.parse(reply.body); } catch { return { kind: "unknown", reason: `${path}: not JSON: ${reply.body.trim().slice(0, 120)}` }; }
+  const parsed = schema.safeParse(body);
   if (!parsed.success) return { kind: "unknown", reason: `${path}: unexpected shape: ${parsed.error.issues[0]?.message ?? "?"}` };
   return { kind: "ok", value: parsed.data };
 }

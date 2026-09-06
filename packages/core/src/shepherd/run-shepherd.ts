@@ -1,9 +1,9 @@
 /**
- * Shepherd runner — launches ephemeral Docker containers that share
- * namespaces with a target container.
+ * Shepherd runner — launches ephemeral containers (Docker or Podman, whichever the
+ * install runs) that share namespaces with a target container.
  *
  * Three lifecycle modes:
- *   - One-shot: `docker run --rm` — exits when done (default)
+ *   - One-shot: `<runtime> run --rm` — exits when done (default)
  *   - Scheduled: one-shot fired by a cron runner (same primitive)
  *   - Long-running: compose service with share.* flags (handled by trait emission, not here)
  *
@@ -56,8 +56,8 @@ export interface ShepherdResult {
  * Launch an ephemeral shepherd container that optionally shares
  * namespaces with a target container.
  *
- * Uses `docker run --rm` — the container is removed after exit.
- * Namespace sharing flags map to Docker's native primitives:
+ * Uses `<runtime> run --rm` — the container is removed after exit.
+ * Namespace sharing flags map to the runtime's native primitives:
  *   - share.network → --network=container:<target>
  *   - share.pid → --pid=container:<target>
  *   - share.ipc → --ipc=container:<target>
