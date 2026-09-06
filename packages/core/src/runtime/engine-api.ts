@@ -14,18 +14,20 @@ export interface EngineOptions {
   /** Defaults to the resolved runtime socket. */
   socketPath?: string;
   appbayHome?: string;
+  /** Per call; `/system/df` walks every layer and volume and needs more than the default. */
+  timeoutMs?: number;
 }
 
 interface Reply { status: number; body: string }
 
-function get(path: string, socketPath: string): Promise<Reply> {
+function get(path: string, socketPath: string, timeoutMs: number = TIMEOUT_MS): Promise<Reply> {
   return new Promise((resolve, reject) => {
-    const req = request({ socketPath, path, method: "GET", timeout: TIMEOUT_MS }, (res) => {
+    const req = request({ socketPath, path, method: "GET", timeout: timeoutMs }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
       res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf-8") }));
     });
-    req.on("timeout", () => req.destroy(new Error(`no answer from ${socketPath} within ${String(TIMEOUT_MS)} ms`)));
+    req.on("timeout", () => req.destroy(new Error(`no answer from ${socketPath} within ${String(timeoutMs)} ms`)));
     req.on("error", reject);
     req.end();
   });
@@ -36,7 +38,7 @@ async function engineGet<T>(path: string, schema: z.ZodType<T>, options: EngineO
   if (!socket.ok) return { kind: "unknown", reason: socket.reason ?? `no socket at ${socket.path}` };
   let reply: Reply;
   try {
-    reply = await get(path, socket.path);
+    reply = await get(path, socket.path, options.timeoutMs);
   } catch (err) {
     return { kind: "unknown", reason: `${socket.path}: ${err instanceof Error ? err.message : String(err)}` };
   }
@@ -90,7 +92,8 @@ export type DiskUsage = z.infer<typeof DiskUsage>;
 
 /** `GET /system/df`: what the runtime's store holds; the volumes carry their compose project label. */
 export async function apiDiskUsage(options: EngineOptions = {}): Promise<Inspection<DiskUsage>> {
-  const r = await engineGet("/system/df", DiskUsage, options);
+  // `type=volume` skips the image and container sizing; 200 on Docker 29 and Podman 5.8.
+  const r = await engineGet("/system/df?type=volume", DiskUsage, { timeoutMs: 60_000, ...options });
   if (r.kind === "unknown") return r;
   return { kind: "ok", value: r.value ?? {} };
 }

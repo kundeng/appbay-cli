@@ -21,9 +21,9 @@ import { VERSION } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { tryExec, versions } from "@appbay/core";
 
-/** Try to execute a command, returning a fallback string on failure. */
-function tryExecOrFallback(binary: string, args: string[], fallback = "not available"): string {
-  return tryExec(binary, args) ?? fallback;
+/** Run a host tool (uname, sw_vers, …), returning a fallback string on failure. */
+function tryExecOrFallback(command: string, args: string[], fallback = "not available"): string {
+  return tryExec(command, args) ?? fallback;
 }
 
 /**

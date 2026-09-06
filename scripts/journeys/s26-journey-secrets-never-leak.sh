@@ -62,7 +62,7 @@ traits:
     refs:
       APP_SECRET: vault://$APP/APP_SECRET
 EOF" >/dev/null 2>&1
-vm "cd $WORKDIR && printf '%s' '$SENTINEL' | appbay secrets set $APP/APP_SECRET" >/dev/null 2>&1
+vm "cd $WORKDIR && printf '%s' '$SENTINEL' | APPBAY_HOME=$HOME_DIR appbay secrets set $APP/APP_SECRET" >/dev/null 2>&1
 vm "cd $WORKDIR && APPBAY_HOME=$HOME_DIR appbay secrets get $APP/APP_SECRET 2>/dev/null | grep -q '$SENTINEL'" >/dev/null 2>&1 \
   && ok "secret stored with the sentinel value" || { bad "could not store the sentinel secret"; exit 1; }
 

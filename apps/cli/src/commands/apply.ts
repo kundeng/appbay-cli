@@ -5,11 +5,8 @@
  * a previously compiled plan. Useful for review-then-apply workflows.
  */
 import { Command } from "commander";
-import { compile, deploy, type CompileResult, loadProjectVars, compileInstall } from "@appbay/core";
-import {
-  resolveAppsDir,
-  resolveRendersDir,
-  resolveStateDir, resolveAppbayHome } from "../utils/appbay-home.js";
+import { deploy, type CompileResult, loadProjectVars, compileInstall } from "@appbay/core";
+import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { dockerCompose } from "../utils/docker.js";
 import { printDeployReport } from "../utils/deploy-report.js";
 
@@ -21,10 +18,6 @@ export const applyCommand = new Command("apply")
   .option("--all", "apply all apps")
   .option("--namespace <ns>", "namespace for every app whose manifest pins none")
   .action(async (apps: string[], options: { dryRun?: boolean; yes?: boolean; all?: boolean; namespace?: string }) => {
-    const appsDir = resolveAppsDir();
-    const rendersDir = resolveRendersDir();
-    const stateDir = resolveStateDir();
-
     const targetApps = apps.length > 0 ? apps : undefined;
 
     console.log("Compiling plan...\n");
@@ -38,7 +31,16 @@ export const applyCommand = new Command("apply")
       process.exit(1);
     }
 
-    // Show plan
+    // An app that did not compile is absent from `result.apps`; without this it read as
+    // "up to date". The errors are printed the way `up` prints them, and they fail the run.
+    if (result.errors.length > 0) {
+      console.error("Compile errors:");
+      for (const err of result.errors) {
+        console.error(`  ${err.appName ? `[${err.appName}]` : "[global]"} ${err.stage}: ${err.message}`);
+      }
+      process.exit(1);
+    }
+
     const changed = result.apps.filter(a => a.plan.status === "new" || a.plan.status === "changed");
     const unchanged = result.apps.filter(a => a.plan.status === "unchanged");
 
@@ -87,5 +89,5 @@ export const applyCommand = new Command("apply")
       dockerCompose: (subArgs, composePath, env) => dockerCompose(subArgs, composePath, env),
     });
     const { hasFailures } = printDeployReport(deployResult);
-    process.exit(hasFailures || result.errors.length > 0 ? 1 : 0);
+    process.exit(hasFailures ? 1 : 0);
   });

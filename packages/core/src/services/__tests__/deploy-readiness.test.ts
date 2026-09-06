@@ -81,6 +81,20 @@ describe("readiness gating", () => {
     expect(log).not.toContain("web:up");
   });
 
+  it("a container that dies during the readiness wait is a crash, not 'up and not ready' (S48 round 2)", async () => {
+    const { run, observer } = runner({
+      // before, after, crash check: running; from the readiness probe on: exited 1
+      db: (n) => (n <= 3 ? row("db", "running") : { ...row("db", "exited"), exitCode: 1 }),
+      web: () => row("web", "running"),
+    });
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 1, sleep: noSleep, crashGraceMs: 0 });
+    const db = r.apps.find((a) => a.appName === "db")!;
+    expect(db.status).toBe("failed");
+    expect(db.error).toContain("exited");
+    expect(db.containerStartedWithoutRoutes).toBeUndefined();
+    expect(r.startedButUnrouted).toBe(0);
+  });
+
   it("a readiness probe the runtime cannot answer is unobservable, not a timeout (S48)", async () => {
     const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
     const project = observer.project;

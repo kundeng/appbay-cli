@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { containerExec } from "@appbay/core";
-import { requireRunningApp } from "../utils/docker.js";
+import { requireRunningApp, exitWithContainerResult } from "../utils/docker.js";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 export const ollamaCommand = new Command("ollama")
@@ -16,5 +16,5 @@ export const ollamaCommand = new Command("ollama")
       { appbayHome: resolveAppbayHome(), stdio: "inherit" },
     );
 
-    process.exit(result.exitCode);
+    exitWithContainerResult(result);
   });

@@ -237,7 +237,7 @@ const startCommand = new Command("start")
         tryExec(opener, [SERVER_URL]);
       }
     } else {
-      console.log(`\nServer started but health check did not pass within ${HEALTH_MAX_RETRIES}s.`);
+      console.log(`\nServer started but the health check did not pass after ${String(HEALTH_MAX_RETRIES)} attempts.`);
       console.log(`Check logs: docker compose -f "${composePath}" logs`);
       process.exit(1);
     }

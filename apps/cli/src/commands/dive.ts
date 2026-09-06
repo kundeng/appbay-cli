@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { exitWithContainerResult } from "../utils/docker.js";
 import { containerExec, resolveRuntimeSocket } from "@appbay/core";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
@@ -44,5 +45,5 @@ export const diveCommand = new Command("dive")
       { appbayHome: resolveAppbayHome(), stdio: "inherit" },
     );
 
-    process.exit(result.exitCode);
+    exitWithContainerResult(result);
   });

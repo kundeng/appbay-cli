@@ -38,15 +38,31 @@ async function writeRouteFiles(files: RouteFile[], appbayHome: string): Promise<
   }
 }
 
+/** What the route files held before a candidate is written, and the function that puts it back. */
+async function snapshotRouteFiles(files: RouteFile[], appbayHome: string): Promise<() => Promise<void>> {
+  const previous = new Map<string, string | null>();
+  for (const aux of files) {
+    const path = join(appbayHome, aux.path);
+    previous.set(path, await readFile(path, "utf-8").catch(() => null));
+  }
+  return async () => {
+    for (const [path, content] of previous) {
+      if (content === null) await unlink(path).catch(() => undefined);
+      else await writeFile(path, content, "utf-8");
+    }
+  };
+}
+
 /**
- * The three answers a validator can give. `unavailable` is NOT a kind of `rejected`.
+ * The answers a validator can give. `unavailable` is NOT a kind of `rejected`, and neither is
+ * `timeout`: Caddy was asked and did not answer.
  *
  * 🚨 THESE WERE ONE BOOLEAN AND IT MISDIAGNOSED THE OPERATOR (appbay-cli#5). With the edge
  * not deployed, `no such object: appbay.caddy` — the ENGINE saying the container to exec
  * into does not exist — was returned as `ok: false` and rendered as "Caddy configuration
  * rejected". Caddy was never asked. A check that could not run must not return a verdict.
  */
-type CaddyCommandStatus = "ok" | "rejected" | "unavailable";
+type CaddyCommandStatus = "ok" | "rejected" | "unavailable" | "timeout";
 
 const CADDY_EXEC_TIMEOUT_MS = 60_000;
 
@@ -75,11 +91,12 @@ async function runCaddyCommand(
     appbayHome, stdio: ["pipe", "pipe", "pipe"], timeout: CADDY_EXEC_TIMEOUT_MS, label: "caddy exec",
   });
   if (result.failedToStart) return { status: "unavailable", detail: `could not exec into the edge: ${result.output}` };
+  if (result.timedOut) return { status: "timeout", detail: `caddy ${args[0] ?? ""} did not answer within ${String(CADDY_EXEC_TIMEOUT_MS / 1000)} s` };
   return { status: result.exitCode === 0 ? "ok" : "rejected", detail: result.output.trim() };
 }
 
 /** The shape every route install answers with, on either provider. */
-export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavailable" | "write-failed"; detail?: string }
+export interface RouteInstallResult { ok: boolean; reason?: "rejected" | "unavailable" | "timeout" | "write-failed"; detail?: string }
 
 /**
  * Install manifest-derived Caddy routes/policies, validate the complete imported config,
@@ -94,18 +111,7 @@ export async function installCaddyConfig(
   const files = app.auxiliaryFiles.filter((aux) => isCaddyConfigPath(aux.path));
   if (files.length === 0) return { ok: true };
 
-  const previous = new Map<string, string | null>();
-  for (const aux of files) {
-    const path = join(appbayHome, aux.path);
-    previous.set(path, await readFile(path, "utf-8").catch(() => null));
-  }
-  const restore = async () => {
-    for (const [path, content] of previous) {
-      if (content === null) await unlink(path).catch(() => undefined);
-      else await writeFile(path, content, "utf-8");
-    }
-  };
-
+  const restore = await snapshotRouteFiles(files, appbayHome);
   try {
     await writeRouteFiles(files, appbayHome);
   } catch (err) {
@@ -122,13 +128,14 @@ export async function installCaddyConfig(
 
   await restore();
   // A reload is only attempted when there is a Caddy to reload; on `unavailable` it would be
-  // a second no-op against a container that does not exist.
-  if (activation.status === "rejected") {
+  // a second no-op against a container that does not exist. After a timeout Caddy may be
+  // serving the candidate while the disk holds the previous files, so the reload is tried.
+  if (activation.status !== "unavailable") {
     await runCaddyCommand(appbayHome, ["reload", ...caddyfile], observer);
   }
   return {
     ok: false,
-    reason: activation.status === "unavailable" ? "unavailable" : "rejected",
+    reason: activation.status,
     detail: activation.detail || "Caddy rejected the generated configuration.",
   };
 }
@@ -155,9 +162,11 @@ export async function installRoute(
   if (!edge.value.running) {
     return { ok: false, reason: "unavailable", detail: `the ${provider} edge container "${edge.value.name}" exists but is ${edge.value.state}` };
   }
+  const restore = await snapshotRouteFiles(files, appbayHome);
   try {
     await writeRouteFiles(files, appbayHome);
   } catch (err) {
+    await restore();
     return { ok: false, reason: "write-failed", detail: err instanceof Error ? err.message : String(err) };
   }
   return { ok: true };
@@ -175,6 +184,9 @@ export function describeRouteFailure(
       `was never installed (${install.detail}). ${appName}'s own container is up, but it is ` +
       `not reachable through the edge. Deploy the edge first: \`appbay up ${provider}\`.`
     );
+  }
+  if (install.reason === "timeout") {
+    return `edge routes NOT installed — ${install.detail}; the generated files were rolled back and the previous configuration reloaded. ${appName}'s own container is up, but it is not reachable through the edge until the edge answers.`;
   }
   if (install.reason === "write-failed") {
     return `edge routes NOT installed — the route files could not be written: ${install.detail}. ${appName}'s own container is up, but it is not reachable through the edge.`;

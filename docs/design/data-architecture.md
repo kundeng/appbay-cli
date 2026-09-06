@@ -28,7 +28,7 @@ Contract at each boundary:
 | manifest → compile | `AppbayYamlSchema`-parsed manifest, upstream compose as a parsed document | down | typed; the only legal parse is the Zod schema |
 | instance config → compile | `domain`, `ingress_provider`, `container_runtime`, `container_store`, `home` | down | `InstanceConfigSchema`; one loader |
 | generated values → compile | `(namespace, service, key) → value` | both: compile reads, and writes a new key on first use | `GeneratedValueStore` |
-| compile → render | one compose document per app, plus edge fragments written into the provider app's directory | down | files; the render is derived and disposable |
+| compile → render | one compose document per app; the app's edge route files are held in the compile output and written by the deploy's route link once the app's container is up and the edge is seen running | down | files; the render is derived and disposable |
 | render → runtime | `compose -f <render> up -d` | down | the compose binary owns naming and recreate semantics |
 | runtime → services | container state | up | typed rows from one adapter (`runtime/observe.ts`) over the Engine API socket; no CLI text is parsed |
 

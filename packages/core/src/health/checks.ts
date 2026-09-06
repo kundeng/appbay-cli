@@ -20,10 +20,13 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   containerBin,
+  containerExec,
   runtimeProfile,
   containerServerVersion,
   containerStoreRoot,
-  resolveIngressProvider,  tryExec,  versions,
+  resolveIngressProvider,
+  tryExec,
+  versions,
 } from "../runtime/container-runtime.js";
 import { isRunning, networkExists } from "../runtime/observe.js";
 import { loadInstanceConfig } from "../schemas/instance.js";
@@ -685,7 +688,8 @@ export function checkDockerAccessible(appbayHome: string): HealthCheckResult {
 export function checkPlatform(appbayHome: string): HealthCheckResult {
   const platform = process.platform === "darwin" ? "macOS" : "Linux";
   const { displayName } = runtimeProfile(appbayHome);
-  const context = tryExec(containerBin(appbayHome), ["context", "inspect", "--format", "{{.Name}}"]);
+  const contextResult = containerExec(["context", "inspect", "--format", "{{.Name}}"], { appbayHome, timeout: 10_000 });
+  const context = contextResult.exitCode === 0 ? contextResult.output.trim() || null : null;
 
   let runtime = displayName;
   if (context?.includes("orbstack")) runtime = "OrbStack";
@@ -910,13 +914,13 @@ export async function checkSharedNetworkDns(appbayHome: string): Promise<HealthC
   // ⚠️ Keep the dot when editing. It makes the name absolute (FQDN), which is the only way
   // to bypass the search list. Verified the probe still discriminates: a name that does not
   // exist exits 1 even with the dot.
-  const probe = tryExec(bin, [
+  const probe = containerExec([
     "run", "--rm", "--network", SHARED_NETWORK,
     "--name", probeName,
     "busybox:latest", "nslookup", `${probeName}.`,
-  ]);
+  ], { appbayHome, timeout: 60_000, label: "dns probe" });
 
-  if (probe !== null) {
+  if (probe.exitCode === 0) {
     return {
       name: "Shared network DNS",
       status: "ok",

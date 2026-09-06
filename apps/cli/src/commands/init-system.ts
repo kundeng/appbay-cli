@@ -43,8 +43,7 @@ import { homedir } from "node:os";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { SYSTEM_CONFIG_FILE, SYSTEM_CONFIG_DIR } from "../utils/system-config.js";
 import { renderServerUnit, SERVER_UNIT_NAME, SERVER_UNIT_PATH } from "../utils/systemd-unit.js";
-import { cliContainerBin, cliRuntimeProfile } from "../utils/docker.js";
-import { versions } from "@appbay/core";
+import { versions, runtimeProfile, containerBin } from "@appbay/core";
 import {
   PODMAN_ROOTFUL_SOCKET_DIR,
   PODMAN_SOCKET_DROPIN,
@@ -275,8 +274,8 @@ export function planSystemBootstrap(opts?: {
   // ⭐ S23 SETTLED THIS: the container runtime is CONFIGURATION, not a hardcoded choice.
   // Bootstrap therefore installs whatever runtime the install is configured for, exactly
   // like every other spawn site resolving through the runtime resolver.
-  const runtime = cliContainerBin();
-  const profile = cliRuntimeProfile();
+  const runtime = containerBin(resolveAppbayHome());
+  const profile = runtimeProfile(resolveAppbayHome());
   let runtimeWillExist = commandExists(runtime);
 
   if (!runtimeWillExist) {

@@ -137,10 +137,12 @@ export const installCommand = new Command("install")
             stdio: "inherit",
             env: { ...process.env, APPBAY_HOME: home },
           });
-          if (validated.error) throw validated.error;
+          if (validated.error) {
+            console.error(`\nInstalled to ${result.appDir}; validation could not run (${validated.error.message}). Run: appbay validate ${installAs}`);
+            process.exit(1);
+          }
           if (validated.status !== 0) throw new Error(`validate exited ${String(validated.status)}`);
-        } catch (err) {
-          console.error(`\nvalidation could not run: ${err instanceof Error ? err.message : String(err)}`);
+        } catch {
           // The files are on disk, and that is all "installed" can honestly mean here: the
           // manifest does not compile on this install, so it is not ready to deploy.
           console.error(

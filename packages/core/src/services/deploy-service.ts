@@ -17,7 +17,7 @@ import { loadProjectVars } from "./instance-vars.js";
 import { compileInstall } from "./compile-install.js";
 import { runConverges, type DeployContext } from "./deploy/converge.js";
 import { planConverges } from "./deploy/converges.js";
-import { emptyDeployResult, foldDeployResult, type DeployResult, type PlanStatus } from "./deploy/report.js";
+import { emptyDeployResult, foldDeployResult, type DeployResult } from "./deploy/report.js";
 
 export type { AppDeployResult, DeployResult, PlanStatus } from "./deploy/report.js";
 export { writeRenderedOutput, resolveDeployEnv } from "./deploy/converges.js";
@@ -161,7 +161,7 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   };
   const verdicts = await runConverges(chain, ctx);
   return foldDeployResult(
-    graph.order.map((a) => ({ appName: a.appName, planStatus: (a.plan.status === "removed" ? "changed" : a.plan.status) as PlanStatus })),
+    graph.order.map((a) => ({ appName: a.appName, planStatus: a.plan.status === "removed" ? "changed" : a.plan.status })),
     verdicts,
     { compileErrors, warnings: warnings.length > 0 ? warnings : undefined },
   );

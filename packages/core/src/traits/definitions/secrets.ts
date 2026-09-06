@@ -23,7 +23,7 @@ import type {
   TraitTransformOutput,
   ShepherdAction,
 } from "../types.js";
-import { containerBin } from "../../runtime/container-runtime.js";
+import { containerBin, containerExec } from "../../runtime/container-runtime.js";
 
 // ---------------------------------------------------------------------------
 // Trait Definition
@@ -273,14 +273,13 @@ export const secretsTraitDefinition: TraitDefinition<"secrets"> = {
           // and run `docker image inspect` to find it.
           const image = svc.image as string | undefined;
           if (image) {
-            const { spawnSync: ss } = require("node:child_process");
-            const inspectResult = ss(containerBin(), [
+            const inspectResult = containerExec([
               "image", "inspect", image,
               "--format", "{{json .Config.Entrypoint}}|||{{json .Config.Cmd}}",
-            ], { stdio: "pipe", encoding: "utf-8", timeout: 10_000 });
+            ], { stdio: "pipe", timeout: 10_000, label: "image inspect" });
 
-            if (inspectResult.status === 0) {
-              const [epJson, cmdJson] = String(inspectResult.stdout).trim().split("|||");
+            if (inspectResult.exitCode === 0) {
+              const [epJson, cmdJson] = inspectResult.output.trim().split("|||");
               const imgEp = JSON.parse(epJson || "null") as string[] | null;
               const imgCmd = JSON.parse(cmdJson || "null") as string[] | null;
               const fullCmd = [...(imgEp ?? []), ...(imgCmd ?? [])];

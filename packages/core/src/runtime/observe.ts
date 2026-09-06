@@ -238,7 +238,6 @@ export async function isReady(observer: Observer, project: string): Promise<Insp
  * one, else the container's address on any of its networks. Null when neither exists.
  */
 export async function containerEndpoint(container: string, port: number, appbayHome?: string): Promise<Inspection<string | null>> {
-  const { apiInspectContainer } = await import("./engine-api.js");
   const r = await apiInspectContainer(container, { appbayHome });
   if (r.kind === "unknown") return r;
   const net = r.value?.NetworkSettings;

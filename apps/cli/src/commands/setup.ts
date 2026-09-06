@@ -15,15 +15,15 @@ import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
-import { cliRuntimeProfile } from "../utils/docker.js";
 import { selfBinary } from "../utils/self.js";
+import { stopApps } from "./down.js";
 import { ask } from "../utils/prompt.js";
 import {
   resolveIngressProvider,
   resolveAcmeDnsProvider,
   clearContainerRuntimeCache,
   type AcmeDnsProvider,
-  SHARED_NETWORK, checkNetwork } from "@appbay/core";
+  SHARED_NETWORK, checkNetwork, runtimeProfile } from "@appbay/core";
 import { SYSTEM_CONFIG_REL, LEGACY_INSTANCE_CONFIG_REL, findContainerByLabel, APP_LABEL, networkExists, containerExec } from "@appbay/core";
 
 // ---------------------------------------------------------------------------
@@ -36,15 +36,17 @@ function step(n: number, total: number, msg: string): void {
 
 function detectPlatform(): { os: string; docker: string } {
   const platform = process.platform === "darwin" ? "macOS" : "Linux";
+  const appbayHome = resolveAppbayHome();
+  const runtimeName = runtimeProfile(appbayHome).displayName;
 
-  // Detect Docker runtime
-  const result = containerExec(["context", "inspect", "--format", "{{.Name}}"], { appbayHome: resolveAppbayHome() });
+  // The context name tells a desktop distribution apart; the runtime's own name is the default.
+  const result = containerExec(["context", "inspect", "--format", "{{.Name}}"], { appbayHome, timeout: 10_000 });
   const context = result.exitCode === 0 ? result.output.trim() : "";
 
-  let docker = "Docker Engine";
+  let docker = runtimeName;
   if (context.includes("orbstack") || context.includes("colima")) {
     docker = context.includes("orbstack") ? "OrbStack" : "Colima";
-  } else if (platform === "macOS") {
+  } else if (platform === "macOS" && runtimeName === "Docker") {
     docker = "Docker Desktop";
   }
 
@@ -231,14 +233,12 @@ function acmeDnsSnippet(provider: AcmeDnsProvider, resolvers?: string): string {
 // System app deployment with health gates
 // ---------------------------------------------------------------------------
 
-function waitForHealth(url: string, timeoutMs: number): boolean {
+async function waitForHealth(url: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const result = spawnSync("curl", ["-sf", "--max-time", "2", url], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    if (result.status === 0) return true;
-    spawnSync("sleep", ["2"]);
+    const healthy = await fetch(url, { signal: AbortSignal.timeout(2_000) }).then((r) => r.ok).catch(() => false);
+    if (healthy) return true;
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
   return false;
 }
@@ -281,7 +281,7 @@ async function showSetupStatus(): Promise<void> {
 
   const checks = [
     { name: "APPBAY_HOME", ok: existsSync(appbayHome), detail: appbayHome },
-    { name: "Docker network", ok: (await checkNetwork(appbayHome)).status === "ok", detail: SHARED_NETWORK },
+    { name: "Shared network", ok: (await checkNetwork(appbayHome)).status === "ok", detail: SHARED_NETWORK },
     { name: "Selected edge seeded", ok: existsSync(edgeApp), detail: ingressProvider },
     { name: "Selected edge running", ok: await edgeIsRunning(ingressProvider), detail: ingressProvider },
     ...(ingressProvider === "caddy" ? [{
@@ -331,17 +331,21 @@ async function resetSetup(): Promise<void> {
 
   console.log(`  Resetting Appbay at ${appbayHome}\n`);
 
-  // Stop system app containers
-  for (const name of ["caddy", "traefik"]) {
-    const appDir = join(appbayHome, "etc", "apps", name);
-    if (existsSync(join(appDir, "docker-compose.yml"))) {
-      console.log(`  Stopping ${name}...`);
-      containerExec(["compose", "-f", join(appDir, "docker-compose.yml"), "down"], { appbayHome, cwd: appDir });
+  // Stop the edge apps through the one stop path, from the render each was started from; a
+  // failed stop aborts the reset rather than deleting the renders out from under a running
+  // container, which would leave it with no command that reaches it.
+  const stop = await stopApps(appbayHome, ["caddy", "traefik"]);
+  if (stop.failed > 0) {
+    console.error("  Reset aborted: an edge app did not stop; nothing was removed.");
+    process.exit(1);
+  }
+  if (existsSync(join(appbayHome, "docker-compose.server.yml"))) {
+    const server = containerExec(["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], { appbayHome, cwd: appbayHome, timeout: 120_000 });
+    if (server.exitCode !== 0) {
+      console.error(`  Reset aborted: the server did not stop: ${server.output.trim()}`);
+      process.exit(1);
     }
   }
-
-  // Stop server
-  containerExec(["compose", "-f", join(appbayHome, "docker-compose.server.yml"), "down"], { appbayHome, cwd: appbayHome });
 
   // Remove generated configs (keep app definitions and vault)
   // Docker containers may own some files, so use docker run for cleanup
@@ -361,7 +365,11 @@ async function resetSetup(): Promise<void> {
       try {
         await rm(p, { recursive: true, force: true });
       } catch {
-        containerExec(["run", "--rm", "-v", `${appbayHome}:/appbay`, "alpine", "rm", "-rf", `/appbay/${rel}`], { appbayHome });
+        const removed = containerExec(["run", "--rm", "-v", `${appbayHome}:/appbay`, "alpine", "rm", "-rf", `/appbay/${rel}`], { appbayHome, timeout: 60_000 });
+        if (removed.exitCode !== 0) {
+          console.error(`  Could not remove $APPBAY_HOME/${rel}: ${removed.output.trim()}`);
+          process.exit(1);
+        }
       }
       console.log(`  Removed $APPBAY_HOME/${rel}`);
     }
@@ -413,7 +421,7 @@ export const setupCommand = new Command("setup")
     const platform = detectPlatform();
     console.log(`    Platform: ${platform.os} (${platform.docker})`);
 
-    const runtimeName = cliRuntimeProfile().displayName;
+    const runtimeName = runtimeProfile(resolveAppbayHome()).displayName;
     if (!validateDocker()) {
       console.error(`\n  ERROR: ${runtimeName} is not accessible.`);
       console.error(`  Make sure ${runtimeName} is installed and running.`);
@@ -572,7 +580,7 @@ export const setupCommand = new Command("setup")
 
     if (ingressProvider === "traefik") {
         console.log("    Waiting for Traefik health...");
-        const healthy = waitForHealth("http://localhost:8080/api/overview", 30_000);
+        const healthy = await waitForHealth("http://localhost:8080/api/overview", 30_000);
         if (!healthy) {
           console.error("    Traefik health check failed.");
           process.exit(1);

@@ -53,7 +53,7 @@ export class EdgeIdentityStore {
       // have started first.
       if (code === "ENOENT") return emptyIdentityDocument();
 
-      if (code !== "EACCES" || !claimIdentityStoreOwnership()) {
+      if (code !== "EACCES" || !(await claimIdentityStoreOwnership())) {
         throw new Error(`Caddy Security identity store is unavailable at ${this.path}: ${String(error)}`);
       }
       raw = await readFile(this.path, "utf-8").catch((retryError: unknown) => {
@@ -139,7 +139,7 @@ export class EdgeIdentityStore {
 export async function restartEdgeForIdentityChange(): Promise<boolean> {
   const edge = await runningEdge();
   if (!edge) return false;
-  return containerExec(["restart", edge], { stdio: ["ignore", "pipe", "pipe"], label: "edge restart" }).exitCode === 0;
+  return containerExec(["restart", edge], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "edge restart" }).exitCode === 0;
 }
 
 /** The running Caddy edge, by label — a literal name went stale when the system apps were namespaced. */
@@ -162,7 +162,7 @@ async function claimIdentityStoreOwnership(): Promise<boolean> {
   const result = containerExec([
     "exec", "--user", "0", edge, "sh", "-c",
     `chown ${uid}:${gid} /etc/caddy/security/users.json && chmod 600 /etc/caddy/security/users.json`,
-  ], { stdio: ["ignore", "pipe", "pipe"], label: "identity store chown" });
+  ], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000, label: "identity store chown" });
   return result.exitCode === 0;
 }
 
@@ -180,7 +180,7 @@ function hashPassword(password: string): string {
   const image = process.env.APPBAY_CADDY_IMAGE || DEFAULT_CADDY_SECURITY_IMAGE;
   const result = containerExec(["run", "--rm", "-i", "--entrypoint", "caddy", image,
     "hash-password", "--algorithm", "bcrypt", "--bcrypt-cost", "10"], {
-    input: `${password}\n`, stdio: ["pipe", "pipe", "pipe"], label: "caddy hash-password",
+    input: `${password}\n`, stdio: ["pipe", "pipe", "pipe"], timeout: 60_000, label: "caddy hash-password",
   });
   // A binary that is missing is named as such (measured on a Fedora host where core had
   // resolved the runtime to "docker" and only podman was installed: the old message was

@@ -18,7 +18,7 @@ export type ConvergeAction = "started" | "already-running" | "unknown";
  * project whose container is up but never became ready (a partial converge, like a missing
  * route); `skipped` is the executor's verdict, not the link's own.
  */
-export type DivergedReason = "rejected" | "unavailable" | "write-failed" | "not-ready" | "skipped";
+export type DivergedReason = "rejected" | "unavailable" | "timeout" | "write-failed" | "not-ready" | "skipped";
 
 export type Verdict =
   | { kind: "converged"; action?: ConvergeAction; unknownReason?: string }

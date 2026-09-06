@@ -20,9 +20,13 @@ async function volumeBytesByProject(appbayHome: string): Promise<Map<string, num
   if (usage.kind === "unknown") return null;
   const totals = new Map<string, number>();
   for (const v of usage.value.Volumes ?? []) {
-    const project = v.Labels?.["com.docker.compose.project"];
-    if (!project) continue;
-    totals.set(project, (totals.get(project) ?? 0) + (v.UsageData?.Size ?? 0));
+    // Docker labels the volume with its compose project; Podman's compat endpoint returns no
+    // labels, and both name a compose volume `<project>_<volume>`.
+    const project = v.Labels?.["com.docker.compose.project"]
+      ?? (v.Name.startsWith("appbay-secrets-") ? v.Name.slice("appbay-secrets-".length) : v.Name.split("_")[0]);
+    const size = v.UsageData?.Size ?? 0;
+    if (!project || size < 0) continue;
+    totals.set(project, (totals.get(project) ?? 0) + size);
   }
   return totals;
 }

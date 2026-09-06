@@ -109,7 +109,7 @@ async function runShepherdActions(
         if (action.share) {
           const found = await ctx.observer.findByLabel(APP_LABEL, ctx.appName);
           if (found.kind === "unknown") { errors.push(`${action.label}: could not find the app's container to share with (${found.reason})`); continue; }
-          if (found.value === null) { errors.push(`${action.label}: no running container carries ${APP_LABEL}=${ctx.appName} to share with`); continue; }
+          if (!found.value?.running) { errors.push(`${action.label}: no running container carries ${APP_LABEL}=${ctx.appName} to share with${found.value ? ` (${found.value.name} is ${found.value.state})` : ""}`); continue; }
           target = found.value.name;
         }
         const result = await runShepherd({
@@ -226,8 +226,11 @@ function appChain({ app, refusal, dependsOn, waitReady }: PlannedApp): Converge[
         if (Date.now() >= deadline) break;
         await ctx.sleep(2000);
       }
-      // The container is up (compose returned 0, nothing crashed) and never became ready: a
-      // partial converge, reported as one.
+      // Deadline. A container that died during the wait is a crash; one still up that never
+      // became ready is a partial converge, reported as one.
+      const late = await findCrashedServices(ctx.observer, name);
+      if (late.kind === "unknown") return unobservable(late.reason);
+      if (late.value.length > 0) return diverged(`container(s) exited while waiting for readiness: ${late.value.join(", ")}`);
       return diverged(`not ready within ${String(Math.round(ctx.readinessTimeoutMs / 1000))}s: ${last}`, "not-ready");
     }),
 

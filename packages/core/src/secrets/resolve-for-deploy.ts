@@ -1,7 +1,7 @@
 /**
  * Deploy-time secret resolution.
  *
- * Called by the CLI shepherd (phase 2) between compile and docker compose up.
+ * Called by the deploy's `secrets` link between compile and `compose up`.
  * Takes the secretRefs from compile output's traitMetadata and resolves each
  * URI via the SecretStore. Returns a flat env map that the caller injects as
  * process environment to the docker compose child process.
@@ -233,8 +233,11 @@ export async function writeEncryptedBundle(
   const plaintext = Buffer.from(JSON.stringify(secrets));
   const encrypted = encryptBundle(plaintext, key);
 
-  // Create volume
-  containerExec(["volume", "create", volumeName], { stdio: "pipe", label: "volume create" });
+  const created = containerExec(["volume", "create", volumeName], { stdio: "pipe", timeout: 30_000, label: "volume create" });
+  if (created.exitCode !== 0) {
+    errors.push({ ref: refs[0]!, error: `could not create volume ${volumeName}: ${created.output.trim()}` });
+    return { volumeName, secretCount: 0, errors };
+  }
 
   // Write all three files via a single shepherd container
   const seedHex = seed.toString("hex");
@@ -278,7 +281,7 @@ interface WrapperFileResult {
  *
  * Flow:
  *   1. Resolve all wrapper-file refs via SecretStore
- *   2. Launch `docker run --rm -v <vol>:/out busybox sh -c 'echo ... > /out/<key>'`
+ *   2. Run a one-shot busybox with the volume mounted; the files travel on its stdin
  *   3. Target service reads files at startup — no env exposure
  */
 export async function resolveWrapperFileSecrets(
@@ -312,8 +315,12 @@ export async function resolveWrapperFileSecrets(
     return { volumeName, filesWritten: 0, errors };
   }
 
-  // Ensure the external volume exists
-  containerExec(["volume", "create", volumeName], { stdio: "pipe", label: "volume create" });
+  // The compose file declares the volume external: it exists before `up`, or `up` refuses.
+  const created = containerExec(["volume", "create", volumeName], { stdio: "pipe", timeout: 30_000, label: "volume create" });
+  if (created.exitCode !== 0) {
+    errors.push({ ref: wrapperRefs[0]!, error: `could not create volume ${volumeName}: ${created.output.trim()}` });
+    return { volumeName, filesWritten: 0, errors };
+  }
 
   const result = await runShepherd({
     target: shepherdTarget(appName),

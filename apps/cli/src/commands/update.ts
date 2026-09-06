@@ -13,6 +13,8 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { VERSION, compareSemver, containerCompose, discoverApps, isSystemApp } from "@appbay/core";
+import { readFileSync, copyFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
 const REPO = "kundeng/appbay-cli";
@@ -97,11 +99,15 @@ function replaceBinary(newBin: string, target: string): void {
   const tmpTarget = join(targetDir, `.${BINARY_NAME}.new`);
 
   try {
-    // Try direct rename (requires write access to target directory)
-    // On Linux/macOS, rename() is atomic — safe even if current binary is running.
-    renameSync(newBin, tmpTarget);
+    // Copy into the target's own directory, then rename over it: rename(2) is atomic within
+    // one filesystem and safe while the current binary runs; a rename from the temp
+    // directory would fail with EXDEV on any host whose /tmp is its own filesystem.
+    copyFileSync(newBin, tmpTarget);
+    chmodSync(tmpTarget, 0o755);
     renameSync(tmpTarget, target);
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "EACCES" && code !== "EPERM") throw err;
     // No write access; try via sudo
     try {
       const mv = spawnSync("sudo", ["mv", newBin, target], { stdio: "inherit" });
@@ -196,8 +202,13 @@ async function pullSystemImages(): Promise<number> {
   console.log("Pulling system app images...\n");
   let failed = 0;
   for (const app of rendered) {
+    // A service with `build:` (the caddy edge) is built here, never pulled: compose asks the
+    // registry for its local tag and fails. Only the pullable services are named.
+    const services = (parseYaml(readFileSync(app.render, "utf-8")) as { services?: Record<string, { build?: unknown }> }).services ?? {};
+    const pullable = Object.entries(services).filter(([, svc]) => svc.build === undefined).map(([name]) => name);
+    if (pullable.length === 0) { console.log(`  ${app.name}... nothing to pull (built locally)`); continue; }
     process.stdout.write(`  ${app.name}...`);
-    const pull = containerCompose(["pull"], app.render, undefined, appbayHome);
+    const pull = containerCompose(["pull", ...pullable], app.render, undefined, appbayHome);
     if (pull.exitCode === 0) {
       process.stdout.write(" done\n");
     } else {

@@ -5,44 +5,34 @@ import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 
-function getAppUrl(app: string): string | null {
-  const appsDir = resolveAppsDir();
-  const appbayYaml = join(appsDir, app, "appbay.yaml");
-  if (!existsSync(appbayYaml)) return null;
-
-  try {
-    const config = parseYaml(readFileSync(appbayYaml, "utf-8"));
-    const traits = config?.traits ?? [];
-    for (const t of traits) {
-      // cloudflared runs in its own container on the shared network: the upstream is the
-      // service by name, never localhost, which would be cloudflared itself.
-      if (t.type === "ingress" && t.service && t.port) {
-        return `http://${t.service}:${t.port}`;
-      }
-    }
-  } catch { /* ignore parse errors */ }
-
-  return null;
-}
-
-function getInternalUrl(app: string): string | null {
+/**
+ * The URL cloudflared, running on the shared network, reaches the app at: the first service
+ * the render puts on that network, by its alias there (unique per app), on the port its
+ * ingress trait names or, failing that, the container port of its first published mapping.
+ */
+function upstreamUrl(app: string): string | null {
   const home = resolveAppbayHome();
   const renderPath = join(home, "var", "lib", "renders", app, "docker-compose.rendered.yml");
   if (!existsSync(renderPath)) return null;
-
+  const ingressPort = (() => {
+    try {
+      const config = parseYaml(readFileSync(join(resolveAppsDir(), app, "appbay.yaml"), "utf-8")) as { traits?: Array<{ type?: string; port?: number }>; services?: Record<string, { traits?: Array<{ type?: string; port?: number }> }> };
+      const all = [...(config.traits ?? []), ...Object.values(config.services ?? {}).flatMap((svc) => svc.traits ?? [])];
+      return all.find((t) => t.type === "ingress" && t.port)?.port;
+    } catch { return undefined; }
+  })();
   try {
-    const compose = parseYaml(readFileSync(renderPath, "utf-8"));
-    const services = compose?.services ?? {};
-    for (const [svc, config] of Object.entries(services) as Array<[string, Record<string, unknown>]>) {
-      const ports = config.ports as string[] | undefined;
-      if (ports && ports.length > 0) {
-        const first = String(ports[0]);
-        const match = first.match(/:(\d+)/);
-        if (match) return `http://${svc}:${match[1]}`;
-      }
+    const compose = parseYaml(readFileSync(renderPath, "utf-8")) as { services?: Record<string, { ports?: unknown[]; networks?: Record<string, { aliases?: string[] } | null> }> };
+    for (const [svc, config] of Object.entries(compose.services ?? {})) {
+      const alias = config.networks?.[SHARED_NETWORK]?.aliases?.[0];
+      if (!alias) continue;
+      const first = config.ports?.[0];
+      const containerPort = typeof first === "string" ? first.split("/")[0]?.split(":").pop() : typeof first === "object" && first ? String((first as { target?: number }).target ?? "") : "";
+      const port = ingressPort ?? (containerPort ? Number(containerPort) : undefined);
+      if (port) return `http://${alias}:${String(port)}`;
+      return `http://${svc === alias ? svc : alias}`;
     }
-  } catch { /* ignore */ }
-
+  } catch { /* an unreadable render is "cannot determine" below */ }
   return null;
 }
 
@@ -61,7 +51,7 @@ export const tunnelCommand = new Command("tunnel")
       targetUrl = `http://host.docker.internal:${options.port}`;
     } else {
       // Try to find the app's ingress port from its compose
-      const url = getAppUrl(app) || getInternalUrl(app);
+      const url = upstreamUrl(app);
       if (!url) {
         console.error(`Cannot determine port for "${app}". Use --port to specify.`);
         process.exit(1);

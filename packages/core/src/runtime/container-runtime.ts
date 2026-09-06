@@ -304,8 +304,10 @@ export interface ContainerResult {
   exitCode: number;
   /** stdout on success, stderr or the spawn error message on failure. */
   output: string;
-  /** The child never ran (binary missing, timeout, signal): `output` is the spawn error, not the child's. */
+  /** The child never ran (binary missing, EACCES): `output` is the spawn error, not the child's. */
   failedToStart?: boolean;
+  /** The child ran and was killed at `timeout`: `output` is the spawn error, not an answer. */
+  timedOut?: boolean;
 }
 
 /** Options accepted by the container helpers. */
@@ -342,7 +344,8 @@ export function containerExec(
   });
 
   if (result.error) {
-    return { exitCode: 1, output: result.error.message, failedToStart: true };
+    const timedOut = (result.error as NodeJS.ErrnoException).code === "ETIMEDOUT";
+    return { exitCode: 1, output: result.error.message, ...(timedOut ? { timedOut: true } : { failedToStart: true }) };
   }
   if (result.status !== 0) {
     return {

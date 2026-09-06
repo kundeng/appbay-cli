@@ -51,8 +51,7 @@ import {
   parseInstanceConfig,
   SERVER_CONTAINER,
   SHARED_NETWORK,
-  NAMESPACES_DIR_REL,
-} from "@appbay/core";
+  NAMESPACES_DIR_REL, runtimeProfile } from "@appbay/core";
 import {
   resolveAppbayHome,
   saveAppbayHome,
@@ -60,7 +59,6 @@ import {
   explainAppbayHome,
 } from "../utils/appbay-home.js";
 import { ask } from "../utils/prompt.js";
-import { cliRuntimeProfile } from "../utils/docker.js";
 import { resolveRuntimeSocket } from "./server.js";
 import { runInitPreflight, requiredChecksFailed, formatCheck } from "../utils/checks.js";
 
@@ -328,7 +326,7 @@ async function ensureDockerNetwork(): Promise<boolean> {
   if (create.exitCode === 0) return true;
 
   const errMsg = create.output.trim() || "unknown error";
-  console.error(`  Warning: could not create ${cliRuntimeProfile().displayName} network: ${errMsg}`);
+  console.error(`  Warning: could not create ${runtimeProfile(resolveAppbayHome()).displayName} network: ${errMsg}`);
   return false;
 }
 
@@ -980,12 +978,12 @@ export const initCommand = new Command("init")
       }
 
       // Stage 2: Docker network.
-      step(2, 7, `Ensuring shared ${cliRuntimeProfile().displayName} network`);
+      step(2, 7, `Ensuring shared ${runtimeProfile(resolveAppbayHome()).displayName} network`);
       const networkCreated = await ensureDockerNetwork();
       if (networkCreated) {
-        console.log(`  Created ${cliRuntimeProfile().displayName} network: ${SHARED_NETWORK}`);
+        console.log(`  Created ${runtimeProfile(resolveAppbayHome()).displayName} network: ${SHARED_NETWORK}`);
       } else {
-        console.log(`  ${cliRuntimeProfile().displayName} network "${SHARED_NETWORK}" already exists.`);
+        console.log(`  ${runtimeProfile(resolveAppbayHome()).displayName} network "${SHARED_NETWORK}" already exists.`);
       }
 
       // Stage 3: Seed system apps from embedded definitions.

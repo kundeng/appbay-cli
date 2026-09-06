@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { exitWithContainerResult } from "../utils/docker.js";
 import { runningContainerNames, containerExec } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 import { spawnSync } from "node:child_process";
@@ -27,7 +28,7 @@ export const statsCommand = new Command("stats")
 
     args.push(...containers);
 
-    process.exit(containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" }).exitCode);
+    exitWithContainerResult(containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" }));
   });
 
 export const smiCommand = new Command("smi")

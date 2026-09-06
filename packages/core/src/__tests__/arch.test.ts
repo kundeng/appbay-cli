@@ -71,10 +71,12 @@ const RULES: Rule[] = [
   },
   {
     name: "nothing outside runtime/ spawns the container binary, by any name",
-    pattern: /\bspawn(?:Sync)?\(\s*(?:(?:cli)?containerBin\(|"(?:docker|podman)")/,
+    pattern: /\b(?:spawn|spawnSync|execFileSync|execSync|tryExec)\(\s*(?:(?:bin|binary)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {},
-    allowed: {},
+    allowed: {
+      "packages/core/src/compiler/builds.ts": "S49 1.5: six sites in the build path",
+    },
   },
   {
     name: "Go-template parsing of runtime output lives in runtime/",

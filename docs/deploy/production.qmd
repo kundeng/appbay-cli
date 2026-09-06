@@ -25,7 +25,7 @@ Each system app is a standard Appbay app with its own `appbay.yaml` and `docker-
 
 ## Reverse proxy setup
 
-Appbay generates Traefik dynamic configuration as YAML files (file provider), not Docker labels. When you assign the `ingress` trait to a service, the compiler writes a routing file to `var/lib/renders/<app>/traefik/dynamic/<app>.yml`.
+Appbay generates Traefik dynamic configuration as YAML files (file provider), not Docker labels. When you assign the `ingress` trait to a service, the deploy writes a routing file to `etc/apps/traefik/config/dynamic/<app>.yml` once the app's container is up and Traefik is running; a fragment is never left pointing at a container that has not started.
 
 ### Traefik configuration
 

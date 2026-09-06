@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { exitWithContainerResult } from "../utils/docker.js";
 import { SHARED_NETWORK, containerExec } from "@appbay/core";
 import { resolveAppbayHome } from "../utils/appbay-home.js";
 
@@ -23,6 +24,6 @@ export const mcpCommand = new Command("mcp")
         console.log("Press Ctrl+C to stop.\n");
 
         const result = containerExec(args, { appbayHome: resolveAppbayHome(), stdio: "inherit" });
-        process.exit(result.exitCode);
+        exitWithContainerResult(result);
       }),
   );

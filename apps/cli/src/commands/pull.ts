@@ -40,7 +40,7 @@ async function pullModel(name: string): Promise<void> {
   );
 
   if (result.exitCode !== 0) {
-    console.error(`Failed to pull model "${name}".`);
+    console.error(`Failed to pull model "${name}".${result.failedToStart || result.timedOut ? ` ${result.output.trim()}` : ""}`);
     process.exit(1);
   }
 }

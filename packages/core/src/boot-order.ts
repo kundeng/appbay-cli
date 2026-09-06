@@ -150,7 +150,7 @@ export function deployOrder<T extends OrderableApp>(
   }
   for (const [name, spec] of Object.entries(projects)) {
     for (const before of spec.after) {
-      if (!(before in projects) && !known.has(before)) {
+      if (!Object.hasOwn(projects, before) && !known.has(before)) {
         errors.push(`project "${name}" is declared after "${before}", which no app declares and projects.yaml does not define`);
         continue;
       }

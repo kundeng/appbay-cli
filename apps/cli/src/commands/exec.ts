@@ -4,6 +4,7 @@
  * binary is chosen in `runtime/`; this file only builds the argument list.
  */
 import { Command } from "commander";
+import { exitWithContainerResult } from "../utils/docker.js";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { containerExec } from "@appbay/core";
@@ -24,7 +25,7 @@ function composeInteractive(verb: "exec" | "run", app: string, command: string[]
   const cmd = command.length > 0 ? command : ["/bin/sh"];
   const extra = verb === "run" ? ["--rm"] : [];
   const result = containerExec(["compose", "-f", composePath, verb, ...extra, app, ...cmd], { appbayHome, stdio: "inherit" });
-  process.exit(result.exitCode);
+  exitWithContainerResult(result);
 }
 
 export const execCommand = new Command("exec")

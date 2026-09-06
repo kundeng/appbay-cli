@@ -64,9 +64,11 @@ its callers, fixing what each round finds, until a round returns nothing above L
 everything is finally green", and "you already have multiple reviews in history, look at
 them too". Autonomous for the rest of the sprint; no per-row confirmation.
 
-**2026-09-06** — `cliContainerBin` is not indirection without a difference: the CLI's
-`resolveAppbayHome` consults `utils/system-config.ts` before core's four tiers, so the
-wrapper passes a home core cannot derive. The comment was stale, the wrapper is not.
+**2026-09-06** — `cliContainerBin` was first kept on the claim that the CLI's home resolver
+consults a file core's does not. Round 2 read both: `utils/system-config.ts` reads
+`/etc/appbay/config` through core's own `readHostPointer`, and the user pointer is the same
+path. The two resolvers cannot disagree; the wrappers were indirection without a difference
+and are gone. The earlier decision here was wrong and is recorded as such.
 
 **2026-09-06** — Reviews are run by fresh subagents (at most three at once), one per
 region, each handed the S1–S13 / Q1–Q7 rubric and told to read bodies; every finding is
@@ -77,7 +79,7 @@ verified in the main session against the file before it is fixed or dismissed.
 ## Restart
 
 `down.ts` gains `stopApps(appbayHome, names)`: discover, order in reverse of `deployOrder`,
-`compose down` each, return `{stopped, failures}`. `restart` calls it, then `deploy()` with
+`compose down` each, return `{found, stopped, failed, unknown}`. `restart` calls it, then `deploy()` with
 the same targets and prints through `printDeployReport`. Two commands, one stop path, one
 start path.
 
@@ -114,7 +116,7 @@ round n:
 - [x] 1.8 `docker.ts` comment
 - [x] 1.9 knip's unused exported types
 - [x] 2.1 review round 1, fixes
-- [ ] 2.2 review round 2, fixes; further rounds until clean
+- [x] 2.2 review round 2, fixes (round 3 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -156,3 +158,28 @@ diff). Every finding was read against the file before it was acted on.
 Not taken from round 1: `builds.ts` still spawns the container binary through a local `bin`
 (six sites in the build path, listed in the first arch rule; no journey here exercises the
 build) — carried to S49 as a task beside the config loader.
+
+**2026-09-06 — round 2.** Three fresh reviewers over the same regions plus the round-1 diff.
+Round 1's fixes had introduced four defects; every finding was read against the file.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R2.1 | Q1 HIGH | `edge-identity-service.ts:56` | `!claimIdentityStoreOwnership()` negated a Promise (always false): on EACCES the retry raced the un-awaited chown | fixed: awaited |
+| R2.2 | S1 HIGH | `update.ts` | round 1's `compose pull` over every system render failed on the Caddy edge, whose service has `build:` (confirmed on Docker 29: 404 from the registry) | fixed: only services without `build:` are pulled |
+| R2.3 | S1 HIGH | `size.ts` | round 1's volume sum keyed on a label Podman's compat `/system/df` does not return: `0 B` for every app on the S45 host | fixed: name prefix as the fallback (`<project>_…`, `appbay-secrets-<app>`); `?type=volume`; negative sizes skipped |
+| R2.4 | Q1/S1 HIGH | `apply.ts:42-51` | compile errors never printed; a manifest that did not compile read as "All apps are up to date", exit 0 | fixed: printed as `up` prints them, exit 1 |
+| R2.5 | REGRESSION HIGH | `tunnel.ts` | round 1's `t.service` condition returned null for manifests that omit `service` (two in the catalog), and a bare service name is ambiguous on the shared network | fixed: the upstream is the service's alias on `appbay_shared`, read from the render |
+| R2.6 | Q1/S1 MED | `converges.ts` project link | round 1's `not-ready` labelled a container that died during the wait "started but unreachable" | fixed: the deadline re-runs the crash check; test |
+| R2.7 | S7/Q1 MED | `container-runtime.ts`, `route.ts` | a Caddy exec that hit the new 60 s timeout was reported as "the edge is not running"; the compensating reload was skipped | fixed: `timedOut` told apart from `failedToStart`; a `timeout` reason with its own message; reload attempted |
+| R2.8 | S3 MED | `edge-identity-service.ts` | the round-1 timeout landed at one of four edge exec sites | fixed: all four |
+| R2.9 | shape 3 MED | `arch.test.ts` | the no-exemption rule did not match `const bin = containerBin(); spawnSync(bin, …)`, `tryExec(containerBin(…))`, nor `const { spawnSync: ss } = require(…)` in the secrets trait | fixed: the rule matches a local `bin`/`binary` and any call whose first argument is the binary; it found `checks.ts` (two), `info.ts` (a host-tool helper, renamed), the secrets trait's `image inspect`; all through `runtime/`; `builds.ts` listed with its S49 task |
+| R2.10 | Q4/Q5 MED | `engine-api.ts` | the 5 s socket idle timeout on `/system/df` | fixed: per-call timeout, 60 s there |
+| R2.11 | S3/Q7 MED | `docker.ts` | the wrapper justification was false (see Decisions) | fixed: both wrappers deleted, callers use core with the CLI home |
+| R2.12 | Q1 MED | `self.ts` | a PATH lookup can only pick a binary other than the running one (a bun executable reports itself as `process.execPath`) | fixed: `process.execPath` |
+| R2.13 | Q5 MED | exec, dive, mcp, ollama, stats, pull, up | a container binary that never ran exited 1 with no text under `stdio: "inherit"` | fixed: `exitWithContainerResult` prints the spawn error |
+| R2.14 | Q5/Q1 MED | `setup.ts --reset` | `compose down` results dropped, then the renders deleted; a failed stop orphaned a running edge | fixed: through `stopApps`, aborting the delete on failure; the alpine `rm` checked |
+| R2.15 | S3 MED | `setup.ts` | "Docker Engine" / "Docker network" where the runtime may be Podman; `context inspect` without timeout; the Traefik health wait spawned `curl` and `sleep` | fixed: the profile's name; timeout; `fetch` |
+| R2.16 | Q1 MED | `update.ts replaceBinary` | a rename from `/tmp` fails with EXDEV on a separate filesystem and reached for `sudo` | fixed: copy into the target directory, then rename; `sudo` only on EACCES/EPERM |
+| R2.17 | LOW | several | `edge.ts` `startStack` ignored compile errors; `server.ts` "within 30s" understated; stale headers in `docker.ts` and its test; `observe.ts` dynamic import; `resolve-for-deploy` comments and an unchecked `volume create`; a redundant cast; `in` on a plain object; the shepherd share lookup accepting a stopped container; the traefik path not restoring a half-written candidate; `install` conflating "could not run" with "failed"; a journey's `secrets set` without `APPBAY_HOME`; two doc lines describing the render as the writer of edge fragments; the spec's `stopApps` shape | fixed |
+| R2.18 | Q6 LOW | `converges.ts` | `shepherd:post` depends on `route`, so a post-deploy hook is skipped when the edge is down | left for Kun: a design question, recorded here |
+| R2.19 | INFO | new code paths without a test | `containerEndpoint`, `apiDiskUsage`, `containerSpawnSync`, `write-failed`, the `removed` refusal, `stopApps.found`, setup's post-deploy edge check, update's pull loop | recorded as untested; the two runtime readers were verified by hand on Docker 29 and Podman 5.8 by the reviewer |
