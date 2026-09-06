@@ -1,0 +1,49 @@
+review_date: 2026-09-06
+repo: kundeng/appbay-cli
+commit_reviewed: 5895684
+docs: [01-PRODUCT_EXPERIENCE.md, 02-SYSTEM_DESIGN.md, 03-CODE_QUALITY.md, 04-RECONCILIATION_PLAN.md]
+gates:
+  typecheck: clean
+  tests: { core: { passed: 1107, skipped: 7 }, cli: { passed: 385 } }
+  lint: none-configured
+  knip_unused_exports: 4
+specs: { count: 14, active: 0, all_closed: true, chain_linear: true }
+journeys:
+  - { name: up, components: [cli.up, services.deploy, compiler, runtime.observer, traits.ingress], status: verified, breaks: [F2, F4] }
+  - { name: init, components: [cli.init, schemas.instance, system-apps], status: verified }
+  - { name: install, components: [services.catalog, services.vault], status: partial, breaks: [F5, D1] }
+  - { name: edge-migrate, components: [cli.edge, services.edge-migration, runtime.engine-api], status: verified }
+  - { name: secrets-at-deploy, components: [traits.secrets, secrets.resolve-for-deploy, shepherd], status: partial, breaks: [F1, "#11"] }
+  - { name: server-start, components: [cli.server, runtime.observer], status: verified, breaks: [F7] }
+  - { name: doctor, components: [health.checks], status: verified }
+components:
+  - { id: cli, path: apps/cli/src, depends_on: [services, health, runtime] }
+  - { id: services, path: packages/core/src/services, depends_on: [compiler, runtime, secrets, schemas] }
+  - { id: compiler, path: packages/core/src/compiler, depends_on: [schemas, traits, state, runtime] }
+  - { id: runtime, path: packages/core/src/runtime, depends_on: [schemas] }
+  - { id: health, path: packages/core/src/health, depends_on: [runtime, compiler, schemas] }
+  - { id: secrets, path: packages/core/src/secrets, depends_on: [runtime, shepherd, compiler] }
+  - { id: db, path: packages/db, depends_on: [], note: web control plane cache schema; used by rebuild-cache only }
+findings:
+  - { id: F1, lens: S4, severity: HIGH, file: packages/core/src/schemas/appbay-yaml.ts, line: 288, action: approved }
+  - { id: F2, lens: Q1, severity: MEDIUM, file: packages/core/src/services/deploy-service.ts, line: 598, action: approved }
+  - { id: F3, lens: S3, severity: MEDIUM, file: packages/core/src/compiler/compile.ts, line: 533, action: approved }
+  - { id: F4, lens: Q1, severity: MEDIUM, file: packages/core/src/runtime/observe.ts, line: 227, action: approved }
+  - { id: F5, lens: Q1, severity: MEDIUM, file: packages/core/src/services/catalog-service.ts, line: 207, action: approved }
+  - { id: F6, lens: Q3, severity: LOW, file: apps/cli/src/commands/up.ts, line: 85, action: approved }
+  - { id: F7, lens: Q5, severity: MEDIUM, file: apps/cli/src/commands/server.ts, line: 56, action: approved }
+  - { id: F8, lens: S4, severity: MEDIUM, file: packages/core/src/traits/definitions/backup.ts, line: 38, action: blocked, decision: D3 }
+  - { id: F9, lens: S13, severity: HIGH, file: packages/core/src/services/catalog-service.ts, line: 230, action: blocked, decision: D1 }
+  - { id: F10, lens: S13, severity: MEDIUM, file: packages/core/src/secrets/master-password.ts, line: 143, action: blocked, decision: D2 }
+  - { id: F11, lens: S2, severity: HIGH, file: packages/core/src/traits/definitions/secrets.ts, line: 249, action: scheduled, issue: 11 }
+  - { id: F12, lens: S3, severity: LOW, file: packages/core/src/services/vault-service.ts, line: 130, action: proposed }
+  - { id: F13, lens: S5, severity: LOW, file: packages/core/src/compiler/compile.ts, line: 709, action: proposed }
+  - { id: F14, lens: S10, severity: LOW, file: apps/cli/src/utils/docker.ts, line: 83, action: proposed }
+  - { id: F15, lens: hygiene, severity: LOW, file: package.json, line: 1, action: approved-partial }
+  - { id: F16, lens: Q5, severity: LOW, file: packages/core/src/services/deploy-service.ts, line: 620, action: proposed }
+  - { id: F17, lens: S5, severity: LOW, file: apps/cli/src/commands, line: 0, action: proposed }
+  - { id: F18, lens: Q4, severity: LOW, file: apps/cli/src/commands/apply.ts, line: 79, action: accepted }
+  - { id: F19, lens: S7, severity: LOW, file: docs/guide/overlays.qmd, line: 124, action: approved }
+  - { id: F21, lens: Q1, severity: LOW, file: packages/core/src/health/checks.ts, line: 590, action: proposed }
+decisions_pending: [D1, D2, D3, ledger-28, ledger-22]
+next_sprint: S46-review-fixes
