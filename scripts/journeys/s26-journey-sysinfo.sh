@@ -31,7 +31,7 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
+ab()  { vm "cd $WORKDIR && APPBAY_HOME=$HOME_DIR appbay $1 2>&1"; }
 
 cleanup() { ab "down sysinfo" >/dev/null 2>&1; }
 trap cleanup EXIT

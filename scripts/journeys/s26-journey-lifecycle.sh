@@ -28,7 +28,7 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
+ab()  { vm "cd $WORKDIR && APPBAY_HOME=$HOME_DIR appbay $1 2>&1"; }
 
 runtime_state() { vm "$CBIN inspect $CTR --format '{{.State.Status}}' 2>/dev/null || echo absent" | tr -d '[:space:]'; }
 started_at()    { vm "$CBIN inspect $CTR --format '{{.State.StartedAt}}' 2>/dev/null || echo none" | tr -d '[:space:]'; }

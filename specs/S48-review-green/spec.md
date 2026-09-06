@@ -104,15 +104,15 @@ round n:
 
 # 3 · Tasks
 
-- [ ] 1.1 `down.ts` `stopApps`; `restart.ts` through it and `deploy()` (row 40)
-- [ ] 1.2 journeys `WORKDIR` (row 42); run apply-success and lifecycle on both guests
-- [ ] 1.3 row 12 residue
-- [ ] 1.4 `CompileOptions.appbayHome` (F13)
-- [ ] 1.5 KeePass env once
-- [ ] 1.6 `fetch` health wait; `checkGpu` unknown
-- [ ] 1.7 CLI container spawns through `runtime/`; arch rule scope widened
-- [ ] 1.8 `docker.ts` comment
-- [ ] 1.9 knip's unused exported types
+- [x] 1.1 `down.ts` `stopApps`; `restart.ts` through it and `deploy()` (row 40)
+- [x] 1.2 journeys `WORKDIR` (row 42); apply-success and lifecycle on both guests run under 3.1
+- [x] 1.3 row 12 residue
+- [x] 1.4 `CompileOptions.appbayHome` (F13)
+- [x] 1.5 KeePass env once
+- [x] 1.6 `fetch` health wait; `checkGpu` unknown
+- [x] 1.7 CLI container spawns through `runtime/`; arch rule scope widened
+- [x] 1.8 `docker.ts` comment
+- [x] 1.9 knip's unused exported types
 - [ ] 2.1 review round 1, fixes
 - [ ] 2.2 review round 2, fixes; further rounds until clean
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
@@ -121,3 +121,8 @@ round n:
 
 **2026-09-06** — created. Baseline after S47: core 1126, CLI 385, tsc clean, `check:*`
 green, knip: 12 unused exported types and one unused docs file.
+
+**2026-09-06** — 1.1–1.9 landed in 127fc05. Also found while converting setup.ts: its
+Traefik scaffold writes three files through `bash -c "cat > <path> << 'EOF' …"` with the
+path interpolated (ledger row 43); held for the round-1 reviewer of that region and fixed
+after.

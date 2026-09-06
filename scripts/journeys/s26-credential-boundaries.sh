@@ -34,7 +34,7 @@ pass=0; fail=0
 ok()  { echo "  ✅ $1"; pass=$((pass+1)); }
 bad() { echo "  ❌ $1"; fail=$((fail+1)); }
 vm()  { multipass exec "$VM" -- $PRIV bash -c "$1"; }
-ab()  { vm "cd $WORKDIR && appbay $1 2>&1"; }
+ab()  { vm "cd $WORKDIR && APPBAY_HOME=$HOME_DIR appbay $1 2>&1"; }
 
 # sha of a store, or "absent". Never prints contents — these files hold credentials.
 sha() { vm "test -f $1 && sha256sum $1 | cut -d' ' -f1 || echo absent" | tr -d '[:space:]'; }
@@ -101,7 +101,7 @@ db.execute('CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TE
 db.execute(\"INSERT OR REPLACE INTO users VALUES ('u-bnd','boundaryadmin',?,'2026-01-01T00:00:00.000Z')\", ('a'*32 + ':' + 'b'*128,))
 db.commit()
 PY" >/dev/null 2>&1
-  vm "cd $WORKDIR && appbay admin reset-password boundaryadmin --generate" >/dev/null 2>&1
+  vm "cd $WORKDIR && APPBAY_HOME=$HOME_DIR appbay admin reset-password boundaryadmin --generate" >/dev/null 2>&1
   CP_EXISTS=$(vm "test -f $CP && echo yes || echo no" | tr -d '[:space:]')
   [ "$CP_EXISTS" = "yes" ] || { bad "could not provision a control-plane account"; exit 1; }
   PROVISIONED_CP=yes
