@@ -10,6 +10,7 @@ packages/core/src/
   state/        generated values that must survive a recompile
   runtime/      the container runtime adapter: which binary, which socket, how to ask it
   services/     use cases: deploy, install, migrate the edge, vault, config
+  services/deploy/  the deploy as a chain of converges per app, one skip rule, and the fold that makes the report
   health/       doctor checks
   secrets/      secret providers and the deploy-time resolver
   shepherd/     one-shot helper containers run around a deploy

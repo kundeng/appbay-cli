@@ -3,7 +3,7 @@
  * `Observer` fed here with rows directly; mutation is a compose runner that records calls.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deploy } from "../deploy-service.js";
@@ -65,6 +65,21 @@ describe("🚨 an UNCHANGED artifact does not mean an unchanged deployment", () 
     const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "old-id")), ok(row("running", "new-id")), ok(row("running", "new-id"))]) });
     expect(result.deployed).toBe(1);
     expect(result.unchanged).toBe(0);
+  });
+});
+
+describe("what compose did is recorded on every plan status (S47)", () => {
+  it("a NEW plan records that compose started something, and is deployed", async () => {
+    // before: nothing; after and crash check: running
+    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(), ok(row("running", "new-id"))]) });
+    expect(result.apps[0]).toMatchObject({ planStatus: "new", status: "deployed", convergeAction: "started" });
+  });
+
+  it("the render's .env is a copy of the app's on an unchanged plan too", async () => {
+    await seedRender();
+    await writeFile(join(home, "etc", "apps", APP, ".env"), "ROTATED=1\n");
+    await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running", "seed-id"))]) });
+    expect(await readFile(join(home, "var", "lib", "renders", APP, ".env"), "utf-8")).toBe("ROTATED=1\n");
   });
 });
 

@@ -100,6 +100,21 @@ describe("readiness after the 2026-09-06 review", () => {
     expect(log).toContain("web:up");
   });
 
+  it("a dependency whose runtime could not be observed blocks its dependent (S47)", async () => {
+    // db's socket is down; web's is fine. Nothing starts over a dependency nobody saw ready.
+    const { run, observer, log } = runner({ db: () => row("db", "running"), web: () => row("web", "running") });
+    const project = observer.project;
+    observer.project = async (app) => app === "db" ? { kind: "unknown", reason: "no socket" } : project(app);
+    const r = await deploy({ appbayHome: home, dockerCompose: run, observer, readinessTimeoutMs: 10_000, sleep: noSleep, crashGraceMs: 0 });
+    const db = r.apps.find((a) => a.appName === "db")!;
+    const web = r.apps.find((a) => a.appName === "web")!;
+    expect(db).toMatchObject({ status: "unchanged", convergeAction: "unknown", unknownReason: "no socket" });
+    expect(web.status).toBe("failed");
+    expect(web.error).toContain("depends on db, which did not become ready");
+    expect(log).not.toContain("web:up");
+    expect([r.deployed, r.unchanged, r.failed]).toEqual([0, 1, 1]);
+  });
+
   it("a dependency that did not compile blocks its dependent, like one that did not become ready (F2)", async () => {
     // An ingress trait with no host and no domain is a compile error that keeps db in the app
     // set (a manifest that fails to parse drops out of the graph and refuses the whole run).
