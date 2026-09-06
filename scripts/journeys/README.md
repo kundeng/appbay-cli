@@ -29,6 +29,10 @@ VM=appbay-rhel PRIV=sudo CBIN=podman ./s26-journey-lifecycle.sh   # rootful Podm
 | `CBIN` | `docker` | container CLI (`podman` on the RHEL host) |
 | `HOME_DIR` | `/home/ubuntu/.appbay` | APPBAY_HOME on the target |
 
+On a Mac with Lima instead of multipass, put `lib/multipass-lima-shim` on PATH as
+`multipass` (the file's header shows the two lines); `limactl shell` and `limactl copy` stand in
+for the two verbs the journeys use. A rootful Podman guest is `limactl start template:podman-rootful`.
+
 **Six of these run LOCALLY and ignore `VM` entirely.** Passing `VM=…` to one of them does
 nothing — it inspects whatever machine you are sitting on, which is how a batch run reported
 `caddy version — expected v2.11.4, got '<none>'` against a workstation that simply did not

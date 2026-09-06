@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# The journeys speak multipass; on a Mac the guests are Lima. Put this directory first on
+# PATH under the name `multipass` and the scripts run unchanged:
+#   mkdir -p /tmp/mp && ln -sf "$PWD/scripts/journeys/lib/multipass-lima-shim" /tmp/mp/multipass
+#   PATH=/tmp/mp:$PATH VM=podman PRIV=sudo CBIN=podman HOME_DIR=/root/.appbay ./scripts/journeys/s29-journey-deploy-reporting.sh
+# Only the two verbs the journeys use are translated. Used for S45's Podman evidence.
+case "$1" in
+  exec)   vm="$2"; shift 3; exec limactl shell --workdir /tmp "$vm" "$@" ;;
+  transfer) exec limactl copy "$2" "$3" ;;
+  *) echo "shim: unsupported multipass verb $1" >&2; exit 2 ;;
+esac
