@@ -24,6 +24,7 @@ export const restartCommand = new Command("restart")
 
     // A name nothing matches is refused before anything stops: the stop half would tolerate
     // it and the start half (deploy()) would refuse the run, leaving the named apps down.
+    // deploy() checks this too; the copy here exists because the stop runs first.
     const installed = await discoverApps({ appsDir: join(appbayHome, "etc", "apps") });
     const unknown = apps.filter((name) => !installed.some((a) => a.name === name));
     if (unknown.length > 0) {

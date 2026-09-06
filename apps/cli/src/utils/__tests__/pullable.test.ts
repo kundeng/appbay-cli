@@ -17,8 +17,11 @@ beforeAll(() => {
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("pullableServices", () => {
-  it("excludes a service the manifest builds and one the upstream compose builds", () => {
-    expect(pullableServices(join(dir, "render.yml"), join(dir, "upstream.yml"), { caddy: { context: "." } })).toEqual(["whoami"]);
+  it("excludes a service whose render is pinned to the manifest build's image, and one the upstream compose builds", () => {
+    expect(pullableServices(join(dir, "render.yml"), join(dir, "upstream.yml"), { caddy: { context: ".", image: "localhost/appbay-caddy-security:1" } })).toEqual(["whoami"]);
+  });
+  it("a manifest build gated off by when: left the registry image in the render, and that one is pullable", () => {
+    expect(pullableServices(join(dir, "render.yml"), join(dir, "upstream.yml"), { caddy: { context: ".", image: "localhost/appbay-caddy-security:gpu", when: { instance: { gpu: true } } } })).toEqual(["caddy", "whoami"]);
   });
   it("with no builds anywhere, every rendered service is pullable", () => {
     writeFileSync(join(dir, "plain.yml"), "services:\n  a:\n    image: x\n  b:\n    image: y\n");

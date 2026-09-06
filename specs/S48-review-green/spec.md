@@ -119,7 +119,8 @@ round n:
 - [x] 2.2 review round 2, fixes
 - [x] 2.3 review round 3, fixes
 - [x] 2.4 review round 4, fixes
-- [x] 2.5 review round 5, fixes (round 6 pending)
+- [x] 2.5 review round 5, fixes
+- [x] 2.6 review round 6, fixes (round 7 pending)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -237,4 +238,20 @@ pass. The other two returned two HIGH and two MEDIUM, one of each a measured run
 
 Not pinned by a test after this round: the tunnel's `--add-host` and pull check, the DNS
 probe's exit-125 branch, setup's stdout-before-status and `edgeState`, `update`'s restore
-paths, `exec`'s service choice, the edge restart's three answers. Recorded, not claimed.
+paths, `exec`'s service choice, the edge restart's three answers, the doctor's sudo-probe
+timeout, the `models` and `update` fetch timeouts. Recorded, not claimed.
+
+**2026-09-06 — round 6.** The core region passed with nothing above LOW. The diff reviewer
+found one MEDIUM in a round-5 fix; the CLI reviewer found one pre-existing MEDIUM no round
+or journey had reached.
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R6.1 | REGRESSION MED | `utils/pullable.ts` | round 5 keyed "built here" on the manifest having a `builds.<service>` entry; a build gated off by `when:` leaves the registry image in the render, and `pull` would have called it "built locally" | fixed: a service is built here iff its rendered image equals the manifest build's image, or the upstream declares `build:`; test with a gated-off build |
+| R6.2 | S1 MED | `edge.ts` migrate | `edge migrate --to caddy` ran `compose build` against the render, which carries no `build:`; on a host that never built the image the validate step failed with a pull error attributed to the config | fixed: the candidate's manifest build actions (now marked `kind: "build"`) run first, the way the deploy runs them; a failure names the build |
+| R6.3 | LOW | `checks.ts:501,503` | round 5's sudo-probe timeout landed at one of three sites | fixed: all three |
+| R6.4 | LOW | `observe.ts` | a container that vanished between list and inspect read as a ready row (or exit 0) | fixed: not a row; test that a Docker `(healthy)` row costs no inspect and a broken inspect makes the project unknown |
+| R6.5 | LOW | `down.ts` | `down typo` warned and exited 0 while `pull` and `restart` exit 1 | fixed: one rule; scratch-home test |
+| R6.6 | LOW | several | `models rm` and `update`'s version lookups without timeouts; `OLLAMA_HOST` without a scheme; `dive` reading `${VAR:-default}` from the source compose; `logs` exit 0 on a signal; the download budget too small for a slow link; a stale sentence in `observe.ts`; the two-edges sentence untested | fixed |
+| R6.7 | LOW | `converges.ts` readiness poll | one stalled inspect during the poll makes the project unobservable rather than "not yet" | recorded: honest, if impatient; a design choice for a later sprint |
+| R6.8 | LOW | `boot-order.ts:111` | the cycle error names every remaining app, including dependents of the cycle | recorded |

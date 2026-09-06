@@ -20,7 +20,8 @@ interface OllamaModel {
 
 async function getOllamaUrl(): Promise<string> {
   const envUrl = process.env.OLLAMA_HOST ?? process.env.APPBAY_OLLAMA_URL;
-  if (envUrl) return envUrl.replace(/\/$/, "");
+  // Ollama's own convention for OLLAMA_HOST is `host:port`; fetch needs a scheme.
+  if (envUrl) return (/^https?:\/\//.test(envUrl) ? envUrl : `http://${envUrl}`).replace(/\/$/, "");
 
   const found = await runningAppContainer("ollama");
   const container = found.kind === "ok" && found.value?.running ? found.value.name : null;
@@ -98,6 +99,7 @@ async function removeModel(name: string): Promise<void> {
   let resp: Response;
   try {
     resp = await fetch(`${url}/api/delete`, {
+      signal: AbortSignal.timeout(30_000),
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),

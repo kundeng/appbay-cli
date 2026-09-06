@@ -183,6 +183,7 @@ function normaliseArgs(args: unknown): Record<string, string> {
 export function buildShepherdAction(build: ResolvedBuild, appDir: string): ShepherdAction {
   return {
     phase: "pre-deploy",
+    kind: "build",
     label: `Build ${build.image} for service ${build.service}`,
     timeoutMs: 1_800_000,
     run: async (ctx) => {

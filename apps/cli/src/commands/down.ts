@@ -87,10 +87,8 @@ export const downCommand = new Command("down")
       console.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
-    for (const name of result.unknown) console.warn(`  Warning: app "${name}" not found`);
-    if (result.found === 0 || (apps.length > 0 && result.unknown.length === apps.length)) {
-      console.log("No apps found to stop.");
-    }
+    for (const name of result.unknown) console.error(`  [${name}] target: no installed app named "${name}"`);
+    if (result.found === 0) console.log("No apps found to stop.");
     console.log(`\n${result.stopped} stopped`);
-    process.exit(result.failed > 0 ? 1 : 0);
+    process.exit(result.failed > 0 || result.unknown.length > 0 ? 1 : 0);
   });

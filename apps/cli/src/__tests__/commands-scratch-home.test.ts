@@ -73,6 +73,9 @@ describe("commands against a scratch home", () => {
     expect(restart.status).toBe(1);
     expect(restart.stderr).toContain('no installed app named "typo"');
     expect(restart.stdout).not.toContain("Stopping");
+    const down = appbay(["down", "typo"]);
+    expect(down.status).toBe(1);
+    expect(down.stderr).toContain('no installed app named "typo"');
     const pull = appbay(["pull", "whoami", "typo"]);
     expect(pull.status).toBe(1);
     expect(pull.stderr).toContain('app "typo" not found');

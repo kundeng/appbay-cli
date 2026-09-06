@@ -54,7 +54,7 @@ async function fetchLatestVersion(): Promise<string> {
   }
 
   const url = `https://api.github.com/repos/${REPO}/releases/latest`;
-  const resp = await fetch(url, { headers });
+  const resp = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
 
   if (resp.ok) {
     const json = (await resp.json()) as { tag_name?: string };
@@ -64,7 +64,7 @@ async function fetchLatestVersion(): Promise<string> {
   // Fallback: /releases/latest returns 404 for repos with only pre-releases.
   // List all releases and pick the most recent.
   const fallbackUrl = `https://api.github.com/repos/${REPO}/releases?per_page=1`;
-  const fallbackResp = await fetch(fallbackUrl, { headers });
+  const fallbackResp = await fetch(fallbackUrl, { headers, signal: AbortSignal.timeout(30_000) });
 
   if (!fallbackResp.ok) {
     throw new Error(`GitHub API error ${fallbackResp.status}: ${await fallbackResp.text()}`);
@@ -82,7 +82,7 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
   const resp = await fetch(url, {
     headers: { "User-Agent": `appbay-cli/${VERSION}` },
     redirect: "follow",
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(1_800_000),
   });
 
   if (!resp.ok) throw new Error(`Download failed (${resp.status}): ${url}`);

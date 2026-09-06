@@ -153,8 +153,15 @@ const migrate = new Command("migrate")
         // Caddyfile's secret-bearing directives validate against empty strings and fail.
         const resolved = await resolveDeployEnv(app, appsDir);
         if (resolved.error) return resolved.error;
-        const build = containerCompose(["build"], render, resolved.env, appbayHome);
-        if (build.exitCode !== 0) return `could not build the ${to} image: ${build.output.trim().split("\n").pop()}`;
+        // The render carries no `build:` (the compiler strips it and pins the tag), so the
+        // image is built the way the deploy builds it: the manifest's build actions.
+        for (const action of app.shepherdActions.filter((a) => a.kind === "build")) {
+          try {
+            await action.run?.({ appName: app.appName, appbayHome, secretEnv: resolved.env });
+          } catch (err) {
+            return `could not build the ${to} image (${action.label}): ${err instanceof Error ? err.message : String(err)}`;
+          }
+        }
         const check = containerCompose(
           ["run", "--rm", "--no-deps", "--entrypoint", "caddy", to, "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
           render, resolved.env, appbayHome,

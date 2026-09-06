@@ -75,6 +75,11 @@ describe("describeRouteFailure names what is wrong, per reason", () => {
     expect(text).toContain("did not answer");
     expect(text).not.toMatch(/previous configuration reloaded\./);
   });
+  it("two running edges: the sentence names the ambiguity, not a missing edge (S48 round 5)", () => {
+    const text = describeRouteFailure("whoami", { ok: false, reason: "unavailable", detail: "could not ask the runtime for the edge (2 running containers carry com.appbay.app=caddy: a, b)" }, "caddy");
+    expect(text).toContain("more than one caddy edge is running");
+    expect(text).not.toContain("appbay up caddy");
+  });
   it("write-failed and rejected each say so", () => {
     expect(describeRouteFailure("whoami", { ok: false, reason: "write-failed", detail: "EACCES" }, "traefik")).toContain("could not be written");
     expect(describeRouteFailure("whoami", { ok: false, reason: "rejected", detail: "line 3: unknown directive" }, "caddy")).toContain("rejected the generated configuration");

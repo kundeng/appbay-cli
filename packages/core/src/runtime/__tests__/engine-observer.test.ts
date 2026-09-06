@@ -13,6 +13,8 @@ import { apiPing, apiInspectContainer } from "../engine-api.js";
 interface Fake { Id: string; Names: string[]; State: string; Status: string; Labels: Record<string, string>; ExitCode?: number; Health?: string }
 let containers: Fake[] = [];
 let networks = new Set<string>();
+let inspects = 0;
+let inspectFails = false;
 let dir: string; let sock: string; let server: Server;
 
 beforeAll(async () => {
@@ -31,6 +33,8 @@ beforeAll(async () => {
       json(200, out.map(({ ExitCode: _e, Health: _h, ...c }) => c)); return;
     }
     const m = /^\/containers\/([^/]+)\/json$/.exec(url.pathname);
+    if (m) inspects++;
+    if (m && inspectFails) { json(500, { message: "inspect broke" }); return; }
     if (m && decodeURIComponent(m[1]!) === "truncated") {
       // A daemon that dies mid-reply: headers, five bytes, then the socket is gone.
       res.writeHead(200, { "content-type": "application/json", "content-length": "1000" });
@@ -103,6 +107,18 @@ describe("engine observer", () => {
     expect(await isReady(obs(), "pv")).toMatchObject({ kind: "ok", value: { ready: false } });
     containers[0]!.Health = "healthy";
     expect(await isReady(obs(), "pv")).toMatchObject({ kind: "ok", value: { ready: true } });
+  });
+
+  it("a Docker status line that carries the health word costs no inspect; a broken inspect makes the project unknown", async () => {
+    containers = [c("d-web-1", "running", { "com.docker.compose.project": "d", "com.docker.compose.service": "web" }, { Status: "Up 9 seconds (healthy)" })];
+    inspects = 0;
+    expect((await obs().project("d")).kind).toBe("ok");
+    expect(inspects).toBe(0);
+    containers = [c("d-web-1", "running", { "com.docker.compose.project": "d", "com.docker.compose.service": "web" }, { Status: "Up 9 seconds" })];
+    inspectFails = true;
+    const r = await obs().project("d");
+    inspectFails = false;
+    expect(r.kind).toBe("unknown");
   });
 
   it("answers running-state and network existence", async () => {

@@ -11,8 +11,9 @@ function resolveImage(target: string): string {
   if (target.includes("/") || target.includes(":")) return target;
 
   // Try to resolve from app's compose file
-  const appsDir = resolveAppsDir();
-  const composePath = join(appsDir, target, "docker-compose.yml");
+  // The render's image is the resolved tag; the source may carry `${VAR:-default}`.
+  const render = join(resolveAppbayHome(), "var", "lib", "renders", target, "docker-compose.rendered.yml");
+  const composePath = existsSync(render) ? render : join(resolveAppsDir(), target, "docker-compose.yml");
   if (existsSync(composePath)) {
     try {
       const compose = parseYaml(readFileSync(composePath, "utf-8"));

@@ -90,6 +90,8 @@ export type ShepherdPhase = "pre-deploy" | "post-deploy" | "on-stop" | "cron";
 /** A shepherd action emitted by a trait — an operational task tied to a lifecycle phase. */
 export interface ShepherdAction {
   phase: ShepherdPhase;
+  /** What the action is, where a caller needs to pick some out: the image builds the manifest declares. */
+  kind?: "build";
   /** Human-readable label (e.g., "Generate edge authorization policy"). */
   label: string;
   /** Docker image for the shepherd container. */

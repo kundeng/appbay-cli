@@ -498,9 +498,9 @@ function defaultProbeAs(
   // always, which is a different false answer from the one it exists to remove but no less
   // useless. Caught by running it on a real service install, not by the unit tests, which
   // inject the probe.
-  const canSudo = tryExec("sudo", ["-n", "id", "-un"]);
+  const canSudo = tryExec("sudo", ["-n", "id", "-un"], { timeoutMs: 10_000 });
   if (canSudo === null) return "cannot-probe";
-  const out = tryExec("sudo", ["-n", "-u", user, ...probeArgv(bin, appbayHome)]);
+  const out = tryExec("sudo", ["-n", "-u", user, ...probeArgv(bin, appbayHome)], { timeoutMs: 10_000 });
   return out !== null ? "ok" : "denied";
 }
 

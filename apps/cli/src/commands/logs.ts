@@ -42,7 +42,7 @@ export const logsCommand = new Command("logs")
     // stdio inherited on all three: a read-only stream with the terminal's stdin is harmless,
     // and the plain form keeps the ChildProcess type that carries `.on()`.
     const child = containerSpawn(args, { appbayHome, stdio: "inherit" });
-    child.on("close", (code) => process.exit(code ?? 0));
+    child.on("close", (code) => process.exit(code ?? 1));
     child.on("error", (err) => {
       console.error(`Failed to run compose logs: ${err.message}`);
       process.exit(1);
