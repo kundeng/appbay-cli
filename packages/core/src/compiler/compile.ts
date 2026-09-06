@@ -39,7 +39,7 @@ import { TraitRegistry } from "../traits/registry.js";
 import { registerCoreTraits } from "../traits/definitions/index.js";
 import { GeneratedValueStore, parseMagicVar } from "../state/generated-values.js";
 import { discoverApps } from "./discover.js";
-import { transformUpstream } from "./upstream-transform.js";
+import { transformUpstream, applyIdentity } from "./upstream-transform.js";
 import { ScopeResolver } from "./scope-resolver.js";
 import { selectActiveOverlays } from "./overlay-engine.js";
 import type { ActiveOverlay } from "./overlay-engine.js";
@@ -474,6 +474,9 @@ async function compileApp(input: CompileAppInput): Promise<CompileAppOutput> {
         details: err,
       });
     }
+  } else {
+    // No upstream block: the compose is taken as written, but identity is not optional.
+    compose = applyIdentity(compose, appNamespace, app.name);
   }
 
   // -----------------------------------------------------------------------

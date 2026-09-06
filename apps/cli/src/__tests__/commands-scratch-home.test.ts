@@ -86,6 +86,7 @@ describe("commands against a scratch home", () => {
     // The alias the fragment dials is the alias the compose file declares.
     expect(fragment).toContain("http://lab_echo_echo:80");
     expect(rendered).toContain("- lab_echo_echo");
+    expect(rendered).toContain("container_name: appbay.lab.echo.echo");
     const plain = appbay(["compile", "echo"]);
     expect(plain.status).not.toBe(0);
     expect(plain.stdout + plain.stderr).toContain('"TIER" in scope "ns"');

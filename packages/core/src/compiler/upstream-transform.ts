@@ -94,6 +94,45 @@ interface ServiceDef {
 // ---------------------------------------------------------------------------
 
 /**
+ * The identity every service carries whatever its manifest says: the container name
+ * `appbay.[<ns>.]<app>.<service>` and the labels consumers ask by instead of parsing that
+ * name (identity.ts). This used to run only inside `transformUpstream`, so an app without
+ * an `upstream:` block deployed as `<app>-<svc>-1` with no labels and no by-label observer
+ * could see it (appbay-cli#10).
+ */
+export function withIdentity(
+  service: ServiceDef,
+  namespace: string | undefined,
+  appName: string,
+  serviceName: string,
+): ServiceDef {
+  return {
+    ...service,
+    container_name: containerName(namespace, appName, serviceName),
+    labels: {
+      ...(typeof service.labels === "object" && !Array.isArray(service.labels) ? service.labels : {}),
+      [APP_LABEL]: appName,
+      [NAMESPACE_LABEL]: namespace ?? "default",
+    },
+  };
+}
+
+/** `withIdentity` over every service of a compose model that had no upstream transform. */
+export function applyIdentity(
+  compose: Record<string, unknown>,
+  namespace: string | undefined,
+  appName: string,
+): Record<string, unknown> {
+  const services = (compose.services ?? {}) as Record<string, ServiceDef>;
+  return {
+    ...compose,
+    services: Object.fromEntries(
+      Object.entries(services).map(([name, svc]) => [name, withIdentity(svc, namespace, appName, name)]),
+    ),
+  };
+}
+
+/**
  * Transform an upstream compose file for namespace isolation.
  *
  * This is a pure function -- it does not read or write the filesystem.
@@ -157,18 +196,7 @@ export function transformUpstream(
       continue;
     }
 
-    const svc: ServiceDef = { ...service };
-
-    // Container name: appbay.<appname>.<service>, namespaced when there is one.
-    svc.container_name = containerName(namespace, appName, name);
-
-    // Labels so consumers can ask which app/namespace a container belongs to instead of
-    // parsing its name — see identity.ts APP_LABEL for why parsing does not survive §4.
-    svc.labels = {
-      ...(typeof svc.labels === "object" && !Array.isArray(svc.labels) ? svc.labels : {}),
-      [APP_LABEL]: appName,
-      [NAMESPACE_LABEL]: namespace ?? "default",
-    };
+    const svc: ServiceDef = withIdentity(service, namespace, appName, name);
 
     // Network configuration (skip if service uses network_mode)
     if (!svc.network_mode) {

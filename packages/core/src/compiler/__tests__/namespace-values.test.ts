@@ -104,3 +104,16 @@ describe("the default ingress host", () => {
     expect(r.errors.map((e) => e.message).join("\n")).toContain("no host: given and the install has no domain");
   });
 });
+
+describe("identity without upstream (appbay-cli#10)", () => {
+  it("an app with no upstream: block still gets the container name and labels, namespaced", async () => {
+    await app("plain", "namespace: uom.sim\n", "services:\n  web:\n    image: nginx\n    labels:\n      keep: me\n");
+    const r = await compile(opts());
+    expect(r.errors).toEqual([]);
+    const rendered = r.apps[0]!.rendered;
+    expect(rendered).toContain("container_name: appbay.uom-sim.plain.web");
+    expect(rendered).toContain("com.appbay.app: plain");
+    expect(rendered).toContain("com.appbay.namespace: uom.sim");
+    expect(rendered).toContain("keep: me");
+  });
+});
