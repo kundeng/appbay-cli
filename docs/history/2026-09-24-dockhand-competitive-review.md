@@ -312,15 +312,41 @@ strings.
 The tempting responses to this review are all more expensive and less valuable
 than the list above.
 
-**Do not answer the feature gap with features.** The thirteen absent
-subsystems are real, and thirteen is not a sprint. The asymmetry worth pressing
-is the compiler, which is one document away from being visible, against a
-feature list that is thirteen subsystems away from being closed.
+**Do not treat the thirteen absences as one decision.** Both investigations
+recommended declining the feature gap wholesale. That is too blunt, and the
+compiler is the reason why: AppBay has extension seams — the trait registry
+(`packages/core/src/traits/definitions/`, with user-provided extension traits
+already anticipated in `types.ts`), `SYSTEM_APPS`, the `hooks` trait, and
+catalog sources. A capability that lands on an existing seam is not a subsystem;
+it is a declaration plus a generator.
 
-**Do not chase Dockhand's feature list.** Vulnerability scanning, Git-repository
-deploys, webhook triggers, multi-host agents, backup destinations and
-notification fan-out are absent here and present there, shipped at a release
-every six days with 6366 stars of feedback behind them. [both]
+Sort the thirteen by which seam they need, not by whether Dockhand has them:
+
+| Capability | Plausible seam | Cost |
+|---|---|---|
+| Scheduling | `hooks` trait, or a cron system app | low |
+| Notification fan-out | system app, or a hook | low |
+| Backup destinations | the `backup` trait **already exists**; destinations extend it | low |
+| Vulnerability scanning | scanner system app plus a reporting command | moderate |
+| Git-repository deploy, webhooks, auto-sync | a catalog source type plus a scheduler | moderate |
+| Container file browsing, shell UI | needs the web surface, not the CLI | moderate |
+| **Multi-host agents** | **none** | **high** |
+
+Multi-host is the one that genuinely does not fit. `traits/types.ts` states the
+model is "adapted for **single-node** Docker Compose", and the ingress trait
+resolves one installation-level proxy from one `project.yaml`. Multi-host is not
+a trait; it invalidates an assumption the compiler is built on. Decline that
+one on architecture, and judge the rest individually on the seam they land on.
+
+The order still matters: a capability added before the compiler is documented is
+a capability nobody knows to look for. Ship the P0 above first, then pick from
+this table.
+
+**Do not chase Dockhand's feature list as a list.** Matching a competitor's
+headline set at one release every six days, with 6366 stars of feedback behind
+it, is a losing race, and the brief excludes significant features. Adding a
+capability because it fits AppBay's extension model is a different decision from
+adding it because Dockhand has it, and only the first is worth making. [both]
 
 **Do not add bearer tokens to the control-plane API.** This is the obvious
 reading of the composability finding and it is wrong. The API is tokenless
