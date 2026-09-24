@@ -62,3 +62,7 @@ apps/cli/.tmp-home-tests/
 
 # CodeGraph index, per machine
 .codegraph/
+
+# Local research imports: investigation records from competitive/UX studies.
+# Large, not part of the product, and summarised in docs/history/.
+.research/
