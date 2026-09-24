@@ -1,0 +1,142 @@
+record: probe-10-appbay-test-suite-at-the-pinned-commit
+type: probe
+title: appbay-test-suite-at-the-pinned-commit
+timestamp: 2026-09-24T11:49:32-04:00
+claim: AppBay's own tests pass at 9f00b579 with its uncommitted changes
+verdict: supports
+key_evidence: "pnpm turbo test at the pinned tree: 5/5 tasks successful, @appbay/core 85 files / 1148 passed + 1 skipped, @appbay/cli 29 files / 403 passed. Zero failures \u2014 while probe-05 shows live silent data loss, so the suite is green and the defect is real."
+exit_code: 0
+duration_s: 7
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/run_appbay_tests.sh
+params:
+  env:
+    AB_BUILD: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox
+    AB_RUN: runs/appbay-tests-20260924
+code:
+  - path: src/appbay-dockhand/run_appbay_tests.sh
+    sha256: a52bd4a045d9f461b41419c5a89f4a3427c88a5cb0e4c463c249316d955323f5
+    stored: raw/code/a52bd4a0-run_appbay_tests.sh
+output_kind: text
+output:
+  text: |2
+    @appbay/cli:test:  ✓ src/commands/__tests__/init-container-runtime.test.ts (8 tests) 21ms
+    @appbay/core:test:  ✓ src/health/__tests__/checks-store-binding.test.ts (9 tests) 66ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/checks.test.ts (23 tests) 369ms
+    @appbay/cli:test:    ✓ runInitPreflight > returns exactly the four environment-level required checks  364ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/namespace-values.test.ts (10 tests) 436ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/builds.test.ts (15 tests) 3ms
+    @appbay/core:test:  ✓ src/services/__tests__/control-plane-edge.test.ts (13 tests) 2ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/url-utils.test.ts (13 tests) 2ms
+    @appbay/core:test:  ✓ src/services/__tests__/edge-migration-flow.test.ts (5 tests) 207ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/deploy-report.test.ts (3 tests) 3ms
+    @appbay/core:test:  ✓ src/secrets/__tests__/master-password.test.ts (13 tests) 222ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/edge-cases.test.ts (7 tests) 136ms
+    @appbay/core:test:  ✓ src/secrets/__tests__/external-providers.test.ts (12 tests) 226ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/podman-access.test.ts (11 tests) 9ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/validate.test.ts (10 tests) 2ms
+    @appbay/core:test:  ✓ src/health/__tests__/checks-sudo.test.ts (3 tests) 2ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/doctor.test.ts (17 tests) 2ms
+    @appbay/core:test:  ✓ src/services/__tests__/route-install.test.ts (9 tests) 47ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/magic-var-compile.test.ts (6 tests) 304ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/pullable.test.ts (4 tests) 14ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/status.test.ts (12 tests) 4ms
+    @appbay/cli:test: stdout | src/commands/__tests__/down-runtime-socket.test.ts > render-less down through APPBAY_RUNTIME_SOCKET > does not call an exited container running or refuse it
+    @appbay/cli:test:   - whoami         (1 container(s) exist, none running)
+    @appbay/cli:test: 
+    @appbay/cli:test: stderr | src/commands/__tests__/down-runtime-socket.test.ts > render-less down through APPBAY_RUNTIME_SOCKET > refuses a running project owned by another home
+    @appbay/cli:test:   Failed to stop whoami: project "whoami" is not owned by this Appbay home: container whoami-1 has foreign working directory /srv/other/var/lib/renders/whoami.
+    @appbay/cli:test: 
+    @appbay/cli:test: stderr | src/commands/__tests__/down-runtime-socket.test.ts > render-less down through APPBAY_RUNTIME_SOCKET > checks exited rows too when running and exited ownership is mixed
+    @appbay/cli:test:   Failed to stop whoami: project "whoami" is not owned by this Appbay home: container whoami-1 has foreign working directory /srv/other/var/lib/renders/whoami.
+    @appbay/cli:test: 
+    @appbay/cli:test: stderr | src/commands/__tests__/down-runtime-socket.test.ts > render-less down through APPBAY_RUNTIME_SOCKET > fails closed when an existing container has no ownership label
+    @appbay/cli:test:   Failed to stop whoami: project "whoami" is not owned by this Appbay home: container whoami-1 has no working-directory ownership label.
+    @appbay/cli:test: 
+    @appbay/cli:test: stderr | src/commands/__tests__/down-runtime-socket.test.ts > render-less down through APPBAY_RUNTIME_SOCKET > checks ownership even when the rendered compose file exists
+    @appbay/cli:test:   Failed to stop whoami: project "whoami" is not owned by this Appbay home: container whoami-1 has foreign working directory /srv/other/var/lib/renders/whoami.
+    @appbay/cli:test: 
+    @appbay/cli:test:  ✓ src/commands/__tests__/down-runtime-socket.test.ts (5 tests) 35ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/open.test.ts (14 tests) 2ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/server-runtime-socket.test.ts (9 tests) 2ms
+    @appbay/core:test:  ✓ src/traits/definitions/__tests__/backup.test.ts (7 tests) 2ms
+    @appbay/core:test:  ✓ src/__tests__/system-apps-sync.test.ts (3 tests) 68ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/provider-agnostic.test.ts (3 tests) 351ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/system-config.test.ts (8 tests) 10ms
+    @appbay/core:test:  ✓ src/traits/__tests__/conflict-edge-cases.test.ts (5 tests) 189ms
+    @appbay/core:test:  ✓ src/__tests__/caddy-edge-contract.test.ts (5 tests) 2ms
+    @appbay/core:test:  ✓ src/services/__tests__/instance-vars.test.ts (11 tests) 75ms
+    @appbay/core:test:  ✓ src/services/__tests__/catalog-source.test.ts (5 tests) 285ms
+    @appbay/core:test:  ✓ src/secrets/__tests__/one-password-writer.test.ts (4 tests) 7ms
+    @appbay/core:test:  ✓ src/services/__tests__/deploy-readiness.test.ts (10 tests) 1876ms
+    @appbay/core:test:  ✓ src/state/__tests__/magic-var-integration.test.ts (6 tests) 13ms
+    @appbay/cli:test:  ✓ src/utils/__tests__/appbay-home-save.test.ts (4 tests) 10ms
+    @appbay/core:test:  ✓ src/runtime/__tests__/extract-version.test.ts (11 tests) 2ms
+    @appbay/core:test:  ✓ src/__tests__/boot-order.test.ts (7 tests) 3ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/identity.test.ts (10 tests) 2ms
+    @appbay/core:test:  ✓ src/secrets/providers/__tests__/sops.test.ts (13 tests) 3ms
+    @appbay/core:test:  ✓ src/services/__tests__/edge-migration-ports.test.ts (5 tests) 18ms
+    @appbay/core:test:  ✓ src/runtime/__tests__/facts.test.ts (14 tests) 2055ms
+    @appbay/core:test:  ✓ src/schemas/__tests__/project.test.ts (7 tests) 3ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/when-clause-label.test.ts (15 tests) 2ms
+    @appbay/core:test:  ✓ src/secrets/__tests__/integration.test.ts (7 tests) 25ms
+    @appbay/core:test:  ✓ src/schemas/__tests__/instance.test.ts (8 tests) 7ms
+    @appbay/core:test:  ✓ src/services/__tests__/env-local-mode.test.ts (3 tests) 30ms
+    @appbay/core:test:  ✓ src/runtime/__tests__/home.test.ts (6 tests) 8ms
+    @appbay/core:test:  ✓ src/secrets/providers/__tests__/vault-format.test.ts (15 tests) 2949ms
+    @appbay/core:test:    ✓ v2 is per-vault salted — the defect §2.5 exists to fix > writes a fresh vault in v2  509ms
+    @appbay/core:test:    ✓ v2 is per-vault salted — the defect §2.5 exists to fix > keeps its salt across writes, so it stays readable  378ms
+    @appbay/core:test:    ✓ an entry key the writer never wrote > 🚨 reports an unslashed key verbatim, not the key minus its last character  324ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/scope-resolver.test.ts (7 tests) 3ms
+    @appbay/core:test:  ✓ src/services/__tests__/edge-target.test.ts (2 tests) 33ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/delete-runtime-socket.test.ts (5 tests) 1738ms
+    @appbay/cli:test:    ✓ delete --force through APPBAY_RUNTIME_SOCKET > refuses foreign ownership without deleting the app  510ms
+    @appbay/cli:test:    ✓ delete --force through APPBAY_RUNTIME_SOCKET > refuses missing ownership without deleting the app  387ms
+    @appbay/cli:test:    ✓ delete --force through APPBAY_RUNTIME_SOCKET > deletes the app when no containers exist  372ms
+    @appbay/core:test:  ✓ src/schemas/__tests__/home-assertion.test.ts (6 tests) 6ms
+    @appbay/core:test:  ✓ src/shepherd/__tests__/run-shepherd.test.ts (5 tests) 368ms
+    @appbay/core:test:    ✓ STDIN_FILE_WRITER actually run on its payload > writes every file byte-for-byte, including values whose base64 is padded  365ms
+    @appbay/core:test:  ✓ src/secrets/__tests__/resolve-for-deploy.test.ts (2 tests) 2ms
+    @appbay/core:test:  ✓ src/compiler/__tests__/overlay-merge.test.ts (1 test) 55ms
+    @appbay/core:test:  ✓ src/services/__tests__/edge-identity-service.test.ts (2 tests) 91ms
+    @appbay/core:test:  ✓ src/services/__tests__/catalog-install-as.test.ts (1 test) 112ms
+    @appbay/core:test:  ✓ src/traits/__tests__/secrets-entrypoint-wrapper.test.ts (1 test) 62ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/home.test.ts (16 tests) 3767ms
+    @appbay/cli:test:    ✓ appbay home > prints ONLY the path, so $(appbay home) stays usable  1261ms
+    @appbay/cli:test:    ✓ appbay home > falls back to ~/.appbay when nothing is configured  470ms
+    @appbay/core:test:  ✓ src/services/__tests__/deploy-converge.test.ts (20 tests) 2910ms
+    @appbay/core:test:    ✓ 🚨 an UNCHANGED artifact does not mean an unchanged deployment > a container that was gone and is now created counts as DEPLOYED  417ms
+    @appbay/cli:test:  ✓ src/commands/__tests__/init-system.test.ts (13 tests) 3535ms
+    @appbay/cli:test:    ✓ planSystemBootstrap > returns the bootstrap actions in a stable order  1296ms
+    @appbay/core:test:  ✓ src/services/__tests__/kdbx-crud.test.ts (6 tests) 2550ms
+    @appbay/core:test:    ✓ KeePass CRUD round trip (real keepassxc-cli) > stores and reads back a new entry  438ms
+    @appbay/core:test:    ✓ KeePass CRUD round trip (real keepassxc-cli) > updates an existing entry — this is the path `edit --password` never reached  568ms
+    @appbay/core:test:    ✓ KeePass CRUD round trip (real keepassxc-cli) > round-trips a default-scope key  348ms
+    @appbay/core:test:    ✓ KeePass CRUD round trip (real keepassxc-cli) > round-trips a value full of shell metacharacters byte-exact  326ms
+    @appbay/core:test:    ✓ KeePass CRUD round trip (real keepassxc-cli) > lists and deletes  707ms
+    @appbay/core:test:  ✓ src/services/__tests__/vault-rotate.test.ts (10 tests) 3720ms
+    @appbay/core:test:    ✓ rotateVaultPassword > 🚨 the vault still opens afterwards — the whole bug  1400ms
+    @appbay/core:test:    ✓ rotateVaultPassword > writes the new password where the resolver looks FIRST  727ms
+    @appbay/core:test: 
+    @appbay/core:test:  Test Files  85 passed (85)
+    @appbay/core:test:       Tests  1148 passed | 1 skipped (1149)
+    @appbay/core:test:    Start at  11:49:26
+    @appbay/core:test:    Duration  6.00s (transform 2.33s, setup 0ms, collect 15.33s, tests 21.64s, environment 7ms, prepare 7.57s)
+    @appbay/core:test: 
+    @appbay/cli:test:  ✓ src/__tests__/commands-scratch-home.test.ts (8 tests) 5171ms
+    @appbay/cli:test:    ✓ commands against a scratch home > list shows every seeded app with its namespace  645ms
+    @appbay/cli:test:    ✓ commands against a scratch home > status names the app's directory and services  562ms
+    @appbay/cli:test:    ✓ commands against a scratch home > doctor --json is a three-valued report and never ok over a required unknown  1164ms
+    @appbay/cli:test:    ✓ commands against a scratch home > apply and pull refuse a target nothing matches, instead of converging or reporting success  568ms
+    @appbay/cli:test:    ✓ commands against a scratch home > compile --namespace resolves ${{ns:KEY}} from that namespace's values file  361ms
+    @appbay/cli:test: 
+    @appbay/cli:test:  Test Files  29 passed (29)
+    @appbay/cli:test:       Tests  403 passed (403)
+    @appbay/cli:test:    Start at  11:49:26
+    @appbay/cli:test:    Duration  6.13s (transform 1.79s, setup 0ms, collect 24.45s, tests 14.73s, environment 3ms, prepare 3.98s)
+    @appbay/cli:test: 
+    
+     Tasks:    5 successful, 5 total
+    Cached:    2 cached, 5 total
+      Time:    6.93s 
+    
+    turbo-exit=0

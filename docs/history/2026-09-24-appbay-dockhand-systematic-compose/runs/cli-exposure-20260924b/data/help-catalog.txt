@@ -1,0 +1,15 @@
+Usage: appbay catalog [options] [command]
+
+Browse and manage the app catalog
+
+Options:
+  -h, --help                display help for command
+
+Commands:
+  list [options]            List all catalog entries
+  search [options] <query>  Search catalog by name, tag, or category
+  info <name>               Show detailed information about a catalog entry
+  add-source <name> <url>   Add an external catalog source (git repo)
+  update [source]           Update catalog sources (git pull)
+  sources                   List configured catalog sources
+  help [command]            display help for command

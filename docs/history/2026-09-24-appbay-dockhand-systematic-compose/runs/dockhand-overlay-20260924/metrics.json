@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 0,
+  "artifact_count": 0,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/dockhand_overlay_surface.sh",
+  "run_id": "dockhand-overlay-20260924"
+}

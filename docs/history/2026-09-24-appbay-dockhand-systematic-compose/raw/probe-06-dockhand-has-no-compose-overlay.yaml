@@ -1,0 +1,157 @@
+record: probe-06-dockhand-has-no-compose-overlay
+type: probe
+title: dockhand-has-no-compose-overlay
+timestamp: 2026-09-24T11:42:45-04:00
+claim: Dockhand applies the compose file as written; nothing systematically adds deployment concerns
+verdict: supports
+key_evidence: "Compose content is reassigned at exactly two points between deployStack and the spawn (stacks.ts:1258 rewriteComposeVolumePaths, :1279 rewriteBindsToHostDir), both line-regex bind-path fixups for running inside a container. Every traefik.http.routers occurrence is a labels[] READ in utils/traefik-urls.ts or UI prose; traefik.enable, certresolver, acme, letsencrypt, forward_auth: 0 occurrences in src/. Dockhand reads proxy labels the user wrote and never writes one."
+exit_code: 0
+duration_s: 3
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/dockhand_overlay_surface.sh
+params:
+  env:
+    DH_RUN: runs/dockhand-overlay-20260924
+    DH_SRC: /tmp/audited-ops-eval-20260924b/sources/dockhand
+code:
+  - path: src/appbay-dockhand/dockhand_overlay_surface.sh
+    sha256: 1e4e28ad296890136602f00e669a66c9c1ac5a5bbf129a03cf16bbbc1b54421d
+    stored: raw/code/1e4e28ad-dockhand_overlay_surface.sh
+output_kind: text
+output:
+  text: |2
+    ===== 1. the compose content variable, from deploy to spawn =====
+    --- deployStack -> executeComposeCommand -> executeLocalCompose ---
+    
+    Callees of "deployStack" (20):
+    
+    function    withStackLock
+      src/lib/server/stacks.ts:228
+    
+    function    getStackSource
+      src/lib/server/db.ts:2997
+    
+    function    usesFlatLocalStacksDir
+      src/lib/server/stacks.ts:424
+    
+    function    checkFlatLocalStackNameCollision
+      src/lib/server/stacks.ts:1024
+    
+    function    getStackDir
+      src/lib/server/stacks.ts:462
+    
+    function    readDirFilesAsMap
+      src/lib/server/stacks.ts:283
+    
+    function    applyFileDeletions
+      src/lib/server/git-deletions.ts:296
+    
+    function    skipReasonMessage
+      src/lib/server/git-deletions.ts:100
+    
+    function    getNonSecretEnvVarsAsRecord
+      src/lib/server/db.ts:5622
+    
+    function    getSecretEnvVarsAsRecord
+      src/lib/server/db.ts:5572
+    
+    function    resolveProviderEnvVars
+      src/lib/server/stacks.ts:3633
+    
+    function    getEnvironment
+      src/lib/server/db.ts:145
+    
+    function    shouldRunSeparateBuildStep
+    
+    ===== 2. every call site that reassigns compose content before the spawn =====
+    1254:	let finalComposeContent = composeContent;
+    1258:			finalComposeContent = rewriteResult.content;
+    1265:			for (const line of finalComposeContent.split('\n')) {
+    1277:		const rw = rewriteBindsToHostDir(finalComposeContent, remoteStackHostDir);
+    1279:			finalComposeContent = rw.content;
+    1385:	const useStdin = finalComposeContent !== composeContent;
+    1486:			proc.stdin.write(finalComposeContent);
+    
+    ===== 3. the one compose rewriter, and its callers =====
+    
+    Callers of "rewriteComposeVolumePaths" (3):
+    
+    function    executeLocalCompose
+      src/lib/server/stacks.ts:1190
+    
+    file        rewrite-compose-volume-paths.test.ts
+      tests/rewrite-compose-volume-paths.test.ts:1
+    
+    file        stacks.ts
+      src/lib/server/stacks.ts:1
+    
+    
+    ===== 4. is any proxy label/config ever WRITTEN? =====
+    pattern 'traefik\.http\.routers': 7 occurrence(s) in src/
+        src/lib/utils/traefik-urls.ts:5: *   traefik.http.routers.<name>.rule         e.g. Host(`app.example.com`)
+        src/lib/utils/traefik-urls.ts:6: *   traefik.http.routers.<name>.entrypoints  e.g. websecure
+        src/lib/utils/traefik-urls.ts:7: *   traefik.http.routers.<name>.tls          e.g. true
+        src/lib/utils/traefik-urls.ts:72:	const tls = labels[`traefik.http.routers.${router}.tls`];
+        src/lib/utils/traefik-urls.ts:75:	const entrypoints = labels[`traefik.http.routers.${router}.entrypoints`] || '';
+        src/routes/settings/general/GeneralTab.svelte:560:											<p>Parse <code>traefik.http.routers.&lt;name&gt;.rule</code>, <code>pangolin.public-resources.&lt;name&gt;.full-domain</code>, <code>pangolin.private-resources.&lt;name&gt;.full-domain</code>, and caddy-docker-proxy <code>caddy</code>/<code>caddy_&lt;n&gt;</code> site-address labels, and surface the resulting URLs as clickable pills next to ports. When off, only explicit <code>dockhand.url</code> labels are shown.</p>
+    pattern 'traefik\.enable': 0 occurrence(s) in src/
+    pattern 'certresolver': 0 occurrence(s) in src/
+    pattern 'acme': 0 occurrence(s) in src/
+    pattern 'letsencrypt': 0 occurrence(s) in src/
+    pattern 'reverse_proxy': 2 occurrence(s) in src/
+        src/lib/utils/caddy-urls.ts:14: * Only the site-address key matters here; directive labels (`caddy.reverse_proxy`,
+        src/lib/utils/caddy-urls.ts:33:// make it a directive like `caddy.reverse_proxy`).
+    pattern 'forward_auth': 0 occurrence(s) in src/
+    pattern 'authorization policy': 0 occurrence(s) in src/
+    
+    ===== 5. what the Traefik/Caddy modules actually do =====
+    **src/lib/utils/traefik-urls.ts** — 86 lines, 6 symbols · used by 3 files: src/routes/containers/+page.svelte, src/routes/stacks/+page.svelte, tests/traefik-urls.test.ts
+    
+    1	/**
+    2	 * Traefik label → public URL extraction (#2).
+    3	 *
+    4	 * Parses standard Traefik v2/v3 router labels on a container:
+    5	 *   traefik.http.routers.<name>.rule         e.g. Host(`app.example.com`)
+    6	 *   traefik.http.routers.<name>.entrypoints  e.g. websecure
+    7	 *   traefik.http.routers.<name>.tls          e.g. true
+    8	 *
+    9	 * Returns one URL per router whose rule contains at least one Host() match.
+    10	 * Multiple Host() entries on the same router yield multiple URLs. Path
+    11	 * prefixes (e.g. `Host(`x`) && PathPrefix(`/api`)`) are appended so the link
+    12	 * lands on the actual served path.
+    13	 *
+    14	 * Scheme inference (in order):
+    15	 *   1. explicit `tls=true` → https
+    16	 *   2. entrypoints contains "websecure" → https
+    17	 *   3. entrypoints contains "web" (and no secure variant) → http
+    18	 *   4. default → https (the overwhelmingly common production setup)
+    19	 *
+    20	 * dockhand.url labels override this — Traefik extraction is a fallback,
+    21	 * never a winner over an explicit user-provided URL.
+    22	 */
+    23	export interface TraefikUrl {
+    ---
+    **src/lib/utils/caddy-urls.ts** — 104 lines, 4 symbols · used by 3 files: src/routes/containers/+page.svelte, src/routes/stacks/+page.svelte, tests/caddy-urls.test.ts
+    
+    1	/**
+    2	 * caddy-docker-proxy label -> public URL extraction (#1390).
+    3	 *
+    4	 * caddy-docker-proxy (https://github.com/lucaslorentz/caddy-docker-proxy) turns
+    5	 * container labels into a Caddyfile. The site address - the clickable URL - is the
+    6	 * VALUE of the bare `caddy` key (or `caddy_<N>` for isolated groups):
+    7	 *
+    8	 *   caddy: whoami.example.com                 -> https://whoami.example.com
+    9	 *   caddy: example.com, example.org           -> two URLs (comma-separated addresses)
+    10	 *   caddy_0: site-a.com                        -> grouped/isolated addresses
+    11	 *   caddy_1: site-b.com
+    12	 *   caddy: example.com/api/*                    -> https://example.com/api (path kept)
+    13	 *
+    14	 * Only the site-address key matters here; directive labels (`caddy.reverse_proxy`,
+    15	 * `caddy_0.tls`, ...) carry a dot after the prefix and are ignored.
+    16	 *
+    17	 * SCHEME: Caddy serves HTTPS automatically, so the default is https. It is http only
+    18	 * when the address says so explicitly - an `http://` scheme or an `:80` port. A
+    19	 * `:443`/`https://` is https; any other explicit port keeps https (Caddy still serves
+    20	 * TLS on a custom port). Snippet/named-matcher values like `(encode)` are NOT site
+    21	 * addresses and are skipped.
+    22	 *
+    23	 * dockhand.url labels override this - Caddy extraction is a fallback, never a winner

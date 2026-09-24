@@ -1,0 +1,75 @@
+record: analysis-13-web-deploy-drops-the-edge-route
+type: analysis
+title: web-deploy-drops-the-edge-route
+timestamp: 2026-09-24T11:52:51-04:00
+claim: no web deploy path installs auxiliaryFiles, so an app deployed from the UI has no route and no auth policy
+bears_on: [H1]
+verdict: supports
+key_evidence: auxiliaryFiles appears exactly once under apps/web/src — plans.ts:112, which maps it to paths for DISPLAY in the plan preview. No web deploy path writes it. deployments.up (4 UI call sites) compiles, writes only docker-compose.rendered.yml, and spawns docker compose up -d; the queue's deploy.ts worker does the same. fullDeploy, the one procedure whose docstring claims parity with appbay up, has 0 UI call sites. 16 hardcoded "docker" spawn sites in the web server versus the CLI's containerBin(appbayHome) resolver. The web also calls compile({activeApps}), an option the current core deliberately removed.
+exit_code: 0
+duration_s: 0
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/web_cli_parity.sh
+params:
+  env:
+    AB_RUN: runs/web-cli-parity-20260924
+    AB_CLI_SRC: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac
+    AB_WEB: /tmp/audited-ops-eval-20260924b/sources/appbay-mac/apps/web
+code:
+  - path: src/appbay-dockhand/web_cli_parity.sh
+    sha256: 7d27226ed648e83ad6c56673f6f8ced76939bc4582c71921db6759eb09677dbd
+    stored: raw/code/7d27226e-web_cli_parity.sh
+output_kind: text
+output:
+  text: |2
+    ===== deploy paths exposed by the web server =====
+    67:  applyPlan: protectedProcedure
+    159:  up: protectedProcedure
+    274:  down: protectedProcedure
+    303:  restart: protectedProcedure
+    338:  enqueue: protectedProcedure
+    388:  list: protectedProcedure
+    404:  get: protectedProcedure
+    420:  fullDeploy: protectedProcedure
+    job-queue workers:
+      backup.ts
+      deploy.ts
+      eject.ts
+      pull-images.ts
+      rebuild-cache.ts
+    
+    ===== which of them write auxiliaryFiles? =====
+    occurrences of auxiliaryFiles anywhere under apps/web/src:
+      /tmp/audited-ops-eval-20260924b/sources/appbay-mac/apps/web/src/server/routers/plans.ts:112:            auxiliaryFiles: appResult.auxiliaryFiles.map((f) => ({
+      (none => no web deploy path installs the edge route or the auth policy)
+    
+    ===== for contrast: the CLI path =====
+      /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/packages/core/src/services/deploy/route.ts:28:export function isRouteFilePath(path: string): boolean {
+      /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/packages/core/src/services/deploy/route.ts:107:  app: Pick<AppCompileResult, "auxiliaryFiles">,
+      /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/packages/core/src/services/deploy/route.ts:111:  const files = app.auxiliaryFiles.filter((aux) => isCaddyConfigPath(aux.path));
+      /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/packages/core/src/services/deploy/route.ts:146:  app: Pick<AppCompileResult, "auxiliaryFiles">,
+      /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/packages/core/src/services/deploy/route.ts:153:  const files = app.auxiliaryFiles.filter((aux) => aux.path.startsWith(`etc/apps/${provider}/config/dynamic/`));
+    
+    ===== which procedure does the UI actually call? =====
+      deployments.up : 4 call site(s) outside the server
+      deployments.enqueue : 1 call site(s) outside the server
+      deployments.fullDeploy : 0 call site(s) outside the server
+      deployments.applyPlan : 0 call site(s) outside the server
+      deployments.down : 3 call site(s) outside the server
+      deployments.restart : 4 call site(s) outside the server
+      (fullDeploy is the one whose docstring claims 'feature parity with appbay up')
+    
+    ===== runtime selection: one resolver, or hardcoded? =====
+      web server spawn sites hardcoding "docker": 16
+      CLI spawn sites hardcoding "docker" outside the resolver:
+    2
+      CLI resolver: containerBin(appbayHome) -> 6 use(s) in the runtime module
+    
+    ===== has the web app drifted from the current core API? =====
+      web calls compile({...activeApps}):
+        173:      const activeApps = discoverRunningApps();
+        181:        activeApps,
+      current core CompileOptions:
+        74: * ⚠️ There is deliberately no `activeApps` here. Overlays used to be evaluated against a
+        75- * `podman ps` snapshot passed in by the caller; RFC-001 §5 makes `when:` mean *installed*,
+        76- * which is a fact about the declared app set. It is derived inside `compile()` rather than
+        77- * accepted as input, because it must be the FULL declared set — accepting it from the caller

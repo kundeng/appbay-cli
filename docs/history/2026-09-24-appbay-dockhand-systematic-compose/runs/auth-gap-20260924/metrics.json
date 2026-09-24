@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 910,
+  "artifact_count": 12,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/auth_error_still_deploys.sh",
+  "run_id": "auth-gap-20260924"
+}

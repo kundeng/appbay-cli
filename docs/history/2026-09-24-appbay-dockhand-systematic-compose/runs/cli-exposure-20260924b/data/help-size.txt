@@ -1,0 +1,10 @@
+Usage: appbay size [options] [app]
+
+Show disk usage for apps
+
+Arguments:
+  app         specific app (default: all)
+
+Options:
+  --all       include system apps
+  -h, --help  display help for command

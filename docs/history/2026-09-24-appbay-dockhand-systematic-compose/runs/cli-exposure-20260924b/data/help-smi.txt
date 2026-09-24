@@ -1,0 +1,6 @@
+Usage: appbay smi [options]
+
+Show NVIDIA GPU information
+
+Options:
+  -h, --help  display help for command

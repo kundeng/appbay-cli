@@ -1,0 +1,13 @@
+Usage: appbay install [options] <name>
+
+Install an app from the catalog
+
+Arguments:
+  name              catalog app to install
+
+Options:
+  --set <pairs...>  set input values (KEY=VALUE)
+  --as <name>       install under a different app name, for a second copy
+  --force           overwrite if app already exists
+  --no-validate     skip post-install validation
+  -h, --help        display help for command

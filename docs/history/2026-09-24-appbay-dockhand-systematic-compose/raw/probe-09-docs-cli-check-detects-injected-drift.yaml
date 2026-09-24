@@ -1,0 +1,70 @@
+record: probe-09-docs-cli-check-detects-injected-drift
+type: probe
+title: docs-cli-check-detects-injected-drift
+timestamp: 2026-09-24T11:48:53-04:00
+claim: check-docs-cli.mjs goes red on drift it claims to catch, so its green result means something
+verdict: supports
+key_evidence: "Three-way mutation test on the sandbox copy: baseline exit 0; a documented-but-absent command (appbay teleport) -> 2 discrepancies, exit 1; a documented-but-absent flag (appbay status --telepathy) -> 1 discrepancy, exit 1; restored -> exit 0. The checker is sensitive to both failure classes it claims to catch."
+exit_code: 0
+duration_s: 138
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/docs_check_detects_drift.sh
+params:
+  env:
+    AB_BUILD: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox
+    AB_RUN: runs/docs-check-mutation-20260924
+code:
+  - path: src/appbay-dockhand/docs_check_detects_drift.sh
+    sha256: 428174583b5b21d51aecf905eb7168e5df482466c25ebd1c43d2f5809619dbc0
+    stored: raw/code/42817458-docs_check_detects_drift.sh
+output_kind: text
+output:
+  text: |2
+    ===== baseline (tree as shipped) =====
+      docs:   28 files scanned
+    
+      ✅ every documented command, flag and tRPC procedure exists, and every router is documented
+    
+      ════ 0 discrepancies ════
+    exit=0
+    
+    ===== mutation A: document a command that does not exist =====
+      docs:   28 files scanned
+    
+      ❌ documented commands the binary does not have:
+           docs/reference/cli-commands.qmd:962  appbay teleport
+           docs/reference/cli-commands.qmd:967  appbay teleport
+    
+      ════ 2 discrepancies ════
+    exit=1
+    
+    ===== mutation B: document a flag that does not exist =====
+      binary: ./apps/cli/dist/appbay  (51 commands)
+      docs:   28 files scanned
+    
+      ❌ documented flags the binary does not accept:
+           docs/reference/cli-commands.qmd:965  appbay status --telepathy
+    
+      ════ 1 discrepancy ════
+    exit=1
+    
+    ===== control: restored =====
+      ✅ every documented command, flag and tRPC procedure exists, and every router is documented
+    
+      ════ 0 discrepancies ════
+    exit=0
+derived:
+  - path: runs/docs-check-mutation-20260924/data/cli-commands.qmd.orig
+    bytes: 26948
+    sha256: a9e242ba98b49187d042401ef2d14d17e5fa46f5efa1b6403f70fd5c80c6898d
+  - path: runs/docs-check-mutation-20260924/data/mutation-A.txt
+    bytes: 300
+    sha256: 66a3e28782a0fd8633e6ee15631ff001f12e9057f167df5a791c47284401a967
+  - path: runs/docs-check-mutation-20260924/data/mutation-B.txt
+    bytes: 247
+    sha256: 69ac5f2ed0118decbfdcf9496a4977910d746b5679fc2732a28388808f97fba0
+  - path: runs/docs-check-mutation-20260924/data/mutation-baseline.txt
+    bytes: 223
+    sha256: 5ae2c452906b0281a847bcc125fedf0ead57e25c0871d66b30f9117e2615d1f1
+  - path: runs/docs-check-mutation-20260924/data/mutation-control.txt
+    bytes: 223
+    sha256: 5ae2c452906b0281a847bcc125fedf0ead57e25c0871d66b30f9117e2615d1f1

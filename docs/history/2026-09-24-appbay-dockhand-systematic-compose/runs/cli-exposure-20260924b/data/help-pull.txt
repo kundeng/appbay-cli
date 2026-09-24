@@ -1,0 +1,11 @@
+Usage: appbay pull [options] [targets...]
+
+Pull latest images for apps, or pull an Ollama model
+
+Arguments:
+  targets     app names or model name (e.g., llama3:latest)
+
+Options:
+  --all       pull all discovered apps
+  --model     force treat argument as an Ollama model name
+  -h, --help  display help for command

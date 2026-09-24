@@ -1,0 +1,60 @@
+record: probe-16-human-judgement-survives-a-store-rebuild
+type: probe
+title: human-judgement-survives-a-store-rebuild
+timestamp: 2026-09-24T12:06:16-04:00
+claim: an edited decision survives rebuilding while generated columns refresh from the records
+verdict: supports
+key_evidence: G6.decision was hand-edited to 'leave' and G1.blast_radius clobbered; after rebuild G6.decision is still 'leave' (human state read back and merged) and G1.blast_radius is restored from its record. audit_decision grew 10 -> 12 with no row updated or deleted. The seeded decision was then restored through a further append.
+exit_code: 0
+duration_s: 1
+command: bash src/appbay-dockhand/store_roundtrip.sh
+params:
+  env:
+    ST_DIR: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose
+code:
+  - path: src/appbay-dockhand/store_roundtrip.sh
+    sha256: faad890371e65220168808473614ddc95be6130066d846fa38c5500049e05c15
+    stored: raw/code/faad8903-store_roundtrip.sh
+output_kind: text
+output:
+  text: |2
+    ===== before =====
+    gap_id  decision  spec      blast_radius                                                    
+    ------  --------  --------  ----------------------------------------------------------------
+    G1      close     SPEC-001  scopedEnvTraitDefinition: 4 callers (2 tests, 2 barrels)        
+    G6      close     SPEC-006  containerBin impact: 67 symbols; route delivery is a local write
+    
+    ===== a maintainer overrules G6 and damages a generated column =====
+    gap_id  decision  blast_radius                                                    
+    ------  --------  ----------------------------------------------------------------
+    G1      close     CLOBBERED                                                       
+    G6      leave     containerBin impact: 67 symbols; route delivery is a local write
+    
+    ===== rebuild =====
+    gaps: 10  close: 6  leave: 4
+    decisions: 11
+    lineage:   30
+    
+    ===== after: human edit preserved, generated column refreshed? =====
+    gap_id  decision  spec      blast_radius                                                    
+    ------  --------  --------  ----------------------------------------------------------------
+    G1      close     SPEC-001  scopedEnvTraitDefinition: 4 callers (2 tests, 2 barrels)        
+    G6      leave     SPEC-006  containerBin impact: 67 symbols; route delivery is a local write
+    
+    ===== decision log is append-only =====
+    at                         who      row_key  field     old_value  new_value
+    -------------------------  -------  -------  --------  ---------  ---------
+    2026-09-24 16:06:15        kundeng  G6       decision  close      leave    
+    2026-09-24T12:05:56-04:00  kundeng  G10      decision             leave    
+    2026-09-24T12:05:56-04:00  kundeng  G9       decision             leave    
+    total decision rows: 11
+    
+    ===== verdict =====
+    PASS: the human edit survived the rebuild (G6.decision=leave)
+    PASS: generated column refreshed from the record (scopedEnvTraitDefinition: 4 callers (2 tests, 2 barrels))
+    
+    ===== restore the seeded decision, leaving the log intact =====
+    gap_id  decision
+    ------  --------
+    G6      close   
+    decision rows now: 12 (nothing deleted)

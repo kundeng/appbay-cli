@@ -1,0 +1,15 @@
+Usage: appbay setup [options]
+
+Guided setup: init → vault → selected edge
+
+Options:
+  --domain <domain>              base domain for ingress routing
+  --project <name>               project name
+  --email <email>                ACME email for Let's Encrypt
+  --ingress-provider <provider>  supported edge: "traefik" or "caddy"
+  --yes                          non-interactive mode
+  --status                       show setup status without running setup
+  --reset                        stop every app, remove the generated
+                                 configuration and renders, and keep app
+                                 definitions and the vault
+  -h, --help                     display help for command

@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 15264,
+  "artifact_count": 25,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/compile_untouched_compose.sh",
+  "run_id": "compile-untouched-20260924"
+}

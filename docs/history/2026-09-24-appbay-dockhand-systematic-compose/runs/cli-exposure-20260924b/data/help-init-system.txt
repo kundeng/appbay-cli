@@ -1,0 +1,19 @@
+Usage: appbay init-system [options]
+
+Bootstrap a fresh host to run Appbay (RHEL-family): install Docker, set up
+ownership + access for the appbay tree. --owner service (default) creates a
+no-login system service account (D-6, homelab/worklab); --owner operator uses
+your own user (personal). Standalone-host convenience — ansible is authoritative
+for the DGX fleet.
+
+Options:
+  --dry-run                   show what would change without running any sudo
+                              command
+  --owner <operator|service>  who owns the appbay tree (default: service)
+  --service-user <name>       service account name (default: appbay)
+  --service-uid <n>           system uid for the service account (default: 950)
+  --group <name>              grant a group access via default ACLs (repeatable)
+                              (default: [])
+  --home <path>               APPBAY_HOME location (default: ~/appbay for
+                              operator, /var/lib/appbay for service)
+  -h, --help                  display help for command

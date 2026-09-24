@@ -1,0 +1,10 @@
+Usage: appbay tunnel [options] <app>
+
+Create a Cloudflare quick tunnel to expose a local app publicly
+
+Arguments:
+  app            app name to tunnel
+
+Options:
+  --port <port>  override the port to tunnel
+  -h, --help     display help for command

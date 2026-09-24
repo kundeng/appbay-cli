@@ -1,0 +1,9 @@
+Usage: appbay open [options] <app>
+
+Open an app in the default browser
+
+Arguments:
+  app         app name
+
+Options:
+  -h, --help  display help for command

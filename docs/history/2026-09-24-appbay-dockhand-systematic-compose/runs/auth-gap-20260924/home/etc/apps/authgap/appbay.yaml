@@ -1,0 +1,10 @@
+name: authgap
+traits:
+  - type: auth
+    policy: authenticated
+services:
+  web:
+    traits:
+      - type: ingress
+        port: 80
+        exposure: both

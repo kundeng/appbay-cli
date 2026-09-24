@@ -1,0 +1,11 @@
+gap_id,title,decision,spec
+G1,Map-form environment is silently lost,close,SPEC-001
+G10,No vulnerability scanning or registry management,leave,SPEC-000
+G2,Web deploy path drops auxiliaryFiles,close,SPEC-002
+G3,Default edge cannot run the auth trait,close,SPEC-003
+G4,Stale lockfile breaks the release workflow,close,SPEC-004
+G5,Only 4 of 47 commands emit JSON,close,SPEC-005
+G6,No multi-host support,close,SPEC-006
+G7,Backup trait is declared but unwired,close,SPEC-007
+G8,No per-operator RBAC or audit trail,leave,SPEC-000
+G9,GUI breadth an order of magnitude behind,leave,SPEC-000

@@ -1,0 +1,108 @@
+record: analysis-14-dockhand-leads-and-their-mechanisms
+type: analysis
+title: dockhand-leads-and-their-mechanisms
+timestamp: 2026-09-24T11:53:47-04:00
+claim: where Dockhand goes further, named with the code that implements it
+verdict: supports
+key_evidence: "Multi-host: Dockhand parameterises every call by envId (2822 references, 255 files) over a docker HTTP API (dockerFetch at docker.ts:789) with four connection types; AppBay's spawn layer (containerExec/containerSpawn/containerCompose) takes no host and route delivery is a local write, join(appbayHome, aux.path) at deploy/route.ts:35,45. Multi-user: Dockhand has users/sessions/roles/userRoles with env-scoped roles, LDAP, OIDC, apiTokens, auditLogs and a central authorize() gate (RBAC enterprise-gated, 5 isEnterprise checks); AppBay delegates identity to the edge with three operations (edge users list/create/reset-password). GUI: 700 files / 129,226 lines over 21 pages and 266 API routes, versus AppBay web's 136 files / 25,550 lines over 9 pages. Dockhand also leads on backups (37 restic modules vs AppBay's metadata-only trait), 10 scheduled tasks, git-driven deploys, vulnerability scanning, notifications and a remote agent. One section failed: a malformed path made the edge-users help line error; captured separately."
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/dockhand_leads.sh
+params:
+  env:
+    DH_RUN: runs/dockhand-leads-20260924
+    DH_SRC: /tmp/audited-ops-eval-20260924b/sources/dockhand
+code:
+  - path: src/appbay-dockhand/dockhand_leads.sh
+    sha256: daf06ad740abd51ed8150dbd022ccd71f3c66e5784b00907fb6d1914c258b491
+    stored: raw/code/daf06ad7-dockhand_leads.sh
+output_kind: text
+output:
+  text: |2
+    ===== MULTI-HOST =====
+    Dockhand: every host is an environments row; envId parameterises every call.
+      environments table columns:
+        	id: integer('id'
+        	name: text('name'
+        	host: text('host'
+        	port: integer('port'
+        	protocol: text('protocol'
+        	tlsCa: text('tls_ca'
+        	tlsCert: text('tls_cert'
+        	tlsKey: text('tls_key'
+        	tlsSkipVerify: integer('tls_skip_verify'
+        	icon: text('icon'
+        	collectActivity: integer('collect_activity'
+        	collectMetrics: integer('collect_metrics'
+        	highlightChanges: integer('highlight_changes'
+        	labels: text('labels'
+        	connectionType: text('connection_type'
+        	socketPath: text('socket_path'
+        	hawserToken: text('hawser_token'
+        	hawserLastSeen: text('hawser_last_seen'
+        	hawserAgentId: text('hawser_agent_id'
+        	hawserAgentName: text('hawser_agent_name'
+        	hawserVersion: text('hawser_version'
+        	hawserCapabilities: text('hawser_capabilities'
+        	createdAt: text('created_at'
+        	updatedAt: text('updated_at'
+      connection types: 'socket' | 'direct' | 'hawser-standard' | 'hawser-edge'
+      envId references in src/: 2822 across 255 files
+      transport: dockerFetch(path, opts, envId) — the Docker HTTP API, not a local binary
+        789:export async function dockerFetch(
+    AppBay: no host dimension exists.
+      spawn layer: 327:export function containerExec( 360:export function containerSpawnSync( 372:export function containerSpawn( 394:export function containerCompose( 
+      none of them takes a host; they take appbayHome and spawn a LOCAL binary.
+      route delivery is a local filesystem write:
+        35:    const path = join(appbayHome, aux.path);
+        45:    const path = join(appbayHome, aux.path);
+      trait model states the assumption:
+         * model. Inspired by OAM (Open Application Model) traits, adapted for
+         * single-node Docker Compose.
+         *
+    
+    ===== MULTI-USER =====
+    Dockhand: users/sessions/roles/userRoles + a central authorize() gate.
+        175:export const users = sqliteTable('users', {
+        191:export const sessions = sqliteTable('sessions', {
+        202:export const ldapConfig = sqliteTable('ldap_config', {
+        224:export const oidcConfig = sqliteTable('oidc_config', {
+        248:export const roles = sqliteTable('roles', {
+        259:export const userRoles = sqliteTable('user_roles', {
+        466:export const auditLogs = sqliteTable('audit_logs', {
+        606:export const apiTokens = sqliteTable('api_tokens', {
+      role scoping: roles.environmentIds (JSON array, null = all), userRoles unique on (user, role, environment)
+      gate:
+        68:	can: (resource: keyof Permissions, action: string, environmentId?: number) => Promise<boolean>;
+        74:	canAccessEnvironment: (environmentId: number) => Promise<boolean>;
+      RBAC is licence-gated: 5 isEnterprise checks in authorize.ts
+    AppBay: identity is delegated to the edge, by design (RFC-001 §1).
+      edge users command surface:
+        investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/dockhand_leads.sh: line 42: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac/../../../../Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli/dist/appbay: No such file or directory
+    
+    ===== GUI =====
+      Dockhand UI: 700 files, 129226 lines
+      Dockhand top-level pages: 21
+    activity alerts api audit backups containers dashboard environments images login logs metrics networks profile registry schedules settings stacks templates terminal volumes 
+      Dockhand API routes: 266
+      AppBay web: 136 files, 25550 lines
+      AppBay web pages: apps auth catalog deploy doctor login secrets settings setup 
+    
+    ===== OTHER LEADS (named surfaces Dockhand has and AppBay does not) =====
+      backups: 37 modules (restic: repo, snapshots, retention, restore, destinations)
+        AppBay: backup trait emits metadata only; the CLI warns it is NOT SCHEDULED:
+          126:      `backup declared but NOT SCHEDULED for: ${backedUp.join(", ")}. The backup trait ` +
+      scheduled tasks: backup.ts block-decision.ts container-update.ts deploy-log-reconcile.ts env-update-check.ts git-stack-sync.ts image-prune.ts repo-maintenance.ts system-cleanup.ts update-utils.ts 
+      git-driven deploys: 8 git modules + gitRepositories/gitStacks tables + webhook auto-sync
+        AppBay: catalog sources (a git clone of app definitions), no per-app repo sync:
+          40:export async function catalogList(
+          70:export async function catalogGet(
+          108:export async function catalogInstall(options: InstallOptions): Promise<InstallResult> {
+          375:export async function catalogAddSource(
+          441:export async function catalogUpdateSource(
+          483:export async function catalogListSources(
+      vulnerability scanning: vulnerabilityScans table + 67 files
+      audit log: auditLogs table + 2 audit modules; AppBay: 3 files
+      notifications: 19 modules
+      registries / templates / image updates: registries, templateSources, pendingContainerUpdates tables
+      remote agent: hawser (WebSocket edge + token-authed standard), 2 modules

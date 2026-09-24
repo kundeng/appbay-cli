@@ -1,0 +1,7 @@
+  binary: ./apps/cli/dist/appbay  (51 commands)
+  docs:   28 files scanned
+
+  ✅ every documented command, flag and tRPC procedure exists, and every router is documented
+
+  ════ 0 discrepancies ════
+exit=0

@@ -1,0 +1,85 @@
+record: action-18-work-graph-loads-and-reconciles
+type: action
+title: work-graph-loads-and-reconciles
+timestamp: 2026-09-24T12:10:26-04:00
+claim: the work graph builds into LadybugDB and its counts reconcile against the records
+verdict: inconclusive
+key_evidence: "LadybugDB 0.20.4 refused the bulk COPY: 'The table ABOUT has multiple FROM and TO pairs defined in the schema.' The bridge pointed ABOUT at both Product and CodeSite; the projector's COPY does not name a pair. Import CSVs were written (227 nodes / 330 edges) but nothing loaded. Superseded by action-19 after making each bridge type single-label."
+exit_code: 1
+duration_s: 1
+command: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/bin/python /tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py investigations/2026-09-24-appbay-dockhand-systematic-compose --domain investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/domain.py --ladybug
+state_change: true
+params:
+  argv:
+    - investigations/2026-09-24-appbay-dockhand-systematic-compose
+  env:
+    WG_PY: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/bin/python
+code:
+  - path: /tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py
+    sha256: 9333b97da2d43716def3f588991cb4d0549dc067650ac30a4e22eb99b2dd4689
+    stored: raw/code/9333b97d-work-graph.py
+  - path: src/appbay-dockhand/domain.py
+    sha256: 699038da40f4b28489ad9d460379752582d49d734c4727abe2cd063cd5d1bb19
+    stored: raw/code/699038da-domain.py
+output_kind: text
+output:
+  text: |2
+    === 2026-09-24-appbay-dockhand-systematic-compose
+      -- claim layer
+      Question            15
+      Hypothesis           1
+      Finding             16
+      ProbeRecord         17
+      Cohort               2
+      Judgement           12
+      -- provenance layer
+      Run                 12
+      Code                27
+      Artifact            92
+      -- domain layer
+      Product              3
+      CodeSite            20
+      Gap                 10
+      --
+      RAISES               0   (none found)
+      BEARS_ON             3
+      ANSWERS              0   (none found)
+      CITES               17
+      REFERS_TO            0   (none found)
+      MOVED_BY             7
+      OVER                 0   (none found)
+      SUPERSEDES           0   (none found)
+      REFINES              0   (none found)
+      NARROWS              0   (none found)
+      EXTENDS              0   (none found)
+      OVERTAKEN_BY         0   (none found)
+      INVALIDATES          0   (none found)
+      JUDGED               0   (none found)
+      BECAUSE             12
+      RAN                 17
+      PRODUCED            92
+      IN_RUN               6
+      USED_CODE           10
+      WROTE               92
+      ABOUT               20
+      DERIVES              8
+      INCLUDES             8
+    
+      wrote 227 nodes / 330 edges -> /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose/runs/work-graph/import
+stderr: |2
+  Traceback (most recent call last):
+    File "/tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py", line 1183, in <module>
+      sys.exit(main())
+               ^^^^^^
+    File "/tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py", line 1150, in main
+      loaded = load_db(out, db, nodes, edges, domain_labels,
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "/tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py", line 988, in load_db
+      conn.execute(f'COPY `{rel}` FROM "{imp / f"edges_{rel}.csv"}" '
+    File "/Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/lib/python3.12/site-packages/ladybug/connection.py", line 843, in execute
+      query_result_internal = self._execute_with_pybind(query, parameters)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "/Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/lib/python3.12/site-packages/ladybug/connection.py", line 726, in _execute_with_pybind
+      return py_connection.query(query)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  RuntimeError: Binder exception: The table ABOUT has multiple FROM and TO pairs defined in the schema. A specific pair of FROM and TO options is expected when copying data into the ABOUT table.

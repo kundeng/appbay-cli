@@ -1,0 +1,76 @@
+record: probe-07-cli-exposure-measured-from-the-binary
+type: probe
+title: cli-exposure-measured-from-the-binary
+timestamp: 2026-09-24T11:44:39-04:00
+claim: the shipped CLI exposes fewer commands than it registers, and most reporting commands have no --json
+verdict: inconclusive
+key_evidence: "Procedure defect found on reread: grep -c 'json$' also matched 'no-json' (51+47=98 over 51 commands), and the declared-command list swept in subcommand names from every commands/*.ts file, so 'declared but not in help' listed secrets/edge/catalog subcommands. Superseded by probe-08, which counts top-level names only and anchors the --json match."
+exit_code: 0
+duration_s: 3
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/cli_exposure.sh
+params:
+  env:
+    AB_RUN: runs/cli-exposure-20260924
+    AB_CLI: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli/dist/appbay
+    AB_SRC: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac
+code:
+  - path: src/appbay-dockhand/cli_exposure.sh
+    sha256: 2cc06cfe3f327e660e512e1a177aae44486a358d523050e6fcb824701fac9eb2
+    stored: raw/code/2cc06cfe-cli_exposure.sh
+output_kind: text
+output:
+  text: |2
+    ===== commands visible in `appbay --help` =====
+          51
+    admin apply auth authelia catalog compile completion config delete dive doctor down edge eject env exec fixfs help home info init init-system install list logs mcp models ollama open presets profile ps pull rebuild-cache restart run secrets server setup shell size smi stats status tunnel tunnel-down up update url validate version 
+    
+    ===== command names declared under apps/cli/src/commands/ =====
+          71
+    apply catalog check clear compile completion config create delete delete-kdbx dive doctor down edge eject env exec fixfs get get-kdbx home import info init init-kdbx init-system inspector install kdbx list logs ls mcp migrate models ollama open presets profile ps pull rebuild-cache repair-password-file reset-password restart rm rotate-password run save scan secrets server set set-kdbx setup shell size smi start stats status stop tunnel tunnel-down up update url users validate vault version 
+    
+    ===== declared but NOT in the top-level help =====
+    check clear create delete-kdbx get get-kdbx import init-kdbx inspector kdbx ls migrate repair-password-file reset-password rm rotate-password save scan set set-kdbx start stop users vault 
+    
+    ===== documented in docs/reference/cli-commands.qmd =====
+          46
+    
+    ===== in help but absent from the CLI reference doc =====
+    auth authelia exec help run 
+    
+    ===== which commands accept --json? (from each command's own --help) =====
+    with --json:   51
+    without --json: 47
+    --- without --json ---
+    admin apply auth authelia catalog compile completion config delete dive down edge eject env exec fixfs help home info init init-system install logs mcp models ollama open presets profile pull rebuild-cache restart run secrets server setup shell size smi stats tunnel tunnel-down up update url validate version 
+    
+    ===== does the docs-CLI consistency check actually check anything? =====
+    exit=2
+      ✖ binary not found at ./apps/cli/dist/appbay — run `pnpm turbo build` first
+derived:
+  - path: runs/cli-exposure-20260924/data/check_docs_cli.txt
+    bytes: 82
+    sha256: 511c39292691a914821e685eb102e5904715d55efc812585e28274a3bf05fc9e
+  - path: runs/cli-exposure-20260924/data/cli_help.txt
+    bytes: 5720
+    sha256: 690c2b40845ff898880c8ca8962dc4266b518d3140f949519e701b9e2a1b23ab
+  - path: runs/cli-exposure-20260924/data/commands_declared.txt
+    bytes: 495
+    sha256: 7f9f18d2a4129e701325fb58e440346586f2f4bc514998a6c2ddf47472dea847
+  - path: runs/cli-exposure-20260924/data/commands_in_docs.txt
+    bytes: 304
+    sha256: 9de64c401b1c89c19efa669775c052bb104e5fbfd2a9d9e41fc25aa5c5f0ea36
+  - path: runs/cli-exposure-20260924/data/commands_in_help.txt
+    bytes: 332
+    sha256: aec3b83f6f61862e8e18c61c43a3ec159f207c642f59d8ab4de2f09735814285
+  - path: runs/cli-exposure-20260924/data/commands_registered_raw.txt
+    bytes: 0
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: runs/cli-exposure-20260924/data/help_not_in_docs.txt
+    bytes: 28
+    sha256: 1f920ef26d9cec45783a64f0bf79f80f57cb9c02ccd68f552643dbc269c97391
+  - path: runs/cli-exposure-20260924/data/json_support.tsv
+    bytes: 728
+    sha256: 124de49d13607db84e840e15238538f1d60070f20527155b9897d2acc1db5a46
+  - path: runs/cli-exposure-20260924/data/undocumented_in_help.txt
+    bytes: 188
+    sha256: 09c8cd766ee4218ae2e94fc9449ae2a2c95839dbe0030c9d0227da64bd797b6b

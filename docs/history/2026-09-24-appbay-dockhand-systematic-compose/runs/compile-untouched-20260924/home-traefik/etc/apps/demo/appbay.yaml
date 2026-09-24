@@ -1,0 +1,18 @@
+name: demo
+namespace: default
+traits:
+  - type: auth
+    policy: authenticated
+services:
+  web:
+    traits:
+      - type: ingress
+        port: 80
+        exposure: both
+      - type: scoped-env
+        vars:
+          TEAM: "${{ns:TEAM}}"
+      - type: secrets
+        refs:
+          API_TOKEN: vault://demo/api_token
+        injection: runtime-env

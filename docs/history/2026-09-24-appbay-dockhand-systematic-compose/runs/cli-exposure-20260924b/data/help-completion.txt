@@ -1,0 +1,9 @@
+Usage: appbay completion [options] [shell]
+
+Generate shell completion scripts
+
+Arguments:
+  shell       shell type: bash, zsh, fish (default: "bash")
+
+Options:
+  -h, --help  display help for command

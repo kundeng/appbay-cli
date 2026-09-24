@@ -1,0 +1,4 @@
+start,end,verdict
+analysis-13-web-deploy-drops-the-edge-route,H1,supports
+probe-05-map-form-environment-is-handled-three-ways,H1,supports
+probe-08-cli-exposure-top-level-commands,H1,supports

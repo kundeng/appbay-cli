@@ -1,0 +1,5 @@
+start,end
+magic-vars,secrets-env
+scoped-env,secrets-env
+web-up,cli-deploy
+web-worker,cli-deploy

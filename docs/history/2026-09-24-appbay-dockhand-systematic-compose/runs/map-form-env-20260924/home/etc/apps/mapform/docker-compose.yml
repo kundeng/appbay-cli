@@ -1,0 +1,11 @@
+services:
+  listform:
+    image: traefik/whoami:v1.10
+    environment:
+      - KEEP_ME=important
+      - GEN_PASSWORD=${password:16}
+  mapform:
+    image: traefik/whoami:v1.10
+    environment:
+      KEEP_ME: important
+      GEN_PASSWORD: ${password:16}

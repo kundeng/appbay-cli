@@ -1,0 +1,13 @@
+id,at,who,what,chose,instead_of,why,evidence
+J1,2026-09-24 16:06:15,kundeng,gap:G6.decision,leave,close,Deferred pending the reading-(a)-or-(b) decision in SPEC-006 stage 0.,[F8]
+J10,2026-09-24T12:05:56-04:00,kundeng,gap:G8.decision,leave,,RFC-001 §1 made the edge the sole identity authority. Building this recreates exactly what that RFC deleted.,[F9] raw/analysis-14-dockhand-leads-and-their-mechanisms.yaml
+J11,2026-09-24T12:05:56-04:00,kundeng,gap:G9.decision,leave,,Different product category. ~100k lines of UI for capabilities Docker Desktop and Portainer already provide.,[F10] raw/analysis-14-dockhand-leads-and-their-mechanisms.yaml
+J12,2026-09-24T12:05:56-04:00,kundeng,gap:G10.decision,leave,,Commodity; good standalone tools exist; no interaction with the trait compiler.,[F8] raw/analysis-14-dockhand-leads-and-their-mechanisms.yaml
+J2,2026-09-24 16:06:16,kundeng,gap:G6.decision,close,leave,Round-trip probe complete; restoring the decision this investigation actually recommends.,[F8]
+J3,2026-09-24T12:05:56-04:00,kundeng,gap:G1.decision,close,,"Only finding that destroys operator data; blast radius is four callers, two of them the tests that assert the loss.",[F3] raw/probe-05-map-form-environment-is-handled-three-ways.yaml
+J4,2026-09-24T12:05:56-04:00,kundeng,gap:G2.decision,close,,The GUI drops the product's distinguishing output. Undercuts the stated purpose more directly than any other defect.,[F5] raw/analysis-13-web-deploy-drops-the-edge-route.yaml
+J5,2026-09-24T12:05:56-04:00,kundeng,gap:G3.decision,close,,A default that contradicts the documented happy path. Single-sourced constant; the migration hazard is the real work.,[F6] raw/probe-04-untouched-compose-compiles-under-both-edges.yaml
+J6,2026-09-24T12:05:56-04:00,kundeng,gap:G4.decision,close,,One command fixes it and it unblocks releases plus six written-but-unrun checks.,[F7] raw/action-01-appbay-builds-from-the-snapshot.yaml
+J7,2026-09-24T12:05:56-04:00,kundeng,gap:G5.decision,close,,Upstream of MCP and of web/CLI convergence; the concrete form of the exposure thesis.,[F13] raw/probe-08-cli-exposure-top-level-commands.yaml
+J8,2026-09-24T12:05:56-04:00,kundeng,gap:G6.decision,close,,"The only structural gap. Staged, and stage 0 is a decision rather than code — do not start before SPEC-001..004.",[F8] raw/analysis-14-dockhand-leads-and-their-mechanisms.yaml
+J9,2026-09-24T12:05:56-04:00,kundeng,gap:G7.decision,close,,Two shipped apps declare backups that never run. Emit the invocation; do not build the engine.,[F14] raw/analysis-12-appbay-declared-but-unreachable-surface.yaml

@@ -1,0 +1,13 @@
+Usage: appbay presets [options] [command]
+
+Manage app selection presets
+
+Options:
+  -h, --help             display help for command
+
+Commands:
+  save [options] <name>  Save a named app selection preset
+  load <name>            Show apps in a preset (pipe to appbay up)
+  list                   List saved presets
+  delete <name>          Delete a preset
+  help [command]         display help for command

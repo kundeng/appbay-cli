@@ -1,0 +1,7 @@
+start,end
+action-15-auth-trait-error-does-not-stop-the-deploy,auth-gap-20260924
+probe-04-untouched-compose-compiles-under-both-edges,compile-untouched-20260924
+probe-05-map-form-environment-is-handled-three-ways,map-form-env-20260924
+probe-07-cli-exposure-measured-from-the-binary,cli-exposure-20260924
+probe-08-cli-exposure-top-level-commands,cli-exposure-20260924b
+probe-09-docs-cli-check-detects-injected-drift,docs-check-mutation-20260924

@@ -1,0 +1,6 @@
+Usage: appbay version [options]
+
+Print Appbay version
+
+Options:
+  -h, --help  display help for command

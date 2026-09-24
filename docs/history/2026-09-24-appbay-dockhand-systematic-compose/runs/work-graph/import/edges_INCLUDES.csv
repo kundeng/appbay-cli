@@ -1,0 +1,9 @@
+start,end
+env-touching-sites,magic-vars
+env-touching-sites,scoped-env
+env-touching-sites,secrets-env
+deploy-paths,cli-deploy
+deploy-paths,web-up
+deploy-paths,web-worker
+deploy-paths,web-fulldeploy
+deploy-paths,dh-deploy

@@ -1,0 +1,9 @@
+version: 1
+values:
+  - key:
+      namespace: default
+      service: listform
+      varName: GEN_PASSWORD
+    value: P^wZTojSh(jDFB^x
+    generator: password:16
+    createdAt: 2026-09-24T15:41:11.611Z

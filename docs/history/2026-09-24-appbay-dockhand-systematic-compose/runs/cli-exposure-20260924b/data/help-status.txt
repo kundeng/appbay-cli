@@ -1,0 +1,10 @@
+Usage: appbay status [options] [app]
+
+Show app status and configuration details
+
+Arguments:
+  app         app name for detailed status (omit for summary)
+
+Options:
+  --json      output as JSON
+  -h, --help  display help for command

@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 0,
+  "artifact_count": 0,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/run_appbay_tests.sh",
+  "run_id": "appbay-tests-20260924"
+}

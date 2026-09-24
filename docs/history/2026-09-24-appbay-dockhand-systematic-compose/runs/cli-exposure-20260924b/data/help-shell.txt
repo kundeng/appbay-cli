@@ -1,0 +1,9 @@
+Usage: appbay shell [options] <app>
+
+Open an interactive shell in a running service container
+
+Arguments:
+  app         app name
+
+Options:
+  -h, --help  display help for command

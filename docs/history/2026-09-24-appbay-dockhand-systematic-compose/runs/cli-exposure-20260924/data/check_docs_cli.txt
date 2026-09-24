@@ -1,0 +1,1 @@
+  ✖ binary not found at ./apps/cli/dist/appbay — run `pnpm turbo build` first

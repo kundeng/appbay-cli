@@ -1,0 +1,12 @@
+Usage: appbay fixfs [options] <app>
+
+Fix filesystem permissions for app volumes
+
+Arguments:
+  app         app to fix permissions for
+
+Options:
+  --uid <n>   specific UID to grant access
+  --gid <n>   specific GID to grant access
+  --dry-run   show what would change
+  -h, --help  display help for command

@@ -1,0 +1,82 @@
+record: action-15-auth-trait-error-does-not-stop-the-deploy
+type: action
+title: auth-trait-error-does-not-stop-the-deploy
+timestamp: 2026-09-24T11:55:06-04:00
+claim: an app whose auth trait failed to compile is still brought up and routed
+verdict: refutes
+key_evidence: "The hypothesis was that a failed auth trait still deploys. It does not. appbay up exits 1 with 'Failed: authgap \u2014 not deployed: its configuration did not compile \u2026 Deploying it would start a container that cannot serve its declared routes.' docker ps by label: no containers. No policy and no route file written. The per-app gate is deploy-service.ts:154-164 (appsWithCompileErrors -> refusalOf). Teardown removed the appbay_shared network; nothing left behind."
+exit_code: 1
+duration_s: 0
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/auth_error_still_deploys.sh
+state_change: true
+params:
+  env:
+    AB_RUN: runs/auth-gap-20260924
+    AB_CLI: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli/dist/appbay
+code:
+  - path: src/appbay-dockhand/auth_error_still_deploys.sh
+    sha256: a0c1cfc7128af65df5f7ab2dfb647a1fef8d46ae920355cd973a410286123cb5
+    stored: raw/code/a0c1cfc7-auth_error_still_deploys.sh
+output_kind: text
+output:
+  text: |2
+    ===== the operator asked for authenticated access. What does up do? =====
+    appbay up exit=1
+    --- stdout ---
+    Compiling apps...
+    
+    
+    0 deployed, 0 unchanged, 1 error(s)
+    --- stderr ---
+    Compile errors:
+      [authgap] apply-traits: The auth trait requires the Caddy Security edge. Re-run `appbay init --ingress-provider caddy`; Traefik remains supported for ingress but is not an authentication provider.
+    
+      Failed: authgap — not deployed: its configuration did not compile (see the errors above). Deploying it would start a container that cannot serve its declared routes.
+    
+    ===== is the container running? =====
+    (a name above means the app is up)
+    
+    ===== was any authorization policy written? =====
+    (empty means the app is deployed with NO authorization policy)
+    route files that WERE written:
+    --- teardown ---
+      open runs/auth-gap-20260924/home/var/lib/renders/authgap/docker-compose.rendered.yml: no such file or directory
+      Error response from daemon: No such container: appbay.authgap.web
+      appbay_shared
+derived:
+  - path: runs/auth-gap-20260924/data/policies.txt
+    bytes: 0
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: runs/auth-gap-20260924/data/routes.txt
+    bytes: 0
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: runs/auth-gap-20260924/data/running.txt
+    bytes: 0
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: runs/auth-gap-20260924/data/up.stderr
+    bytes: 386
+    sha256: e4a6f173f9c9bbaaddee83edb00f23525e0a05d54604eec9d99be6d74f2f1fbb
+  - path: runs/auth-gap-20260924/data/up.stdout
+    bytes: 56
+    sha256: 1bc9bb1ce9fda74446aa2322f7fda45473dd74b7dd3e1119bcc8e5fff0450984
+  - path: runs/auth-gap-20260924/home/etc/apps/authgap/.env
+    bytes: 0
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: runs/auth-gap-20260924/home/etc/apps/authgap/appbay.yaml
+    bytes: 154
+    sha256: d659fdd939cee3459bdebb03c440e2f88eefa0234f3806d547001aea00fa33a9
+  - path: runs/auth-gap-20260924/home/etc/apps/authgap/docker-compose.yml
+    bytes: 49
+    sha256: 2eebb199b98159e46b0eccbf0bbb695288e1039eae1b6fa24b7db7c8881676f0
+  - path: runs/auth-gap-20260924/home/etc/namespaces/default.yaml
+    bytes: 24
+    sha256: 12cf8138d2fb6d0db3ba1d1a8df8d509c70e9329aa2a2a6ed5f3428398c640fe
+  - path: runs/auth-gap-20260924/home/etc/system.yaml
+    bytes: 183
+    sha256: 67655e41eb39ca9cc0fbaa95c06c629347cb2362e3051acaf021667b6ea76a0a
+  - path: runs/auth-gap-20260924/home/var/lib/state/generated-values.yaml
+    bytes: 22
+    sha256: 614af6355415f2de2b2385c990021523d206c166cbd832b127ede119245120b5
+  - path: runs/auth-gap-20260924/home/var/lib/state/operator-id
+    bytes: 36
+    sha256: 798022eee6b75d16b0c8b0fe3b645d45df7c8ff4dce2f9a7b8a5e4b3b53f075a

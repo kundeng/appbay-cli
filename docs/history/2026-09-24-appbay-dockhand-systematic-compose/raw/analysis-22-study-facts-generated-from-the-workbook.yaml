@@ -1,0 +1,24 @@
+record: analysis-22-study-facts-generated-from-the-workbook
+type: analysis
+title: study-facts-generated-from-the-workbook
+timestamp: 2026-09-24T12:18:02-04:00
+claim: each study page's facts block is generated from the workbook and the records, not hand-written
+verdict: supports
+key_evidence: "21 inquiry rows and 17 findings parsed from the workbook; 5 study pages rewritten between their markers. study-map.py could not be used: it matches rows as '| NPnn | status | settles |' (status before settles, not the documented order) and hardcodes a U0..U9 thread vocabulary, reporting '21 rows, 0 ran, 0 placed on a page' against this workbook."
+exit_code: 0
+duration_s: 0
+command: python3 src/appbay-dockhand/study_facts.py
+code:
+  - path: src/appbay-dockhand/study_facts.py
+    sha256: b891032be3566146753adbeed7e8826681df8da501ac5dc8ac9bb2d8289f179a
+    stored: raw/code/b891032b-study_facts.py
+output_kind: text
+output:
+  text: |2
+    compiler-mechanism.md: 4 row(s)
+    dockhand-leads.md: 1 row(s)
+    dockhand-overlay.md: 1 row(s)
+    exposure-and-presentation.md: 3 row(s)
+    implementation-maturity.md: 6 row(s)
+    
+    workbook rows parsed: 21   findings parsed: 17   pages rewritten: 0

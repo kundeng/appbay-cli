@@ -1,0 +1,110 @@
+record: analysis-12-appbay-declared-but-unreachable-surface
+type: analysis
+title: appbay-declared-but-unreachable-surface
+timestamp: 2026-09-24T11:51:30-04:00
+claim: AppBay declares vocabulary, channels and fields that no code produces or reads
+verdict: supports
+key_evidence: ShepherdPhase declares on-stop and cron; on-stop has 0 producers and 0 handling in converges.ts, cron has 0 real producers (the 1 counted by the script is the doc comment at traits/types.ts:109 — a conformance defect in the counting, noted). ShepherdAction.schedule has 0 readers in the shepherd/deploy path. The trait warnings channel now has exactly one producer (gpu.ts:241), so the 'no producers' note in types.ts is historical, not current.
+exit_code: 0
+duration_s: 2
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/appbay_dead_surface.sh
+params:
+  env:
+    AB_RUN: runs/dead-surface-20260924
+    AB_SRC: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac
+code:
+  - path: src/appbay-dockhand/appbay_dead_surface.sh
+    sha256: 7c54101b9487ff13e4e4ab9a030c6f58d69cb7b3050a7259c36f3303dd370bf7
+    stored: raw/code/7c54101b-appbay_dead_surface.sh
+output_kind: text
+output:
+  text: |2
+    ===== 1. ShepherdPhase members with no producer =====
+      phase 'pre-deploy': 3 producer(s), 1 mention(s) in the runner
+      phase 'post-deploy': 1 producer(s), 1 mention(s) in the runner
+      phase 'on-stop': 0 producer(s), 0 mention(s) in the runner
+      phase 'cron': 1 producer(s), 0 mention(s) in the runner
+    
+    ===== 2. the trait warnings channel: any producer now? =====
+      traits returning warnings:
+        packages/core/src/traits/definitions/gpu.ts:241:        warnings: [`${detail} Deploying WITHOUT GPU acceleration — expect it to be slow.`],
+      (empty = the channel documented as having no producers still has none)
+    
+    ===== 3. ShepherdAction fields with no reader =====
+      ShepherdAction.schedule: 0 read site(s) in the shepherd/deploy path
+      ShepherdAction.kind: 18 read site(s) in the shepherd/deploy path
+      ShepherdAction.timeoutMs: 2 read site(s) in the shepherd/deploy path
+      ShepherdAction.share: 5 read site(s) in the shepherd/deploy path
+      ShepherdAction.mounts: 3 read site(s) in the shepherd/deploy path
+    
+    ===== 4. exported compiler/trait symbols whose only callers are tests or barrels =====
+      buildTraefikConfig       callers=2   non-test non-barrel call sites=1
+      traefikAuxPath           callers=2   non-test non-barrel call sites=1
+      caddyAuxPath             callers=3   non-test non-barrel call sites=3
+      buildCaddySnippet        callers=3   non-test non-barrel call sites=3
+      certResolverName         callers=2   non-test non-barrel call sites=1
+      routerName               callers=2   non-test non-barrel call sites=1
+      caddySecurityPolicy      callers=4   non-test non-barrel call sites=3
+      caddySecurityRoute       callers=4   non-test non-barrel call sites=3
+      whenClauseLabel          callers=3   non-test non-barrel call sites=1
+      mergeServiceFragment     callers=7   non-test non-barrel call sites=5
+    
+    ===== 5. CLI / web parity: tRPC routers vs CLI commands =====
+      tRPC routers in the web app:
+        apps: appsRouter
+        auth: authRouter
+        catalog: catalogRouter
+        configs: configsRouter
+        deployments: deploymentsRouter
+        doctor: doctorRouter
+        health: healthRouter
+        jobs: jobsRouter
+        plans: plansRouter
+        secrets: secretsRouter
+        system: systemRouter
+        validation: validationRouter
+      router files:
+        __tests__/auth.test.ts
+        __tests__/backup-scheduler.test.ts
+        __tests__/backup-worker.test.ts
+        __tests__/deploy-worker.test.ts
+        __tests__/docker-utils.test.ts
+        __tests__/events.test.ts
+        __tests__/extract-secret-refs.test.ts
+        __tests__/extract-service-names.test.ts
+        __tests__/pull-images-worker.test.ts
+        __tests__/shell-sessions.test.ts
+        __tests__/when-clause.test.ts
+        auth.ts
+        docker-utils.ts
+        events.ts
+        queue/__tests__/queue.test.ts
+        queue/backup-scheduler.ts
+        queue/index.ts
+        queue/workers/backup.ts
+        queue/workers/deploy.ts
+        queue/workers/eject.ts
+        queue/workers/pull-images.ts
+        queue/workers/rebuild-cache.ts
+        routers/__tests__/apps-routing-utils.test.ts
+        routers/__tests__/secrets-utils.test.ts
+        routers/__tests__/system-utils.test.ts
+        routers/_app.ts
+        routers/apps-routing-utils.ts
+        routers/apps.ts
+        routers/auth.ts
+        routers/catalog.ts
+        routers/configs.ts
+        routers/deployments.ts
+        routers/doctor.ts
+        routers/health.ts
+        routers/jobs.ts
+        routers/plans.ts
+        routers/secrets-utils.ts
+        routers/secrets.ts
+        routers/system-utils.ts
+        routers/system.ts
+        routers/validation.ts
+        shell-sessions.ts
+        startup.ts
+        trpc.ts

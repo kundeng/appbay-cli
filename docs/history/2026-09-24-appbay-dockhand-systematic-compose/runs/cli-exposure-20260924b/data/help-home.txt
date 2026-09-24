@@ -1,0 +1,11 @@
+Usage: appbay home [options] [command]
+
+Print, explain or repoint the APPBAY_HOME path
+
+Options:
+  --explain             show every resolution tier and which one wins
+  -h, --help            display help for command
+
+Commands:
+  set [options] <path>  Persist the APPBAY_HOME path used by future commands
+  clear                 Forget the persisted home and fall back to the next tier

@@ -1,0 +1,7 @@
+Usage: appbay doctor [options]
+
+Check Appbay prerequisites and environment health
+
+Options:
+  --json      output machine-readable JSON
+  -h, --help  display help for command

@@ -1,0 +1,10 @@
+Usage: appbay down [options] [apps...]
+
+Stop selected apps
+
+Arguments:
+  apps        specific apps to stop (default: all)
+
+Options:
+  --all       stop all discovered apps
+  -h, --help  display help for command

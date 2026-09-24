@@ -1,0 +1,19 @@
+record: probe-00-capabilities
+type: capabilities
+title: capabilities
+timestamp: 2026-09-24T11:36:27-04:00
+claim: what this surface could do at the start
+verdict: inconclusive
+key_evidence: recorded for later comparison
+exit_code: 0
+command: python3 audit.py init 2026-09-24-appbay-dockhand-systematic-compose
+output_kind: json
+output:
+  impl: audit.py
+  python: 3.10.9
+  tools:
+    jq: true
+    yq: true
+    python3: true
+    curl: true
+    git: true

@@ -1,0 +1,15 @@
+start,end
+G1,scoped-env
+G1,magic-vars
+G1,scoped-env-test
+G2,web-up
+G2,web-worker
+G2,web-fulldeploy
+G2,web-plan
+G3,default-edge
+G3,auth-guard
+G4,release-install
+G4,docs-check
+G6,container-bin
+G6,cli-route
+G7,shepherd-phase

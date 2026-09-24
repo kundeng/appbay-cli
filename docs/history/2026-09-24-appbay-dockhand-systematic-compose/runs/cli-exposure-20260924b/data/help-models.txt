@@ -1,0 +1,10 @@
+Usage: appbay models [options] [command]
+
+Manage AI models (Ollama)
+
+Options:
+  -h, --help    display help for command
+
+Commands:
+  ls [options]  List downloaded models
+  rm <model>    Remove a model

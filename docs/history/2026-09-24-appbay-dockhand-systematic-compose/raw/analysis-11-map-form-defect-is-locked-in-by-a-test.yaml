@@ -1,0 +1,175 @@
+record: analysis-11-map-form-defect-is-locked-in-by-a-test
+type: analysis
+title: map-form-defect-is-locked-in-by-a-test
+timestamp: 2026-09-24T11:50:05-04:00
+claim: the environment data loss is asserted as correct by a passing test, which is why the green suite missed it
+verdict: supports
+key_evidence: "scoped-env.test.ts:178 is titled 'treats object-form environment as empty array (does not merge)' and asserts environment === ['NEW_VAR=new-value'], i.e. the loss is the expected result. secrets.test.ts:177 asserts the opposite for the same construct ({DB_PASSWORD, OTHER} -> OTHER kept). Blast radius is small: scopedEnvTraitDefinition has 4 callers (2 tests, 2 barrel index.ts). Four shipped system apps use map-form environment (nextcloud, jellyfin, homeassistant, sysinfo); none declares scoped-env today, so the destructive path is armed but not yet fired in the shipped catalog."
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/env_defect_blast_radius.sh
+params:
+  env:
+    AB_RUN: runs/env-defect-radius-20260924
+    AB_SRC: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac
+code:
+  - path: src/appbay-dockhand/env_defect_blast_radius.sh
+    sha256: eef9d9fe499da1fbe52633a510b5047b576007979f3d29c9e88b0045b5efa584
+    stored: raw/code/eef9d9fe-env_defect_blast_radius.sh
+output_kind: text
+output:
+  text: |2
+    ===== the three sites =====
+         1	
+         2	  for (const [svcName, svc] of Object.entries(services)) {
+         3	    if (!Array.isArray(svc.environment)) continue;
+         4	
+         5	    const resolvedEnv: string[] = [];
+    -- scoped-env.ts:32-41 --
+        if (targetService && services && services[targetService]) {
+          const svc = services[targetService];
+          const existing = Array.isArray(svc.environment)
+            ? svc.environment
+            : [];
+          const newVars = Object.entries(props.vars).map(
+            ([k, v]) => `${k}=${v}`,
+          );
+          svc.environment = [...existing, ...newVars];
+        }
+    -- secrets.ts:94-100 (the site that gets it right) --
+            } else if (env && typeof env === "object") {
+              // Object-style: { KEY: "value" }
+              const envObj = env as Record<string, unknown>;
+              for (const key of refKeys) {
+                if (key in envObj) {
+                  // Case 1: refs key matches env var key — always rewrite
+                  envObj[key] = `\${${key}}`;
+    
+    ===== blast radius: scopedEnvTraitDefinition =====
+    
+    Impact of changing "scopedEnvTraitDefinition" — 5 affected symbols:
+    
+    packages/core/src/traits/definitions/scoped-env.ts
+      constant    scopedEnvTraitDefinition:15
+    
+    packages/core/src/traits/__tests__/registry.test.ts
+      file        registry.test.ts:1
+    
+    packages/core/src/traits/definitions/__tests__/scoped-env.test.ts
+      file        scoped-env.test.ts:1
+    
+    packages/core/src/traits/definitions/index.ts
+      file        index.ts:1
+    
+    packages/core/src/traits/index.ts
+      file        index.ts:1
+    
+    
+    ===== callers: scopedEnvTraitDefinition =====
+    
+    Callers of "scopedEnvTraitDefinition" (4):
+    
+    file        registry.test.ts
+      packages/core/src/traits/__tests__/registry.test.ts:1
+    
+    file        scoped-env.test.ts
+      packages/core/src/traits/definitions/__tests__/scoped-env.test.ts:1
+    
+    file        index.ts
+      packages/core/src/traits/definitions/index.ts:1
+    
+    file        index.ts
+      packages/core/src/traits/index.ts:1
+    
+    
+    ===== blast radius: the compile orchestrator that owns resolveMagicVars =====
+    
+    Impact of changing "compile" — 24 affected symbols:
+    
+    packages/core/src/compiler/compile.ts
+      function    compile:200
+    
+    packages/core/src/compiler/__tests__/compile.test.ts
+      file        compile.test.ts:1
+    
+    packages/core/src/compiler/__tests__/edge-cases.test.ts
+      file        edge-cases.test.ts:1
+    
+    packages/core/src/compiler/__tests__/magic-var-compile.test.ts
+      file        magic-var-compile.test.ts:1
+    
+    packages/core/src/compiler/__tests__/namespace-values.test.ts
+      file        namespace-values.test.ts:1
+    
+    packages/core/src/compiler/__tests__/overlay-integration.test.ts
+      file        overlay-integration.test.ts:1
+    
+    packages/core/src/compiler/__tests__/overlay-merge.test.ts
+      file        overlay-merge.test.ts:1
+    
+    packages/core/src/compiler/__tests__/properties.test.ts
+      file        properties.test.ts:1
+    
+    packages/core/src/compiler/__tests__/provider-agnostic.test.ts
+      function    compileWith:68
+      file        provider-agnostic.test.ts:1
+    
+    packages/core/src/compiler/__tests__/scope-integration.test.ts
+      file        scope-integration.test.ts:1
+      function    suggestionsFor:214
+    
+    
+    ===== the test that asserts the loss =====
+    178:  it("treats object-form environment as empty array (does not merge)", () => {
+    179-    // When environment is a dict { KEY: "val" } rather than an array, the guard
+    180-    // `Array.isArray(svc.environment) ? svc.environment : []` yields [].
+    181-    // New vars are appended to [] — the original object-form entries are not included.
+    182-    const props: ScopedEnvTrait = {
+    183-      type: "scoped-env",
+    184-      vars: { NEW_VAR: "new-value" },
+    185-    };
+    186-    const input = makeInput(props, {
+    187-      compose: {
+    188-        services: {
+    189-          web: {
+    190-            image: "nginx:latest",
+    191-            environment: { EXISTING: "old-value" } as unknown as string[],
+    192-          },
+    193-        },
+    194-      },
+    
+    ===== the sibling trait's test asserting the OPPOSITE for the same construct =====
+      });
+    
+      it("replaces matching env var values with ${KEY} references for runtime-env injection", () => {
+        const originalCompose = {
+          services: {
+            web: {
+              image: "nginx:latest",
+              environment: { DB_PASSWORD: "placeholder", OTHER: "keep" },
+            },
+          },
+        };
+        const props: SecretsTrait = {
+          type: "secrets",
+          provider: "vault",
+          refs: { DB_PASSWORD: "vault://proj/dev/DB_PASSWORD" },
+          injection: "runtime-env",
+        };
+        const input = makeInput(props, { compose: originalCompose, service: "web" });
+        const output = secretsTraitDefinition.transform(input);
+    
+        const svc = (output.compose.services as Record<string, Record<string, unknown>>).web;
+        const env = svc.environment as Record<string, string>;
+        // DB_PASSWORD replaced with ${DB_PASSWORD} so docker compose resolves from process env
+        expect(env.DB_PASSWORD).toBe("${DB_PASSWORD}");
+        // OTHER untouched
+        expect(env.OTHER).toBe("keep");
+    
+    ===== which shipped manifests use map-form environment? =====
+    system-apps/ and catalogs in this tree:
+      MAP  system-apps/nextcloud/docker-compose.yml
+      MAP  system-apps/jellyfin/docker-compose.yml
+      MAP  system-apps/homeassistant/docker-compose.yml
+      MAP  system-apps/sysinfo/docker-compose.yml
+    (no output above means every shipped manifest uses the list form)

@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 3889152,
+  "artifact_count": 44,
+  "has_logs": false,
+  "producing_code": "src/appbay-dockhand/domain.py",
+  "run_id": "work-graph"
+}

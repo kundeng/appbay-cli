@@ -1,0 +1,14 @@
+Usage: appbay up [options] [apps...]
+
+Compile and deploy selected apps
+
+Arguments:
+  apps                 specific apps to deploy (default: all)
+
+Options:
+  --all                deploy all discovered apps
+  --namespace <ns>     namespace for every app whose manifest pins none
+  --collection <name>  deploy only apps in this collection
+  --tail               tail logs after deploy
+  --open               open in browser after deploy
+  -h, --help           display help for command

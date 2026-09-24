@@ -1,0 +1,6 @@
+Usage: appbay tunnel-down [options]
+
+Stop all running Cloudflare tunnels
+
+Options:
+  -h, --help  display help for command

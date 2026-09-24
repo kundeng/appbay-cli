@@ -1,0 +1,11 @@
+Usage: appbay config [options] <app> [key] [value]
+
+Get or set app configuration values in appbay.yaml
+
+Arguments:
+  app         app name
+  key         config key (dot-separated path)
+  value       value to set
+
+Options:
+  -h, --help  display help for command

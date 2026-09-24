@@ -1,0 +1,8 @@
+Usage: appbay update [options]
+
+Update Appbay CLI binary and system app images
+
+Options:
+  --check        check for updates without installing
+  --system-only  only pull system app Docker images
+  -h, --help     display help for command

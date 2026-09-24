@@ -1,0 +1,4 @@
+Compile errors:
+  [authgap] apply-traits: The auth trait requires the Caddy Security edge. Re-run `appbay init --ingress-provider caddy`; Traefik remains supported for ingress but is not an authentication provider.
+
+  Failed: authgap — not deployed: its configuration did not compile (see the errors above). Deploying it would start a container that cannot serve its declared routes.

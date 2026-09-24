@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 27941,
+  "artifact_count": 5,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/docs_check_detects_drift.sh",
+  "run_id": "docs-check-mutation-20260924"
+}

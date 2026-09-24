@@ -1,0 +1,11 @@
+Usage: appbay ps [options] [apps...]
+
+Show container status for apps
+
+Arguments:
+  apps        specific apps to inspect (default: all)
+
+Options:
+  --all       include apps without rendered compose files
+  --json      output as JSON
+  -h, --help  display help for command

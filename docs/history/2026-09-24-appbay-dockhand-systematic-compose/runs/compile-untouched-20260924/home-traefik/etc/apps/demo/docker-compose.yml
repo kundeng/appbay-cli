@@ -1,0 +1,17 @@
+services:
+  web:
+    image: traefik/whoami:v1.10
+    ports:
+      - "8080:80"
+    environment:
+      - WHOAMI_NAME=demo
+      - ADMIN_PASSWORD=${password:24}
+    restart: unless-stopped
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${password:32}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+volumes:
+  dbdata:

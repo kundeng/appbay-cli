@@ -1,0 +1,22 @@
+site,product,path,line,symbol,kind
+auth-guard,appbay-cli,packages/core/src/traits/definitions/auth.ts,77,authTraitDefinition,trait
+cli-deploy,appbay-cli,packages/core/src/services/deploy-service.ts,154,deploy,deploy-path
+cli-route,appbay-cli,packages/core/src/services/deploy/route.ts,35,writeRouteFiles,deploy-path
+compile-orchestrator,appbay-cli,packages/core/src/compiler/compile.ts,200,compile,pipeline
+container-bin,appbay-cli,packages/core/src/runtime/container-runtime.ts,145,containerBin,transport
+default-edge,appbay-cli,packages/core/src/schemas/instance.ts,72,DEFAULT_INGRESS_PROVIDER,config
+dh-deploy,dockhand,src/lib/server/stacks.ts,3084,deployStack,deploy-path
+dh-docker-fetch,dockhand,src/lib/server/docker.ts,789,dockerFetch,transport
+dh-rewrite,dockhand,src/lib/server/host-path.ts,566,rewriteComposeVolumePaths,compose-transform
+dh-traefik-read,dockhand,src/lib/utils/traefik-urls.ts,34,extractTraefikUrls,label-reader
+docs-check,appbay-cli,scripts/check-docs-cli.mjs,1,check-docs-cli,ci
+magic-vars,appbay-cli,packages/core/src/compiler/compile.ts,1019,resolveMagicVars,env-site
+release-install,appbay-cli,.github/workflows/release.yml,53,pnpm install --frozen-lockfile,ci
+scoped-env,appbay-cli,packages/core/src/traits/definitions/scoped-env.ts,34,scopedEnvTraitDefinition,env-site
+scoped-env-test,appbay-cli,packages/core/src/traits/definitions/__tests__/scoped-env.test.ts,178,object-form assertion,test
+secrets-env,appbay-cli,packages/core/src/traits/definitions/secrets.ts,56,secretsTraitDefinition,env-site
+shepherd-phase,appbay-cli,packages/core/src/traits/types.ts,88,ShepherdPhase,type
+web-fulldeploy,appbay-web,apps/web/src/server/routers/deployments.ts,420,deployments.fullDeploy,deploy-path
+web-plan,appbay-web,apps/web/src/server/routers/plans.ts,112,plans.get,display
+web-up,appbay-web,apps/web/src/server/routers/deployments.ts,159,deployments.up,deploy-path
+web-worker,appbay-web,apps/web/src/server/queue/workers/deploy.ts,63,dockerComposeUp,deploy-path

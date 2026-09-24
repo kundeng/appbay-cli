@@ -1,0 +1,21 @@
+Usage: appbay init [options]
+
+Initialize Appbay home directory scaffold
+
+Options:
+  --dir <path>                    custom APPBAY_HOME location
+  --project <name>                project name
+  --domain <name>                 base domain for ingress routing
+  --catalog <source>              catalog source: local path or git URL
+  --container-runtime <runtime>   container binary to invoke: "docker" or
+                                  "podman" (default: docker)
+  --refresh-system-apps           Replace installed system-app files that differ
+                                  from what this version ships (.bak kept).
+  --acme-dns-provider <provider>  DNS provider for the ACME DNS-01 challenge
+                                  (cloudflare). Absent means no DNS-01.
+  --ingress-provider <provider>   reverse proxy to emit config for: "traefik" or
+                                  "caddy" (default: traefik)
+  --yes                           non-interactive: accept all defaults
+  --force                         skip the preflight gate and continue even if a
+                                  required environment check fails
+  -h, --help                      display help for command

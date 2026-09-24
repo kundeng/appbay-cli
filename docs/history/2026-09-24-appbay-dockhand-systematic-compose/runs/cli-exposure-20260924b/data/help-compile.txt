@@ -1,0 +1,11 @@
+Usage: appbay compile [options] [apps...]
+
+Compile app definitions into rendered compose files
+
+Arguments:
+  apps              specific apps to compile (default: all)
+
+Options:
+  --output <dir>    write rendered output to this directory
+  --namespace <ns>  namespace for every app whose manifest pins none
+  -h, --help        display help for command

@@ -1,0 +1,14 @@
+start,end
+appbay-tests-20260924,src/appbay-dockhand/run_appbay_tests.sh
+auth-gap-20260924,src/appbay-dockhand/auth_error_still_deploys.sh
+cli-exposure-20260924,src/appbay-dockhand/cli_exposure.sh
+cli-exposure-20260924b,src/appbay-dockhand/cli_exposure.sh
+compile-untouched-20260924,src/appbay-dockhand/compile_untouched_compose.sh
+dead-surface-20260924,src/appbay-dockhand/appbay_dead_surface.sh
+dockhand-leads-20260924,src/appbay-dockhand/dockhand_leads.sh
+dockhand-overlay-20260924,src/appbay-dockhand/dockhand_overlay_surface.sh
+docs-check-mutation-20260924,src/appbay-dockhand/docs_check_detects_drift.sh
+env-defect-radius-20260924,src/appbay-dockhand/env_defect_blast_radius.sh
+map-form-env-20260924,src/appbay-dockhand/map_form_environment.sh
+web-cli-parity-20260924,src/appbay-dockhand/web_cli_parity.sh
+work-graph,src/appbay-dockhand/domain.py

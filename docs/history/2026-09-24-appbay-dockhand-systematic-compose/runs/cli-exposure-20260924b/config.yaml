@@ -1,0 +1,8 @@
+run_id: "cli-exposure-20260924b"
+code: "src/appbay-dockhand/cli_exposure.sh"
+code_version: "appbay-cli-mac@9f00b579 / appbay-mac@d8f557bc / dockhand@99dc1044"
+data_epoch: "top-level commands of the built binary against docs/reference/cli-commands.qmd"
+note: |
+  Sources are immutable snapshots, so the data epoch is the pinned commit set
+  rather than a time window. Nothing in these runs reads a live system except
+  auth-gap-20260924, which used the local Docker daemon and tore down after.

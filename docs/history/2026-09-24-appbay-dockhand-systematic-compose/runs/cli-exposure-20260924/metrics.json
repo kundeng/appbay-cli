@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 7877,
+  "artifact_count": 9,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/cli_exposure.sh",
+  "run_id": "cli-exposure-20260924"
+}

@@ -1,0 +1,3 @@
+services:
+  web:
+    image: traefik/whoami:v1.10

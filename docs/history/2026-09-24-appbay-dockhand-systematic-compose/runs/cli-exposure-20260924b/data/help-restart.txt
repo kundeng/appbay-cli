@@ -1,0 +1,10 @@
+Usage: appbay restart [options] [apps...]
+
+Restart selected apps (down then up)
+
+Arguments:
+  apps        specific apps to restart (default: all)
+
+Options:
+  --all       restart all discovered apps
+  -h, --help  display help for command

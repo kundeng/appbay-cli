@@ -1,0 +1,10 @@
+Usage: appbay mcp [options] [command]
+
+MCP (Model Context Protocol) tools
+
+Options:
+  -h, --help       display help for command
+
+Commands:
+  inspector [url]  Launch the MCP inspector for debugging MCP servers
+  help [command]   display help for command

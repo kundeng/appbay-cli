@@ -1,0 +1,40 @@
+record: action-01-appbay-builds-from-the-snapshot
+type: action
+title: appbay-builds-from-the-snapshot
+timestamp: 2026-09-24T11:37:58-04:00
+claim: the pinned AppBay tree installs and builds, so its CLI can be executed for evidence
+verdict: refutes
+key_evidence: "pnpm install --frozen-lockfile exits 1 with ERR_PNPM_OUTDATED_LOCKFILE: the lockfile still lists @appbay/core as a dependency of packages/db, which packages/db/package.json no longer declares. release.yml:53 runs that exact command, so the tag-triggered release build fails the same way."
+exit_code: 1
+duration_s: 1
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/build_appbay_sandbox.sh
+state_change: true
+params:
+  env:
+    APPBAY_SANDBOX: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox
+code:
+  - path: src/appbay-dockhand/build_appbay_sandbox.sh
+    sha256: 2e91831dd3a66fc901b9f844578c4af8e6cdcea681f172a24ad7592c5f96b95c
+    stored: raw/code/2e91831d-build_appbay_sandbox.sh
+output_kind: text
+output:
+  text: |2+
+    Scope: all 4 workspace projects
+     ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile" because pnpm-lock.yaml is not up to date with <ROOT>/packages/db/package.json
+    
+    Note that in CI environments this setting is true by default. If you still need to run install in such cases, use "pnpm install --no-frozen-lockfile"
+    
+      Failure reason:
+      specifiers in the lockfile don't match specifiers in package.json:
+    * 1 dependencies were removed: @appbay/core@workspace:*
+    
+     ERR_PNPM_META_FETCH_FAIL  GET https://registry.npmjs.org/pnpm: request to https://registry.npmjs.org/pnpm failed, reason: 
+    
+       ╭──────────────────────────────────────────────╮
+       │                                              │
+       │     Update available! 10.29.3 → 12.4.2.      │
+       │     Changelog: https://pnpm.io/v/12.4.2      │
+       │   To update, run: corepack use pnpm@12.4.2   │
+       │                                              │
+       ╰──────────────────────────────────────────────╯
+    

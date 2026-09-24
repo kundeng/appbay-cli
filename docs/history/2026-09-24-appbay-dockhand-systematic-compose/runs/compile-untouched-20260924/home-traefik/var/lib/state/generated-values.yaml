@@ -1,0 +1,9 @@
+version: 1
+values:
+  - key:
+      namespace: default
+      service: web
+      varName: ADMIN_PASSWORD
+    value: Bi#P4dQb@!dKNaUaID1^AXcJ
+    generator: password:24
+    createdAt: 2026-09-24T15:39:48.953Z

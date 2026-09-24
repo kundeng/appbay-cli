@@ -1,0 +1,21 @@
+record: action-17-derived-paths-normalised-without-changing-content
+type: action
+title: derived-paths-normalised-without-changing-content
+timestamp: 2026-09-24T12:08:53-04:00
+claim: making derived paths investigation-relative preserves every artifact's bytes and hash
+verdict: supports
+key_evidence: 12 records had their derived-path prefix made investigation-relative; all 92 derived artifacts were then re-hashed against the sha256 and byte count their records claim, with 0 mismatches. WROTE went 0 -> 92 and IN_RUN 1 -> 6 in the projector, confirming the cause was the path prefix rather than missing artifacts.
+exit_code: 0
+duration_s: 0
+command: python3 src/appbay-dockhand/normalise_record_paths.py
+state_change: true
+code:
+  - path: src/appbay-dockhand/normalise_record_paths.py
+    sha256: 5580283c334202f90b79c46627e9f3637a91941d9c657a1d828d0b0d9ecc8922
+    stored: raw/code/5580283c-normalise_record_paths.py
+output_kind: text
+output:
+  text: |2
+    records with paths rewritten: 12
+    derived artifacts re-verified: 92
+    mismatches: 0

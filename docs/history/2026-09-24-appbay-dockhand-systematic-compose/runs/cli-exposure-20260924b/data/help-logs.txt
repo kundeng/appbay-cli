@@ -1,0 +1,12 @@
+Usage: appbay logs [options] [app] [service]
+
+Show logs for an app or service
+
+Arguments:
+  app           app name
+  service       specific service within the app
+
+Options:
+  -f, --follow  follow log output
+  --tail <n>    number of lines to show from the end
+  -h, --help    display help for command

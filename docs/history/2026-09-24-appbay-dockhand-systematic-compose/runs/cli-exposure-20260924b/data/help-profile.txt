@@ -1,0 +1,12 @@
+Usage: appbay profile [options] [command]
+
+Save and restore named configuration profiles
+
+Options:
+  -h, --help             display help for command
+
+Commands:
+  save [options] <name>  Save current configuration as a named profile
+  set <name>             Restore a saved profile
+  rm <name>              Delete a saved profile
+  ls [options]           List saved profiles

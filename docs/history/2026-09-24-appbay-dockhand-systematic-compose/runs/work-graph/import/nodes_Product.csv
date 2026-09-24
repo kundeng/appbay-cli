@@ -1,0 +1,4 @@
+name,commit,snapshot_date,role
+appbay-cli,9f00b579,2026-09-24,primary subject; CLI and core packages
+appbay-web,d8f557bc,2026-08-09,web and GUI surface; six weeks behind the CLI tree
+dockhand,99dc1044,2026-09-24,"comparison subject; read, not executed"

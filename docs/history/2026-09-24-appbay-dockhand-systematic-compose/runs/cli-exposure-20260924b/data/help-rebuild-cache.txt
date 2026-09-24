@@ -1,0 +1,6 @@
+Usage: appbay rebuild-cache [options]
+
+Regenerate SQLite cache from filesystem state
+
+Options:
+  -h, --help  display help for command

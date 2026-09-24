@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 0,
+  "artifact_count": 0,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/dockhand_leads.sh",
+  "run_id": "dockhand-leads-20260924"
+}

@@ -1,0 +1,10 @@
+Usage: appbay exec [options] <app> [command...]
+
+Execute a command in a running service container
+
+Arguments:
+  app         app name
+  command     command to execute (default: /bin/sh)
+
+Options:
+  -h, --help  display help for command

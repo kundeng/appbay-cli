@@ -1,0 +1,9 @@
+Usage: appbay ollama [options] <args...>
+
+Run Ollama CLI commands inside the Ollama container
+
+Arguments:
+  args        arguments to pass to ollama (e.g., run llama3, list, show llama3)
+
+Options:
+  -h, --help  display help for command

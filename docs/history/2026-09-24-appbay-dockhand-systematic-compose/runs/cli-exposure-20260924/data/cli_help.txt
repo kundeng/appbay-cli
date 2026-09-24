@@ -1,0 +1,91 @@
+Usage: appbay [options] [command]
+
+Appbay — self-hosted app management CLI
+
+Options:
+  -V, --version                      output the version number
+  -h, --help                         display help for command
+
+Commands:
+  setup [options]                    Guided setup: init → vault → selected edge
+  init [options]                     Initialize Appbay home directory scaffold
+  init-system [options]              Bootstrap a fresh host to run Appbay
+                                     (RHEL-family): install Docker, set up
+                                     ownership + access for the appbay tree.
+                                     --owner service (default) creates a
+                                     no-login system service account (D-6,
+                                     homelab/worklab); --owner operator uses
+                                     your own user (personal). Standalone-host
+                                     convenience — ansible is authoritative for
+                                     the DGX fleet.
+  server                             Manage the Appbay server (control plane)
+  doctor [options]                   Check Appbay prerequisites and environment
+                                     health
+  version                            Print Appbay version
+  list [options]                     List all discovered apps
+  status [options] [app]             Show app status and configuration details
+  ps [options] [apps...]             Show container status for apps
+  logs [options] [app] [service]     Show logs for an app or service
+  validate [options] [apps...]       Validate appbay.yaml and compose files
+  compile [options] [apps...]        Compile app definitions into rendered
+                                     compose files
+  eject [options] <app>              Export an app as a standalone compose
+                                     directory
+  apply [options] [apps...]          Apply a deployment plan (compile → review →
+                                     deploy)
+  up [options] [apps...]             Compile and deploy selected apps
+  down [options] [apps...]           Stop selected apps
+  restart [options] [apps...]        Restart selected apps (down then up)
+  pull [options] [targets...]        Pull latest images for apps, or pull an
+                                     Ollama model
+  delete [options] <app>             Delete an app definition
+  rebuild-cache                      Regenerate SQLite cache from filesystem
+                                     state
+  catalog                            Browse and manage the app catalog
+  install [options] <name>           Install an app from the catalog
+  config <app> [key] [value]         Get or set app configuration values in
+                                     appbay.yaml
+  env [options] <app> [key] [value]  Manage app environment variables (.env)
+  presets                            Manage app selection presets
+  secrets                            Manage secrets — vault CRUD, KeePass CRUD,
+                                     scanning, and checking
+  edge                               Manage the edge: the proxy, and the users
+                                     who sign in to your DEPLOYED APPS
+  authelia [args...]                 (retired) Authelia is no longer AppBay's
+                                     authentication edge.
+  auth [args...]                     (retired) `appbay auth` was an alias for
+                                     the Authelia commands, which are retired.
+  admin [args...]                    (retired) AppBay no longer has
+                                     control-plane accounts of its own (RFC-001
+                                     §1).
+  exec <app> [command...]            Execute a command in a running service
+                                     container
+  shell <app>                        Open an interactive shell in a running
+                                     service container
+  run [options] <app> [command...]   Run a one-off command in a service
+                                     container
+  stats [options]                    Show resource usage statistics for running
+                                     containers
+  smi                                Show NVIDIA GPU information
+  models                             Manage AI models (Ollama)
+  ollama <args...>                   Run Ollama CLI commands inside the Ollama
+                                     container
+  profile                            Save and restore named configuration
+                                     profiles
+  tunnel [options] <app>             Create a Cloudflare quick tunnel to expose
+                                     a local app publicly
+  tunnel-down                        Stop all running Cloudflare tunnels
+  mcp                                MCP (Model Context Protocol) tools
+  dive <target>                      Inspect Docker image layers (disk usage
+                                     breakdown)
+  open <app>                         Open an app in the default browser
+  url [options] <app>                Print app URL
+  home [options]                     Print, explain or repoint the APPBAY_HOME
+                                     path
+  info                               Print system information
+  size [options] [app]               Show disk usage for apps
+  fixfs [options] <app>              Fix filesystem permissions for app volumes
+  update [options]                   Update Appbay CLI binary and system app
+                                     images
+  completion [shell]                 Generate shell completion scripts
+  help [command]                     display help for command

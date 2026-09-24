@@ -1,0 +1,11 @@
+Usage: appbay url [options] <app>
+
+Print app URL
+
+Arguments:
+  app         app name
+
+Options:
+  --lan       show LAN address
+  --internal  show internal Docker address
+  -h, --help  display help for command

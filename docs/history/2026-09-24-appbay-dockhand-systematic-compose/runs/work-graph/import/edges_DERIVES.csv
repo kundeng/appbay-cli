@@ -1,0 +1,9 @@
+start,end
+probe-05-map-form-environment-is-handled-three-ways,scoped-env
+probe-05-map-form-environment-is-handled-three-ways,magic-vars
+probe-06-dockhand-has-no-compose-overlay,dh-deploy
+probe-06-dockhand-has-no-compose-overlay,dh-rewrite
+analysis-11-map-form-defect-is-locked-in-by-a-test,scoped-env-test
+analysis-13-web-deploy-drops-the-edge-route,web-up
+analysis-14-dockhand-leads-and-their-mechanisms,dh-docker-fetch
+action-15-auth-trait-error-does-not-stop-the-deploy,cli-deploy

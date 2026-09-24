@@ -1,0 +1,13 @@
+Usage: appbay env [options] <app> [key] [value]
+
+Manage app environment variables (.env)
+
+Arguments:
+  app         app name
+  key         variable name
+  value       variable value (set mode)
+
+Options:
+  --list      list all variables
+  --delete    delete a variable
+  -h, --help  display help for command

@@ -1,0 +1,11 @@
+Usage: appbay delete [options] <app>
+
+Delete an app definition
+
+Arguments:
+  app             app to delete
+
+Options:
+  --keep-volumes  keep Docker volumes
+  --force         skip confirmation
+  -h, --help      display help for command

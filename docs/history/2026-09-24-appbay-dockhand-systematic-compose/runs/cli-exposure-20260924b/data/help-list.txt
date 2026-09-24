@@ -1,0 +1,8 @@
+Usage: appbay list [options]
+
+List all discovered apps
+
+Options:
+  --all       include apps with discovery errors
+  --json      output as JSON array
+  -h, --help  display help for command

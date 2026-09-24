@@ -1,0 +1,18 @@
+id,text,standing
+F1,An untailored Compose file compiles into a full deployment,current
+F10,"Dockhand's GUI lead is an order of magnitude, and it is the product",current
+F11,~~The docs name only 34 of 47 shipped commands~~,current
+F12,~~scripts/check-docs-cli.mjs is inert~~,current
+F13,Only 4 of 47 commands can emit JSON,current
+F14,Declared shepherd vocabulary has no producer and no consumer,current
+F15,~~An app whose auth trait failed is still deployed and routed~~,current
+F16,The test suite is green at the commit where F3 is live,current
+F17,"The investigation's own artifacts hold together, and two of its tools did not",current
+F2,Dockhand has no runtime overlay model,current
+F3,A map-form environment: silently loses every variable it declared,current
+F4,A passing test asserts the loss as correct behaviour,current
+F5,No web deploy path installs the edge route or the authorization policy,current
+F6,The default edge cannot run the auth trait,current
+F7,The stale lockfile disabled CI and now breaks the release workflow,current
+F8,"Dockhand's multi-host lead is an envId parameter, not a subsystem",current
+F9,Dockhand's multi-user lead is environment-scoped RBAC with an audit trail,current

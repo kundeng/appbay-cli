@@ -1,0 +1,9 @@
+  binary: ./apps/cli/dist/appbay  (51 commands)
+  docs:   28 files scanned
+
+  ❌ documented commands the binary does not have:
+       docs/reference/cli-commands.qmd:962  appbay teleport
+       docs/reference/cli-commands.qmd:967  appbay teleport
+
+  ════ 2 discrepancies ════
+exit=1

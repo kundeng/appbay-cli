@@ -1,0 +1,3 @@
+id,definition,n,source
+deploy-paths,"every code path that applies a compiled app to a runtime, in either product",,/Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/domain.py
+env-touching-sites,every compiler site that reads or writes a service `environment:` field,,/Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/domain.py

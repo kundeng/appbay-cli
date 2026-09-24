@@ -1,0 +1,12 @@
+Usage: appbay server [options] [command]
+
+Manage the Appbay server (control plane)
+
+Options:
+  -h, --help       display help for command
+
+Commands:
+  start [options]  Start the Appbay server
+  stop             Stop the Appbay server
+  status           Check Appbay server status
+  help [command]   display help for command

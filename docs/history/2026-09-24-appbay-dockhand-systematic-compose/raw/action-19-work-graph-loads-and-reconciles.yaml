@@ -1,0 +1,75 @@
+record: action-19-work-graph-loads-and-reconciles
+type: action
+title: work-graph-loads-and-reconciles
+timestamp: 2026-09-24T12:10:52-04:00
+claim: the work graph builds into LadybugDB and its counts reconcile against the records
+verdict: supports
+key_evidence: "With each bridge type pointing at one domain label, the graph loaded: 232 nodes / 333 edges and 'conformance: 27 counts reconciled against the CSVs'. dangling_edges.csv held only its header."
+exit_code: 1
+duration_s: 2
+command: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/bin/python /tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py investigations/2026-09-24-appbay-dockhand-systematic-compose --domain investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/domain.py --ladybug --force
+state_change: true
+params:
+  argv:
+    - investigations/2026-09-24-appbay-dockhand-systematic-compose
+  env:
+    WG_PY: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/bin/python
+code:
+  - path: /tmp/audited-ops-eval-20260924b/sources/audited-ops-tooling/work-graph.py
+    sha256: 9333b97da2d43716def3f588991cb4d0549dc067650ac30a4e22eb99b2dd4689
+    stored: raw/code/9333b97d-work-graph.py
+  - path: src/appbay-dockhand/domain.py
+    sha256: 4cda255c305c9e8768ad0ac70c4322edef0659aff8c76f1777d7b1a5f01b16bd
+    stored: raw/code/4cda255c-domain.py
+output_kind: text
+output:
+  text: |2
+    === 2026-09-24-appbay-dockhand-systematic-compose
+      -- claim layer
+      Question            15
+      Hypothesis           1
+      Finding             16
+      ProbeRecord         18
+      Cohort               2
+      Judgement           12
+      -- provenance layer
+      Run                 13
+      Code                29
+      Artifact            92
+      -- domain layer
+      Product              3
+      CodeSite            21
+      Gap                 10
+      --
+      RAISES               0   (none found)
+      BEARS_ON             3
+      ANSWERS              0   (none found)
+      CITES               17
+      REFERS_TO            0   (none found)
+      MOVED_BY             7
+      OVER                 0   (none found)
+      SUPERSEDES           0   (none found)
+      REFINES              0   (none found)
+      NARROWS              0   (none found)
+      EXTENDS              0   (none found)
+      OVERTAKEN_BY         0   (none found)
+      INVALIDATES          0   (none found)
+      JUDGED               0   (none found)
+      BECAUSE             12
+      RAN                 19
+      PRODUCED            92
+      IN_RUN               6
+      USED_CODE           10
+      WROTE               92
+      ABOUT               20
+      DERIVES              8
+      INCLUDES             8
+    
+      wrote 232 nodes / 333 edges -> /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose/runs/work-graph/import
+      loaded 232 nodes / 333 edges -> /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/investigations/2026-09-24-appbay-dockhand-systematic-compose/runs/work-graph/ladybug
+      conformance: 27 counts reconciled against the CSVs
+    
+      3 problem(s):
+        run without config.yaml: runs/work-graph
+        unfilled verdict: action-18-work-graph-loads-and-reconciles.yaml
+        unwritten edge RAISES: this corpus has questions and hypotheses, and nothing connects them. Produced by: an `Hnn` token in a Next probes row's second column

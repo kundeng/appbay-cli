@@ -1,0 +1,13 @@
+Usage: appbay apply [options] [apps...]
+
+Apply a deployment plan (compile → review → deploy)
+
+Arguments:
+  apps              specific apps to apply
+
+Options:
+  --dry-run         show what would change without deploying
+  --yes             skip confirmation
+  --all             apply all apps
+  --namespace <ns>  namespace for every app whose manifest pins none
+  -h, --help        display help for command

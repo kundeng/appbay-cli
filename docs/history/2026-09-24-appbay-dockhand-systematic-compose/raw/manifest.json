@@ -1,0 +1,492 @@
+{
+  "investigation": "2026-09-24-appbay-dockhand-systematic-compose",
+  "generated_by": "src/appbay-dockhand/build_manifest.py",
+  "file_count": 45,
+  "record_count": 23,
+  "verdicts": {
+    "inconclusive": 4,
+    "refutes": 2,
+    "supports": 17
+  },
+  "uncited_records": [],
+  "files": [
+    {
+      "path": "raw/action-01-appbay-builds-from-the-snapshot.yaml",
+      "bytes": 2328,
+      "sha256": "2f682f592c2f8526fe5e33cd9bd69f0b4b292d8b8865843cdc7348d6cc89bba0",
+      "kind": "action",
+      "verdict": "refutes",
+      "claim": "the pinned AppBay tree installs and builds, so its CLI can be executed for evidence",
+      "proves": "pnpm install --frozen-lockfile exits 1 with ERR_PNPM_OUTDATED_LOCKFILE: the lockfile still lists @appbay/core as a dependency of packages/db, which packages/db/package.json no longer declares. release.yml:53 runs that exact command, so the tag-triggered release build fails the same way.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "compiler-mechanism.md"
+      ]
+    },
+    {
+      "path": "raw/action-02-appbay-builds-with-a-refreshed-lockfile.yaml",
+      "bytes": 4141,
+      "sha256": "815f45e139242a070522b53a1d21f243b90356a5403bb8cbd380564377cff09c",
+      "kind": "action",
+      "verdict": "inconclusive",
+      "claim": "with the lockfile refreshed the tree installs, builds and the CLI runs",
+      "proves": "install and build both succeeded (3/3 turbo tasks); only the smoke check failed, because apps/cli builds a bun-compiled binary at dist/appbay and the script looked for dist/index.js. Superseded by action-03.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "compiler-mechanism.md"
+      ]
+    },
+    {
+      "path": "raw/action-03-appbay-builds-with-a-refreshed-lockfile.yaml",
+      "bytes": 2812,
+      "sha256": "4c11e5af60ddabd92c430ad28cbe03768320a02b97a58d71d413f388f66a7a5f",
+      "kind": "action",
+      "verdict": "supports",
+      "claim": "with the lockfile refreshed the tree installs, builds and the CLI runs",
+      "proves": "pnpm install --no-frozen-lockfile then turbo build: 3 of 3 packages built; dist/appbay --version prints 0.1.0-dev. The only barrier to executing AppBay from the snapshot is the stale lockfile.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "compiler-mechanism.md"
+      ]
+    },
+    {
+      "path": "raw/action-15-auth-trait-error-does-not-stop-the-deploy.yaml",
+      "bytes": 4213,
+      "sha256": "2072750ba16038326b5d53ecfef3e9ca1509bc537e623f491653d3084f2ee321",
+      "kind": "action",
+      "verdict": "refutes",
+      "claim": "an app whose auth trait failed to compile is still brought up and routed",
+      "proves": "The hypothesis was that a failed auth trait still deploys. It does not. appbay up exits 1 with 'Failed: authgap \\u2014 not deployed: its configuration did not compile \\u2026 Deploying it would start a container that cannot serve its declared routes.' docker ps by label: no containers. No policy and no route file written. The per-app gate is deploy-service.ts:154-164 (appsWithCompileErrors -> refus",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/action-17-derived-paths-normalised-without-changing-content.yaml",
+      "bytes": 1050,
+      "sha256": "f7e903870fa874f7101fc0d33e58c7f173d20ed92b2a265066b2c3b1f022af40",
+      "kind": "action",
+      "verdict": "supports",
+      "claim": "making derived paths investigation-relative preserves every artifact's bytes and hash",
+      "proves": "12 records had their derived-path prefix made investigation-relative; all 92 derived artifacts were then re-hashed against the sha256 and byte count their records claim, with 0 mismatches. WROTE went 0 -> 92 and IN_RUN 1 -> 6 in the projector, confirming the cause was the path prefix rather than missing artifacts.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/action-18-work-graph-loads-and-reconciles.yaml",
+      "bytes": 4483,
+      "sha256": "b0c261bdf7ebee4e3d00f69ee92ec6e2eb65347f2fff5e8ced7dd1590c231858",
+      "kind": "action",
+      "verdict": "inconclusive",
+      "claim": "the work graph builds into LadybugDB and its counts reconcile against the records",
+      "proves": "LadybugDB 0.20.4 refused the bulk COPY: 'The table ABOUT has multiple FROM and TO pairs defined in the schema.' The bridge pointed ABOUT at both Product and CodeSite; the projector's COPY does not name a pair. Import CSVs were written (227 nodes / 330 edges) but nothing loaded. Superseded by action-19 after making each bridge type single-label.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/action-19-work-graph-loads-and-reconciles.yaml",
+      "bytes": 3511,
+      "sha256": "e1426cce8692edd51f1eddebdcb6cfb9a407008d61a941fd7dc73688d9ff6de1",
+      "kind": "action",
+      "verdict": "supports",
+      "claim": "the work graph builds into LadybugDB and its counts reconcile against the records",
+      "proves": "With each bridge type pointing at one domain label, the graph loaded: 232 nodes / 333 edges and 'conformance: 27 counts reconciled against the CSVs'. dangling_edges.csv held only its header.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/action-21-work-graph-rebuilt-with-valid-run-configs.yaml",
+      "bytes": 3680,
+      "sha256": "4f74c3d98534a24d79a59a0b2867744e2ceb268d3179eff940d4609e35401b2a",
+      "kind": "action",
+      "verdict": "supports",
+      "claim": "with the run configs parseable, the graph rebuilds and every run carries its code version",
+      "proves": "After quoting the run-config scalars (a data_epoch containing ': ' was invalid YAML and the projector swallowed the parse error), all 13 run configs parse under yq and the graph rebuilt at 238 nodes / 339 edges with 'conformance: 27 counts reconciled'. Every run now carries its code_version.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-11-map-form-defect-is-locked-in-by-a-test.yaml",
+      "bytes": 7313,
+      "sha256": "9a01f4f5444854bb91a576b039f0274ddde3643fd474e6ecd7d8cb5f56d3ef1d",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "the environment data loss is asserted as correct by a passing test, which is why the green suite missed it",
+      "proves": "scoped-env.test.ts:178 is titled 'treats object-form environment as empty array (does not merge)' and asserts environment === ['NEW_VAR=new-value'], i.e. the loss is the expected result. secrets.test.ts:177 asserts the opposite for the same construct ({DB_PASSWORD, OTHER} -> OTHER kept). Blast radius is small: scopedEnvTraitDefinition has 4 callers (2 tests, 2 barrel index.ts). Four shipped system",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-12-appbay-declared-but-unreachable-surface.yaml",
+      "bytes": 5054,
+      "sha256": "3f6689424dfb2589f07dbbea63f6e7b13d7116fddd8424300ebc794def6a7c65",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "AppBay declares vocabulary, channels and fields that no code produces or reads",
+      "proves": "ShepherdPhase declares on-stop and cron; on-stop has 0 producers and 0 handling in converges.ts, cron has 0 real producers (the 1 counted by the script is the doc comment at traits/types.ts:109 \u2014 a conformance defect in the counting, noted). ShepherdAction.schedule has 0 readers in the shepherd/deploy path. The trait warnings channel now has exactly one producer (gpu.ts:241), so the 'no producers'",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-13-web-deploy-drops-the-edge-route.yaml",
+      "bytes": 4680,
+      "sha256": "049bc7ebcfba32091e6fefbc358a44a42c02eb130ab817e8ef0624bf24fca7ae",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "no web deploy path installs auxiliaryFiles, so an app deployed from the UI has no route and no auth policy",
+      "proves": "auxiliaryFiles appears exactly once under apps/web/src \u2014 plans.ts:112, which maps it to paths for DISPLAY in the plan preview. No web deploy path writes it. deployments.up (4 UI call sites) compiles, writes only docker-compose.rendered.yml, and spawns docker compose up -d; the queue's deploy.ts worker does the same. fullDeploy, the one procedure whose docstring claims parity with appbay up, has 0 ",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-14-dockhand-leads-and-their-mechanisms.yaml",
+      "bytes": 7074,
+      "sha256": "e36de3984301a4272e1647fedef27cff33096f1d0b03ef1fc271a38b7fb62ee1",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "where Dockhand goes further, named with the code that implements it",
+      "proves": "Multi-host: Dockhand parameterises every call by envId (2822 references, 255 files) over a docker HTTP API (dockerFetch at docker.ts:789) with four connection types; AppBay's spawn layer (containerExec/containerSpawn/containerCompose) takes no host and route delivery is a local write, join(appbayHome, aux.path) at deploy/route.ts:35,45. Multi-user: Dockhand has users/sessions/roles/userRoles with ",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "dockhand-leads.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-20-published-findings-re-derived-from-the-graph.yaml",
+      "bytes": 5558,
+      "sha256": "652708929f476c724004ed16460c2fd0b48e04c05f46120c8ffe4de1b5065f3d",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "querying the loaded graph reproduces the numbers the workbook publishes",
+      "proves": "Ten Cypher queries re-derive published numbers: 16 current findings (matches the claims index), F3's three code sites (compile.ts:1019, scoped-env.ts:34, secrets.ts:56), the two environment disagreements and the two deploy-path disagreements as edges, six deploy paths across three products, 10 gaps split 7 close / 3 leave, and 12 judgements each linked BECAUSE to its finding. Two runs showed a nul",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/analysis-22-study-facts-generated-from-the-workbook.yaml",
+      "bytes": 1195,
+      "sha256": "692f6875b1e9204dd3a68611a6c694b966203e06f766d9c0fd79e771773b3b06",
+      "kind": "analysis",
+      "verdict": "supports",
+      "claim": "each study page's facts block is generated from the workbook and the records, not hand-written",
+      "proves": "21 inquiry rows and 17 findings parsed from the workbook; 5 study pages rewritten between their markers. study-map.py could not be used: it matches rows as '| NPnn | status | settles |' (status before settles, not the documented order) and hardcodes a U0..U9 thread vocabulary, reporting '21 rows, 0 ran, 0 placed on a page' against this workbook.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/code/017d29fd-cli_exposure.sh",
+      "bytes": 3758,
+      "sha256": "017d29fd8541ba15a78a398f52d08b0cb06a136df28dc557cb4039a022d8afc1",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/1e4e28ad-dockhand_overlay_surface.sh",
+      "bytes": 1925,
+      "sha256": "1e4e28ad296890136602f00e669a66c9c1ac5a5bbf129a03cf16bbbc1b54421d",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/21a56db5-build_appbay_sandbox.sh",
+      "bytes": 908,
+      "sha256": "21a56db55d032784558dbb91218b938b5c27cc9b32e6269ebdc94b6447a2ac35",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/2cc06cfe-cli_exposure.sh",
+      "bytes": 3058,
+      "sha256": "2cc06cfe3f327e660e512e1a177aae44486a358d523050e6fcb824701fac9eb2",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/2e91831d-build_appbay_sandbox.sh",
+      "bytes": 817,
+      "sha256": "2e91831dd3a66fc901b9f844578c4af8e6cdcea681f172a24ad7592c5f96b95c",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/42817458-docs_check_detects_drift.sh",
+      "bytes": 1689,
+      "sha256": "428174583b5b21d51aecf905eb7168e5df482466c25ebd1c43d2f5809619dbc0",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/4cda255c-domain.py",
+      "bytes": 8989,
+      "sha256": "4cda255c305c9e8768ad0ac70c4322edef0659aff8c76f1777d7b1a5f01b16bd",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/5580283c-normalise_record_paths.py",
+      "bytes": 3069,
+      "sha256": "5580283c334202f90b79c46627e9f3637a91941d9c657a1d828d0b0d9ecc8922",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/699038da-domain.py",
+      "bytes": 8569,
+      "sha256": "699038da40f4b28489ad9d460379752582d49d734c4727abe2cd063cd5d1bb19",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/7b046ac6-query_work_graph.sh",
+      "bytes": 2395,
+      "sha256": "7b046ac63047f3b8bd7cbf10cec971833085303e20016a427f410d602a6d1629",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/7c54101b-appbay_dead_surface.sh",
+      "bytes": 2853,
+      "sha256": "7c54101b9487ff13e4e4ab9a030c6f58d69cb7b3050a7259c36f3303dd370bf7",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/7d27226e-web_cli_parity.sh",
+      "bytes": 2692,
+      "sha256": "7d27226ed648e83ad6c56673f6f8ced76939bc4582c71921db6759eb09677dbd",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/8d08e8f1-build_appbay_sandbox.sh",
+      "bytes": 1113,
+      "sha256": "8d08e8f118c45e051d2f108a740283a06222aa497346d14aad17bf5b47c52f2f",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/9333b97d-work-graph.py",
+      "bytes": 59177,
+      "sha256": "9333b97da2d43716def3f588991cb4d0549dc067650ac30a4e22eb99b2dd4689",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/a0c1cfc7-auth_error_still_deploys.sh",
+      "bytes": 3101,
+      "sha256": "a0c1cfc7128af65df5f7ab2dfb647a1fef8d46ae920355cd973a410286123cb5",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/a52bd4a0-run_appbay_tests.sh",
+      "bytes": 486,
+      "sha256": "a52bd4a045d9f461b41419c5a89f4a3427c88a5cb0e4c463c249316d955323f5",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/b891032b-study_facts.py",
+      "bytes": 5832,
+      "sha256": "b891032be3566146753adbeed7e8826681df8da501ac5dc8ac9bb2d8289f179a",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/daf06ad7-dockhand_leads.sh",
+      "bytes": 5564,
+      "sha256": "daf06ad740abd51ed8150dbd022ccd71f3c66e5784b00907fb6d1914c258b491",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/ebd46eb6-compile_untouched_compose.sh",
+      "bytes": 3403,
+      "sha256": "ebd46eb606f5c2075e550a6767cdcfcbbbeadd45b5912bfbc01113c4a98af318",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/eef9d9fe-env_defect_blast_radius.sh",
+      "bytes": 2088,
+      "sha256": "eef9d9fe499da1fbe52633a510b5047b576007979f3d29c9e88b0045b5efa584",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/f3a98979-map_form_environment.sh",
+      "bytes": 2683,
+      "sha256": "f3a98979678556c56bac2a0b76f3418c1a95872f6eaf6933979f8cce474dc655",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/code/faad8903-store_roundtrip.sh",
+      "bytes": 3199,
+      "sha256": "faad890371e65220168808473614ddc95be6130066d846fa38c5500049e05c15",
+      "kind": "executed-code",
+      "proves": "immutable copy of code a record executed"
+    },
+    {
+      "path": "raw/probe-00-capabilities.yaml",
+      "bytes": 451,
+      "sha256": "9dac943fd007ddf9885f4bf17961ec1af91b1bb542b13e0c1efc70ab08826c06",
+      "kind": "capabilities",
+      "verdict": "inconclusive",
+      "claim": "what this surface could do at the start",
+      "proves": "recorded for later comparison",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    },
+    {
+      "path": "raw/probe-04-untouched-compose-compiles-under-both-edges.yaml",
+      "bytes": 8065,
+      "sha256": "f11ac3f73e6d001e49ec1ba90a6f56c7b22b4f6a75f82efe6c087a87028cdd14",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "a stock compose file plus a sidecar appbay.yaml compiles to a deployment without the compose file being tailored",
+      "proves": "A stock compose file (host port 8080:80, no networks, no labels) compiled unchanged into a deployment: port stripped, appbay_shared attached with alias demo_web, identity labels and container_name stamped, TEAM=platform injected, API_TOKEN wired, ADMIN_PASSWORD generated, and a provider route file emitted \\u2014 input sha256 571417f2 identical before and after, both providers. But with the code de",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "compiler-mechanism.md"
+      ]
+    },
+    {
+      "path": "raw/probe-05-map-form-environment-is-handled-three-ways.yaml",
+      "bytes": 4866,
+      "sha256": "5ecaab111b44e4c95c90ae8a0bbd7d308aed12306718a41b4605118b930d6b03",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "the compiler's three environment-touching sites disagree about map-form environment",
+      "proves": "Two services identical but for environment spelling. listform (list) keeps KEEP_ME, generates GEN_PASSWORD, gains TEAM and API_TOKEN. mapform (map) renders environment: [TEAM, API_TOKEN] only \\u2014 KEEP_ME=important and GEN_PASSWORD are gone, the generated-values store holds one entry (listform only), and the compile reports '1 compiled, 0 error(s)'.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SPEC-001-one-compose-environment-model.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/probe-06-dockhand-has-no-compose-overlay.yaml",
+      "bytes": 8039,
+      "sha256": "b16629eca8c4f5da7190aef10dea64438aa4c26a7cc3a676cee1a4ebc408cb95",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "Dockhand applies the compose file as written; nothing systematically adds deployment concerns",
+      "proves": "Compose content is reassigned at exactly two points between deployStack and the spawn (stacks.ts:1258 rewriteComposeVolumePaths, :1279 rewriteBindsToHostDir), both line-regex bind-path fixups for running inside a container. Every traefik.http.routers occurrence is a labels[] READ in utils/traefik-urls.ts or UI prose; traefik.enable, certresolver, acme, letsencrypt, forward_auth: 0 occurrences in s",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "dockhand-overlay.md"
+      ]
+    },
+    {
+      "path": "raw/probe-07-cli-exposure-measured-from-the-binary.yaml",
+      "bytes": 4704,
+      "sha256": "9bc2196f5b57a9a3827675a9326f52c8fd39bc00d81ede64ac6cf8bf372c032a",
+      "kind": "probe",
+      "verdict": "inconclusive",
+      "claim": "the shipped CLI exposes fewer commands than it registers, and most reporting commands have no --json",
+      "proves": "Procedure defect found on reread: grep -c 'json$' also matched 'no-json' (51+47=98 over 51 commands), and the declared-command list swept in subcommand names from every commands/*.ts file, so 'declared but not in help' listed secrets/edge/catalog subcommands. Superseded by probe-08, which counts top-level names only and anchors the --json match.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "exposure-and-presentation.md"
+      ]
+    },
+    {
+      "path": "raw/probe-08-cli-exposure-top-level-commands.yaml",
+      "bytes": 10797,
+      "sha256": "69ad3998dff2fe5d038f85af3181d1e1ace0b482d7950c5a9159e95080f61f03",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "measured over top-level commands only: the docs and --json gaps are smaller than the prior count but real",
+      "proves": "47 real top-level commands after subtracting 4 retirement notices (admin, auth, authelia, help) from the 51 names in --help. 46 have a heading in docs/reference/cli-commands.qmd; only exec and run do not. Only 4 of 47 accept --json: doctor, list, ps, status. The repo's own check-docs-cli.mjs exits 0 (51 commands, 28 docs files, 0 discrepancies).",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "exposure-and-presentation.md"
+      ]
+    },
+    {
+      "path": "raw/probe-09-docs-cli-check-detects-injected-drift.yaml",
+      "bytes": 3104,
+      "sha256": "992b294a5f20ea67727642bad553c87b833d5e8bdc592e7c06d3383b5ba1792c",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "check-docs-cli.mjs goes red on drift it claims to catch, so its green result means something",
+      "proves": "Three-way mutation test on the sandbox copy: baseline exit 0; a documented-but-absent command (appbay teleport) -> 2 discrepancies, exit 1; a documented-but-absent flag (appbay status --telepathy) -> 1 discrepancy, exit 1; restored -> exit 0. The checker is sensitive to both failure classes it claims to catch.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "exposure-and-presentation.md"
+      ]
+    },
+    {
+      "path": "raw/probe-10-appbay-test-suite-at-the-pinned-commit.yaml",
+      "bytes": 12420,
+      "sha256": "b3a01f7867a64cdb42c7edd30d3694f5fce68e88832691c51740a9c6569c2e52",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "AppBay's own tests pass at 9f00b579 with its uncommitted changes",
+      "proves": "pnpm turbo test at the pinned tree: 5/5 tasks successful, @appbay/core 85 files / 1148 passed + 1 skipped, @appbay/cli 29 files / 403 passed. Zero failures \\u2014 while probe-05 shows live silent data loss, so the suite is green and the defect is real.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "implementation-maturity.md"
+      ]
+    },
+    {
+      "path": "raw/probe-16-human-judgement-survives-a-store-rebuild.yaml",
+      "bytes": 3319,
+      "sha256": "8a2c655f0673909ab0af1c1ed111b787703f0815e6afe3743a6c247a8a9ae2af",
+      "kind": "probe",
+      "verdict": "supports",
+      "claim": "an edited decision survives rebuilding while generated columns refresh from the records",
+      "proves": "G6.decision was hand-edited to 'leave' and G1.blast_radius clobbered; after rebuild G6.decision is still 'leave' (human state read back and merged) and G1.blast_radius is restored from its record. audit_decision grew 10 -> 12 with no row updated or deleted. The seeded decision was then restored through a further append.",
+      "cited_by": [
+        "INVESTIGATION-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "PLAN-2026-09-24-appbay-dockhand-systematic-compose.md",
+        "SUPPLEMENT-2026-09-24-appbay-dockhand-systematic-compose.md"
+      ]
+    }
+  ]
+}

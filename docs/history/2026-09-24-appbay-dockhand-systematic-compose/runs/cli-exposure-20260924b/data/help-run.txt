@@ -1,0 +1,11 @@
+Usage: appbay run [options] <app> [command...]
+
+Run a one-off command in a service container
+
+Arguments:
+  app         app name
+  command     command to run
+
+Options:
+  --rm        remove container after exit (default: true)
+  -h, --help  display help for command

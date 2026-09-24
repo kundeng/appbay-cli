@@ -1,0 +1,89 @@
+record: action-02-appbay-builds-with-a-refreshed-lockfile
+type: action
+title: appbay-builds-with-a-refreshed-lockfile
+timestamp: 2026-09-24T11:38:36-04:00
+claim: with the lockfile refreshed the tree installs, builds and the CLI runs
+verdict: inconclusive
+key_evidence: install and build both succeeded (3/3 turbo tasks); only the smoke check failed, because apps/cli builds a bun-compiled binary at dist/appbay and the script looked for dist/index.js. Superseded by action-03.
+exit_code: 1
+duration_s: 6
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/build_appbay_sandbox.sh
+state_change: true
+params:
+  env:
+    APPBAY_SANDBOX: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox
+code:
+  - path: src/appbay-dockhand/build_appbay_sandbox.sh
+    sha256: 21a56db55d032784558dbb91218b938b5c27cc9b32e6269ebdc94b6447a2ac35
+    stored: raw/code/21a56db5-build_appbay_sandbox.sh
+output_kind: text
+output:
+  text: |2
+    Scope: all 4 workspace projects
+    Progress: resolved 0, reused 1, downloaded 0, added 0
+     WARN  3 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, prebuild-install@7.1.3
+    Packages: +125
+    ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    Progress: resolved 231, reused 121, downloaded 0, added 124
+    Progress: resolved 231, reused 121, downloaded 0, added 125, done
+    .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+    .../esbuild@0.27.7/node_modules/esbuild postinstall$ node install.js
+    .../esbuild@0.18.20/node_modules/esbuild postinstall$ node install.js
+    .../esbuild@0.18.20/node_modules/esbuild postinstall: Done
+    .../esbuild@0.27.7/node_modules/esbuild postinstall: Done
+    .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+    
+    devDependencies:
+    + turbo 2.9.8
+    
+    Done in 2s using pnpm v10.29.3
+    > turbo build
+    
+    • turbo 2.9.8
+    
+       • Packages in scope: @appbay/cli, @appbay/core, @appbay/db
+       • Running build in 3 packages
+       • Remote caching disabled
+    
+    @appbay/db:build: cache miss, executing 465844294ed61616
+    @appbay/core:build: cache miss, executing 2144392922f0ffb8
+    @appbay/db:build: 
+    @appbay/db:build: > @appbay/db@0.1.0 build /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/packages/db
+    @appbay/db:build: > tsc
+    @appbay/db:build: 
+    @appbay/core:build: 
+    @appbay/core:build: > @appbay/core@0.1.0 build /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/packages/core
+    @appbay/core:build: > tsc
+    @appbay/core:build: 
+    @appbay/cli:build: cache miss, executing 854dc5eeea80ff70
+    @appbay/cli:build: 
+    @appbay/cli:build: > @appbay/cli@0.1.0 build /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli
+    @appbay/cli:build: > bun build --compile src/index.ts --outfile dist/appbay
+    @appbay/cli:build: 
+    @appbay/cli:build:   [51ms]  bundle  355 modules
+    @appbay/cli:build:  [134ms] compile  dist/appbay
+    
+     Tasks:    3 successful, 3 total
+    Cached:    0 cached, 3 total
+      Time:    2.756s 
+    
+    --- built ---
+stderr: |2
+  node:internal/modules/cjs/loader:1424
+    throw err;
+    ^
+  
+  Error: Cannot find module '/Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli/dist/index.js'
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+      at Module._load (node:internal/modules/cjs/loader:1227:37)
+      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47 {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: []
+  }
+  
+  Node.js v24.12.0

@@ -2,6 +2,17 @@
 
 2026-09-24 · competitive review and prioritised recommendations
 
+> **Superseded in part — 2026-09-24, same day.** A second investigation built and ran
+> the product and read Dockhand's source rather than its manual:
+> [`2026-09-24-appbay-dockhand-systematic-compose/`](2026-09-24-appbay-dockhand-systematic-compose/REPORT-2026-09-24-appbay-dockhand-systematic-compose.md).
+> It confirms the compiler finding from source and refutes two claims below:
+> documented commands are **46 of 47** (`docs/reference/cli-commands.qmd`; the 34
+> here counted the README table), so only `exec` and `run` are undocumented; and
+> `check-docs-cli.mjs` is not inert — it is a working check that CI no longer
+> runs because a stale lockfile disables CI and breaks the release workflow.
+> `--json` is worse than stated here: **4 of 47**. The default-edge item is now
+> observed, not inferred. Start from the newer report.
+
 ## Where this came from
 
 Two independent investigations ran the same brief against immutable snapshots of

@@ -1,0 +1,7 @@
+{
+  "artifact_bytes": 0,
+  "artifact_count": 0,
+  "has_logs": true,
+  "producing_code": "src/appbay-dockhand/env_defect_blast_radius.sh",
+  "run_id": "env-defect-radius-20260924"
+}

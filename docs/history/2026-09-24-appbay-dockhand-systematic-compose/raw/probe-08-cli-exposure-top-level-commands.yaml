@@ -1,0 +1,216 @@
+record: probe-08-cli-exposure-top-level-commands
+type: probe
+title: cli-exposure-top-level-commands
+timestamp: 2026-09-24T11:46:01-04:00
+claim: "measured over top-level commands only: the docs and --json gaps are smaller than the prior count but real"
+bears_on: [H1]
+verdict: supports
+key_evidence: "47 real top-level commands after subtracting 4 retirement notices (admin, auth, authelia, help) from the 51 names in --help. 46 have a heading in docs/reference/cli-commands.qmd; only exec and run do not. Only 4 of 47 accept --json: doctor, list, ps, status. The repo's own check-docs-cli.mjs exits 0 (51 commands, 28 docs files, 0 discrepancies)."
+exit_code: 0
+duration_s: 39
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/cli_exposure.sh
+params:
+  env:
+    AB_BUILD: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox
+    AB_RUN: runs/cli-exposure-20260924b
+    AB_CLI: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/appbay-sandbox/apps/cli/dist/appbay
+    AB_SRC: /tmp/audited-ops-eval-20260924b/sources/appbay-cli-mac
+code:
+  - path: src/appbay-dockhand/cli_exposure.sh
+    sha256: 017d29fd8541ba15a78a398f52d08b0cb06a136df28dc557cb4039a022d8afc1
+    stored: raw/code/017d29fd-cli_exposure.sh
+output_kind: text
+output:
+  text: |2
+    ===== top-level names in `appbay --help` =====
+    total:                    51
+    retirement notices:        4 (admin auth authelia help )
+    real commands:            47
+    apply catalog compile completion config delete dive doctor down edge eject env exec fixfs home info init init-system install list logs mcp models ollama open presets profile ps pull rebuild-cache restart run secrets server setup shell size smi stats status tunnel tunnel-down up update url validate version 
+    
+    ===== documented in docs/reference/cli-commands.qmd =====
+    documented names:       46
+    --- real commands with NO heading in the CLI reference ---
+    exec run 
+    count:        2
+    
+    ===== --json support, per command, from its own --help =====
+    with --json:    4
+    without --json: 43
+    --- has --json ---
+    doctor list ps status 
+    
+    ===== the repo's own docs/CLI check, run from the repo root =====
+    exit=0
+      binary: ./apps/cli/dist/appbay  (51 commands)
+      docs:   28 files scanned
+    
+      ✅ every documented command, flag and tRPC procedure exists, and every router is documented
+    
+      ════ 0 discrepancies ════
+derived:
+  - path: runs/cli-exposure-20260924b/data/check_docs_cli.txt
+    bytes: 216
+    sha256: efbfb4fdd713a582ae05d09cf197b4f0469f4df8272cb59c8273c552f412540d
+  - path: runs/cli-exposure-20260924b/data/cli_help.txt
+    bytes: 5720
+    sha256: 690c2b40845ff898880c8ca8962dc4266b518d3140f949519e701b9e2a1b23ab
+  - path: runs/cli-exposure-20260924b/data/commands.txt
+    bytes: 307
+    sha256: 13e3dc23d5179e1517aefe466263d6ae3d6baa92e5cf9045a190d5b89cac9595
+  - path: runs/cli-exposure-20260924b/data/docs.txt
+    bytes: 304
+    sha256: 9de64c401b1c89c19efa669775c052bb104e5fbfd2a9d9e41fc25aa5c5f0ea36
+  - path: runs/cli-exposure-20260924b/data/help-apply.txt
+    bytes: 410
+    sha256: 98937e2eff026d0faa3f8b22c77c10bd29356e49edfcbee584c245e1f9ba31df
+  - path: runs/cli-exposure-20260924b/data/help-catalog.txt
+    bytes: 594
+    sha256: aa957874e5d2504459c66c898be5f65ced5d2fab5792ddb0d8d8916e14cab23e
+  - path: runs/cli-exposure-20260924b/data/help-compile.txt
+    bytes: 351
+    sha256: e8aff20921998102f1b5a072eefc97755a73fe13d5598c7b5b3e9127ae7fb351
+  - path: runs/cli-exposure-20260924b/data/help-completion.txt
+    bytes: 199
+    sha256: 13a3d617cfaac7fe9d60ce5fdfba32c4fc74fe9af0fcff878635902881e5b9a7
+  - path: runs/cli-exposure-20260924b/data/help-config.txt
+    bytes: 260
+    sha256: 8b257fe694be026cbab95dc38dae598e171c94ccf4c44e4a0a1f0d3128088dd2
+  - path: runs/cli-exposure-20260924b/data/help-delete.txt
+    bytes: 234
+    sha256: 59fc054eb73e39214e947a75513a5cf0772833f464d30dee0f4c6ea4f8aa28f8
+  - path: runs/cli-exposure-20260924b/data/help-dive.txt
+    bytes: 224
+    sha256: 8b42cbdd1886156c3c6ba482adb2e18445fb589af05ec9738c3180126e41b692
+  - path: runs/cli-exposure-20260924b/data/help-doctor.txt
+    bytes: 174
+    sha256: 363cc2e4838281a261b2be00b6ffcbd588ae99d01f494f8edc670781c7e6a734
+  - path: runs/cli-exposure-20260924b/data/help-down.txt
+    bytes: 210
+    sha256: ac92abfc7c2d8dd00cb4794d4dec8d2f632507aa6e7288e3f33ba6d24e4033eb
+  - path: runs/cli-exposure-20260924b/data/help-edge.txt
+    bytes: 471
+    sha256: 61751e3dcbed5150f652d10e241c86191a15ac8f5ef201b13340f40cd3f530e9
+  - path: runs/cli-exposure-20260924b/data/help-eject.txt
+    bytes: 258
+    sha256: b6eebaa762e9d5f27af4187516d3fc039050d8313b9a3b0e9c9b31a860419bf6
+  - path: runs/cli-exposure-20260924b/data/help-env.txt
+    bytes: 306
+    sha256: 1c42a1fe9f3e8ab8a260c01f4322ed4f0177a3c0ea87896ef8f82b0edee346ee
+  - path: runs/cli-exposure-20260924b/data/help-exec.txt
+    bytes: 234
+    sha256: 8aaff0140b94f85cc1502cb769557052ed22980727b2cf06ddd86e61af627859
+  - path: runs/cli-exposure-20260924b/data/help-fixfs.txt
+    bytes: 305
+    sha256: 49070f482f1aa7ec0625e768ba9f1d1cd3eb047d2ce75ce226aaae349bf7fa0a
+  - path: runs/cli-exposure-20260924b/data/help-home.txt
+    bytes: 385
+    sha256: ebe4ae958d927e9b29988442630fafb0f9349d57d141a5f9a710796abb663bda
+  - path: runs/cli-exposure-20260924b/data/help-info.txt
+    bytes: 104
+    sha256: f80bea8551c8a9468f43a509c3bb8b5430976eff36cb49ff82a2d00cbd71e2c6
+  - path: runs/cli-exposure-20260924b/data/help-init-system.txt
+    bytes: 1040
+    sha256: 14a4b1cd75aa2e678cdaf124ca1d92521550b27ecb9ab6b0174b377446fcdf91
+  - path: runs/cli-exposure-20260924b/data/help-init.txt
+    bytes: 1190
+    sha256: 261b89300ffab299b0a1b7cafb7aa90ebc9db861aa4b00c6b3c0786f12d39764
+  - path: runs/cli-exposure-20260924b/data/help-install.txt
+    bytes: 406
+    sha256: 6098f5d933f3e132e0865527591ea6969ff83a28d6932d1d42fa81ca61931e96
+  - path: runs/cli-exposure-20260924b/data/help-list.txt
+    bytes: 188
+    sha256: d1f31d6009210c1213bb7e1fb335e3b7ec02a5275fd9a421791b0d66cb673488
+  - path: runs/cli-exposure-20260924b/data/help-logs.txt
+    bytes: 301
+    sha256: 540d6071a5f36c6cf8e2aaffbd9b5234a7cb0782ed1e037fefe0bc5ba9729d43
+  - path: runs/cli-exposure-20260924b/data/help-mcp.txt
+    bytes: 253
+    sha256: 093bd1fee1d0e582985849de12c5ebed1ba45faca3b51ace6c0f83d296844fac
+  - path: runs/cli-exposure-20260924b/data/help-models.txt
+    bytes: 200
+    sha256: aef6c255673ce527d9cb6d2a1f422a6b424942ad482ad5c8d9384c6c6ad10503
+  - path: runs/cli-exposure-20260924b/data/help-ollama.txt
+    bytes: 235
+    sha256: 2bb81809447343b31dd18c66b8b05f23e3fed6176afd991abc9af43d684031e6
+  - path: runs/cli-exposure-20260924b/data/help-open.txt
+    bytes: 155
+    sha256: 87d7e0621a8fc9e6e309146608cbc4037f962b179ee96b02cc09d229e0c3282e
+  - path: runs/cli-exposure-20260924b/data/help-presets.txt
+    bytes: 404
+    sha256: 111b5ad0681003027e338bb43a972c115b80ad4164648088da0c53a6faafe975
+  - path: runs/cli-exposure-20260924b/data/help-profile.txt
+    bytes: 373
+    sha256: a2514041905ca30e070b83c286be058c678937cab6c3c7eac98057381ea05c07
+  - path: runs/cli-exposure-20260924b/data/help-ps.txt
+    bytes: 271
+    sha256: c2762b871556a886356a3a5cfc826a04f26aa72e6ae81a611f875013faa77df0
+  - path: runs/cli-exposure-20260924b/data/help-pull.txt
+    bytes: 315
+    sha256: dbaa5498482a9662a7637057515b7f1d15a9fc56d4ec8f3e70c15ba6b40d5959
+  - path: runs/cli-exposure-20260924b/data/help-rebuild-cache.txt
+    bytes: 134
+    sha256: 464448cd9a6f3a33be73514a709bb0d10526e23495badeb203274a8fade9cb43
+  - path: runs/cli-exposure-20260924b/data/help-restart.txt
+    bytes: 237
+    sha256: 2809eb6fbf3c5e3fdf681dc0106f32144a14ccc59732d07992fec66474a06a35
+  - path: runs/cli-exposure-20260924b/data/help-run.txt
+    bytes: 264
+    sha256: fc453a3cc5f475fbeb040d57bfac63f755e8f7acd1a926643a62c251ed2ad20e
+  - path: runs/cli-exposure-20260924b/data/help-secrets.txt
+    bytes: 1623
+    sha256: 92c803f36aa9e75a4333559e1498f4b8e8890759d373351ffb1123ca838c5ab6
+  - path: runs/cli-exposure-20260924b/data/help-server.txt
+    bytes: 323
+    sha256: 4445a32420e0b4ad44f50dd1ec5f9d3e1975f1039770040285504044c1bf233d
+  - path: runs/cli-exposure-20260924b/data/help-setup.txt
+    bytes: 718
+    sha256: 7ccc28a4dbd707c7a6baf35f771a5bf0abb253b6e1ee70e08811cc530a086045
+  - path: runs/cli-exposure-20260924b/data/help-shell.txt
+    bytes: 178
+    sha256: 60fc49a0535f15ebbcd085ff56762b10115f379794af0037c0dc8b6dd22e3318
+  - path: runs/cli-exposure-20260924b/data/help-size.txt
+    bytes: 198
+    sha256: 9c415ba6842f6874eaaada14c62045cb45bf4953471ece8ce91edeb21512bb3b
+  - path: runs/cli-exposure-20260924b/data/help-smi.txt
+    bytes: 106
+    sha256: 5befc26ac7975644dc0f47f7a4ad8ecca2d185816a57101e6804bf7d5183d927
+  - path: runs/cli-exposure-20260924b/data/help-stats.txt
+    bytes: 184
+    sha256: 12a9f8d5f57f5efeae6f6d5b349cfe5573b0659c8815ecfc70ba20df315a32a0
+  - path: runs/cli-exposure-20260924b/data/help-status.txt
+    bytes: 232
+    sha256: f5c8bec6d0ca08c1f69c122c8a1bda154ce589c4ad500f5171c2de71b573c382
+  - path: runs/cli-exposure-20260924b/data/help-tunnel-down.txt
+    bytes: 122
+    sha256: 8d34e736837f55ac8dd3fa912517eb1b9c4423d891e0009fd600c1ccaff8e1ec
+  - path: runs/cli-exposure-20260924b/data/help-tunnel.txt
+    bytes: 247
+    sha256: 55bc610f768778c2e874675cafd27f8eb4d4689219b319592d88997a91d75389
+  - path: runs/cli-exposure-20260924b/data/help-up.txt
+    bytes: 482
+    sha256: 8a303b3162e58387c5e7c2120df1d4570566dada60d2d2a87723eb5704484415
+  - path: runs/cli-exposure-20260924b/data/help-update.txt
+    bytes: 237
+    sha256: a5e92fb3c16447bdef210020e6ce4c97090da26f69ba9a0a44924220dc08f342
+  - path: runs/cli-exposure-20260924b/data/help-url.txt
+    bytes: 207
+    sha256: 1bd4844238ec93cce20cabae2669cb884f347321fdd57c07f138368376eafd2e
+  - path: runs/cli-exposure-20260924b/data/help-validate.txt
+    bytes: 227
+    sha256: e2724452c6dbf9e26cf41a008aa56c613240a129522dfc3a015e60409ff0ebcb
+  - path: runs/cli-exposure-20260924b/data/help-version.txt
+    bytes: 103
+    sha256: cf06a675c6489732d43c72fb46a0ea738371531b3e1fe7ca91d41e15242acb49
+  - path: runs/cli-exposure-20260924b/data/help_all.txt
+    bytes: 332
+    sha256: aec3b83f6f61862e8e18c61c43a3ec159f207c642f59d8ab4de2f09735814285
+  - path: runs/cli-exposure-20260924b/data/json_support.tsv
+    bytes: 671
+    sha256: eef03ac89249aab8ccf0d01afe55769b72be0ceec50f34f452a12a9737474d75
+  - path: runs/cli-exposure-20260924b/data/retired.txt
+    bytes: 25
+    sha256: 98b400e635fc5c8f70392972b6d0732d974547fe9efa6e5c341fe023e18fe2c1
+  - path: runs/cli-exposure-20260924b/data/undocumented.txt
+    bytes: 9
+    sha256: 1d14f3d421f2ffcba73f605b0f0ef05986b526feabd396a8fbb2862a9e388bc7

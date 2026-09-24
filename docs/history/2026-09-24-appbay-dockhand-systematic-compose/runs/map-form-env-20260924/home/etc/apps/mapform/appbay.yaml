@@ -1,0 +1,18 @@
+name: mapform
+services:
+  listform:
+    traits:
+      - type: scoped-env
+        vars:
+          TEAM: "${{ns:TEAM}}"
+      - type: secrets
+        refs:
+          API_TOKEN: vault://mapform/api_token
+  mapform:
+    traits:
+      - type: scoped-env
+        vars:
+          TEAM: "${{ns:TEAM}}"
+      - type: secrets
+        refs:
+          API_TOKEN: vault://mapform/api_token

@@ -1,0 +1,9 @@
+Usage: appbay dive [options] <target>
+
+Inspect Docker image layers (disk usage breakdown)
+
+Arguments:
+  target      app name or image reference (e.g., ollama or nginx:latest)
+
+Options:
+  -h, --help  display help for command

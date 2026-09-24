@@ -1,0 +1,10 @@
+Usage: appbay validate [options] [apps...]
+
+Validate appbay.yaml and compose files
+
+Arguments:
+  apps        specific apps to validate
+
+Options:
+  --all       validate all discovered apps
+  -h, --help  display help for command

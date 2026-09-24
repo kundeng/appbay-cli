@@ -1,0 +1,10 @@
+Usage: appbay eject [options] <app>
+
+Export an app as a standalone compose directory
+
+Arguments:
+  app             app name to eject
+
+Options:
+  --output <dir>  output directory (default: ./appbay-eject/<appName>/)
+  -h, --help      display help for command

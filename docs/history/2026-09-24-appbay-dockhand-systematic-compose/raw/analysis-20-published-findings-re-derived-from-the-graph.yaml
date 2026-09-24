@@ -1,0 +1,115 @@
+record: analysis-20-published-findings-re-derived-from-the-graph
+type: analysis
+title: published-findings-re-derived-from-the-graph
+timestamp: 2026-09-24T12:11:23-04:00
+claim: querying the loaded graph reproduces the numbers the workbook publishes
+verdict: supports
+key_evidence: "Ten Cypher queries re-derive published numbers: 16 current findings (matches the claims index), F3's three code sites (compile.ts:1019, scoped-env.ts:34, secrets.ts:56), the two environment disagreements and the two deploy-path disagreements as edges, six deploy paths across three products, 10 gaps split 7 close / 3 leave, and 12 judgements each linked BECAUSE to its finding. Two runs showed a null code_version, which exposed invalid YAML in my own generator \u2014 fixed in action-21."
+exit_code: 0
+duration_s: 1
+command: bash investigations/2026-09-24-appbay-dockhand-systematic-compose/src/appbay-dockhand/query_work_graph.sh
+params:
+  env:
+    WG_PY: /Users/kundeng/Projects/eval-audit-ops/runs/dockhand-v2/workdir/scratch/graphvenv/bin/python
+    WG_INV: investigations/2026-09-24-appbay-dockhand-systematic-compose
+code:
+  - path: src/appbay-dockhand/query_work_graph.sh
+    sha256: 7b046ac63047f3b8bd7cbf10cec971833085303e20016a427f410d602a6d1629
+    stored: raw/code/7b046ac6-query_work_graph.sh
+output_kind: text
+output:
+  text: |2+
+    --- current beliefs (findings not superseded or overtaken)
+    current_findings
+    16
+    (1 rows)
+    
+    --- evidence blast radius: records more than one finding leans on
+    p.id | p.verdict | n
+    analysis-14-dockhand-leads-and-their-mechanisms | supports | 3
+    probe-04-untouched-compose-compiles-under-both-edges | supports | 2
+    probe-08-cli-exposure-top-level-commands | supports | 2
+    (3 rows)
+    
+    --- F3's code sites — the environment disagreement, re-derived
+    f.id | c.path | c.line | c.symbol
+    F3 | packages/core/src/compiler/compile.ts | 1019 | resolveMagicVars
+    F3 | packages/core/src/traits/definitions/scoped-env.ts | 34 | scopedEnvTraitDefinition
+    F3 | packages/core/src/traits/definitions/secrets.ts | 56 | secretsTraitDefinition
+    (3 rows)
+    
+    --- the disagreement itself, as edges
+    a.site | a.symbol | b.site | b.symbol
+    magic-vars | resolveMagicVars | secrets-env | secretsTraitDefinition
+    scoped-env | scopedEnvTraitDefinition | secrets-env | secretsTraitDefinition
+    web-up | deployments.up | cli-deploy | deploy
+    web-worker | dockerComposeUp | cli-deploy | deploy
+    (4 rows)
+    
+    --- deploy paths by product — the parity finding, re-derived
+    p.name | c.site | c.path | c.line
+    appbay-cli | cli-deploy | packages/core/src/services/deploy-service.ts | 154
+    appbay-cli | cli-route | packages/core/src/services/deploy/route.ts | 35
+    appbay-web | web-fulldeploy | apps/web/src/server/routers/deployments.ts | 420
+    appbay-web | web-up | apps/web/src/server/routers/deployments.ts | 159
+    appbay-web | web-worker | apps/web/src/server/queue/workers/deploy.ts | 63
+    dockhand | dh-deploy | src/lib/server/stacks.ts | 3084
+    (6 rows)
+    
+    --- gaps to close vs leave, with the finding behind each
+    g.gap_id | g.decision | g.spec | sites
+    G1 | close | SPEC-001 | 3
+    G10 | leave | SPEC-000 | 0
+    G2 | close | SPEC-002 | 4
+    G3 | close | SPEC-003 | 2
+    G4 | close | SPEC-004 | 2
+    G5 | close | SPEC-005 | 0
+    G6 | close | SPEC-006 | 2
+    G7 | close | SPEC-007 | 1
+    G8 | leave | SPEC-000 | 0
+    G9 | leave | SPEC-000 | 0
+    (10 rows)
+    
+    --- decisions and the evidence behind them
+    j.what | j.chose | j.instead_of | f.id
+    gap:G6.decision | leave | close | F8
+    gap:G8.decision | leave | null | F9
+    gap:G9.decision | leave | null | F10
+    gap:G10.decision | leave | null | F8
+    gap:G6.decision | close | leave | F8
+    gap:G1.decision | close | null | F3
+    gap:G2.decision | close | null | F5
+    gap:G3.decision | close | null | F6
+    gap:G4.decision | close | null | F7
+    gap:G5.decision | close | null | F13
+    gap:G6.decision | close | null | F8
+    gap:G7.decision | close | null | F14
+    (12 rows)
+    
+    --- artifact provenance: which run wrote what, from which code
+    r.id | r.code_version | artifacts
+    cli-exposure-20260924b | appbay-cli-mac@9f00b579 / appbay-mac@d8f557bc / dockhand@99dc1044 | 55
+    auth-gap-20260924 | appbay-cli-mac@9f00b579 / appbay-mac@d8f557bc / dockhand@99dc1044 | 12
+    map-form-env-20260924 | null | 11
+    cli-exposure-20260924 | null | 9
+    docs-check-mutation-20260924 | appbay-cli-mac@9f00b579 / appbay-mac@d8f557bc / dockhand@99dc1044 | 5
+    (5 rows)
+    
+    --- the claim/domain bridge: findings and the records that examined the same code
+    f.id | p.id | c.site
+    F15 | action-15-auth-trait-error-does-not-stop-the-deploy | cli-deploy
+    F2 | probe-06-dockhand-has-no-compose-overlay | dh-rewrite
+    F2 | probe-06-dockhand-has-no-compose-overlay | dh-deploy
+    F3 | probe-05-map-form-environment-is-handled-three-ways | scoped-env
+    F3 | probe-05-map-form-environment-is-handled-three-ways | magic-vars
+    F4 | analysis-11-map-form-defect-is-locked-in-by-a-test | scoped-env-test
+    F5 | analysis-13-web-deploy-drops-the-edge-route | web-up
+    F8 | analysis-14-dockhand-leads-and-their-mechanisms | dh-docker-fetch
+    (8 rows)
+    
+    --- cohorts and their members
+    c.id | c.definition | members
+    deploy-paths | every code path that applies a compiled app to a runtime, in either product | 5
+    env-touching-sites | every compiler site that reads or writes a service `environment:` field | 3
+    (2 rows)
+    

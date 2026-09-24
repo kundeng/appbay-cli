@@ -1,0 +1,7 @@
+Usage: appbay stats [options]
+
+Show resource usage statistics for running containers
+
+Options:
+  --no-stream  disable streaming (show snapshot)
+  -h, --help   display help for command

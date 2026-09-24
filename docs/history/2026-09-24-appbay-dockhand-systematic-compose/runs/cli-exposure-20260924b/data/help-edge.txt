@@ -1,0 +1,13 @@
+Usage: appbay edge [options] [command]
+
+Manage the edge: the proxy, and the users who sign in to your DEPLOYED APPS
+
+Options:
+  -h, --help         display help for command
+
+Commands:
+  users              Manage users who sign in to your DEPLOYED APPS (not to
+                     AppBay itself)
+  migrate [options]  Switch the ingress provider, validating first and restoring
+                     the old edge on any failure
+  help [command]     display help for command
