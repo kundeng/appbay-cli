@@ -8,6 +8,26 @@ priority: 6 — high value, highest risk; do not start before SPEC-001..004
 
 # SPEC-006 — Multi-host, as a compiler target rather than a remote-control layer
 
+> **Amended 2026-09-24 — split by tier.** **006a, OSS, `appbay-cli`:** the compiler targets
+> a host. `project.yaml` gains `hosts` beside `ingressProvider`/`domain`; `scope` gains
+> `host` (`ScopeSchema`); `CompilerContext` gains `host`, with provider and domain resolved
+> per host; renders keyed by host; and the edge fragments that `traefikAuxPath` /
+> `caddyAuxPath` (`ingress.ts:150,164`) write to a bind-mounted directory become inline
+> `configs: { <ns>-<app>: { content: ... } }` entries in that host's edge render — the
+> Compose Specification's top-level `configs` accepts `content`, checked 2026-09-24. Routes
+> travel inside the compose; nothing needs a remote filesystem. Transport is the four spawn
+> helpers taking the host's daemon endpoint. No trait definition changes.
+> **006b, Enterprise, `appbay`:** remote agent, host management, fleet views.
+>
+> **Stage 0, the decision.** *(A)* one edge per host, routes inline — native to the model:
+> the edge is a system app, placement is scope, delivery is the app's own transport; TLS
+> terminates where the app runs. *(B)* one central edge proxying to remote hosts — no
+> delivery question, but every remote service must be reachable from the control host,
+> which reintroduces published ports, the thing the compiler exists to remove. Evidence
+> favours A. **Consequence:** with A, a lab host that exposes SSH or a TLS Docker endpoint
+> needs nothing installed; the agent is for hosts that cannot be reached that way. The
+> agent is therefore not a v1 requirement of 006a.
+
 ## Requirement
 
 One `APPBAY_HOME` can compile and deploy its apps across more than one host, with each

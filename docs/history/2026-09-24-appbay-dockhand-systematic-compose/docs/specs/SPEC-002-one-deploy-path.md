@@ -8,6 +8,15 @@ priority: 2 — highest value, medium risk
 
 # SPEC-002 — One deploy path for the CLI and the web
 
+> **Amended 2026-09-24 — tier Enterprise, repo `appbay`, depends SPEC-012.** The two
+> deploy paths this spec removes exist because `apps/web` carries its own copy of
+> `packages/core` (`@appbay/core: workspace:*`, a month behind the base). The fix is not
+> to reconcile the copies but to delete the fork's `packages/core`, depend on the published
+> `@appbay/core` from SPEC-012, and route `deployments.up` (`:159`, four callers) and
+> `queue/workers/deploy.ts:63` through core's pipeline — `fullDeploy` (`:420`, zero UI
+> callers) becomes the only path. This is the first enterprise spec; nothing else in the
+> fork is clean before it.
+
 ## Requirement
 
 There must be exactly one implementation of "apply a compiled app". Every caller — `appbay
