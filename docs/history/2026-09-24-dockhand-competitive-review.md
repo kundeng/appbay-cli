@@ -41,11 +41,28 @@ scanning, scheduling and browsing subsystems. [one]
 ### The uncomfortable half
 
 Dockhand has no command-line client at all, which ought to make AppBay the
-automation choice. It isn't, today. Dockhand serves an OpenAPI 3 document
-generated from its live routes with bearer-token auth, and a community MCP server
-rides on it. AppBay's API is deliberately tokenless, and **16 of its 23
-state-reporting commands cannot emit machine-readable output at any subcommand
-level**. On composability — the axis AppBay should own — Dockhand is ahead. [one]
+automation choice outright. The picture is less comfortable than that.
+
+Dockhand publishes a **formal, machine-readable interface contract**: an OpenAPI
+3 document generated from its live routes, bearer-token auth, and a community
+MCP server riding on it. AppBay's API is deliberately tokenless, and **16 of its
+23 state-reporting commands cannot emit machine-readable output at any
+subcommand level**. [one]
+
+**Be precise about what that does and does not establish.** Dockhand is ahead on
+the *specified* surface — what is written down, published as a spec, and
+therefore programmable by someone who has never read the source. It is not
+established that Dockhand composes better in practice, and nothing here
+demonstrates that it does. AppBay has 47 real commands against Dockhand's zero;
+a shell pipeline over a CLI is a composition mechanism that an OpenAPI document
+is not. Neither product was run (see the limitation at the top), so the
+comparison is between a published contract and an unpublished one, not between
+two measured capabilities.
+
+The actionable form of the finding is narrower and survives the caveat: AppBay's
+composability is real but **undeclared**, and an undeclared contract cannot be
+programmed against by anyone outside the project. That is what `--json` fixes,
+and it is why `--json` outranks every other item here.
 
 Note `secrets check`, the command that answers whether every secret URI
 resolves, has no `--json`. The only `--json` in `secrets.ts` is on the
