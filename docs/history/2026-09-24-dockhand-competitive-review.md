@@ -22,10 +22,88 @@ running either product. Everything rests on reading source and documentation.
 Items marked *behavioural* below should be confirmed on a real host before work
 starts.
 
+## How each system actually works
+
+Establish this before reading any comparison below, because the two products do
+different kinds of work and a feature-by-feature table hides that.
+
+### Dockhand: a GUI over `docker compose`, plus git polling
+
+Dockhand does not transform your Compose file. Its git pipeline, in its own
+documentation, is `git pull` -> sync & compare -> `docker compose up`. The
+compose file in your repository is authoritative and is applied as written.
+
+Consequently none of the concerns a Compose file cannot express are handled by
+Dockhand:
+
+| Concern | How Dockhand handles it |
+|---|---|
+| Ingress / routing | It does not. The word "ingress" appears **zero times** in its 891 KB manual. You hand-write Traefik labels in your own compose file. |
+| TLS certificates | `HTTPS_MODE=on` with `HTTPS_CERT_PATH` is a native HTTPS listener for **Dockhand's own UI and API**, off by default, PEM files supplied by you. Nothing issues or assigns a certificate to your app. |
+| Selective exposure | No control. The manual *warns* that `"5432:5432"` publishes on all interfaces and advises binding `127.0.0.1` yourself. |
+| Environment overlay | "Config sets" are reusable templates (env vars, labels, port mappings) applied when creating a container **through the GUI**. Not a compose overlay, and not part of the git-stack path, where env comes from the `.env` committed in the repo. |
+| Reverse-proxy awareness | Read-only. Since 1.0.34 it *reads* Traefik, Pangolin and caddy-docker-proxy labels and surfaces the resulting URL as a clickable pill. It never generates them. |
+
+Its documented Traefik section shows how to put **Dockhand itself** behind a
+proxy, using labels you type by hand.
+
+One operational trap in that model, documented by Dockhand: stack secrets are
+injected as shell environment during `docker compose up`, and Docker stores the
+compose configuration but not the transient shell environment. After a host
+reboot Docker restarts the containers itself, and `${VAR}` references to secrets
+resolve to **empty strings**. Variables in `.env` survive; secrets do not.
+
+### AppBay: a compiler
+
+AppBay reads an unmodified Compose file plus a sidecar `appbay.yaml` declaring
+traits, and *generates* the configuration those concerns require.
+`packages/core/src/compiler/` (compile, overlay-engine, trait-engine,
+scope-resolver, renderer) applies trait definitions from
+`packages/core/src/traits/definitions/` — `ingress`, `auth`, `gpu`, `secrets`,
+`scoped-env`, `hooks`, `backup`.
+
+The `ingress` trait takes `host`, `port`, `exposure: internal | external | both`
+and `tls.staging`, and emits a router, service and middleware definition into
+`etc/apps/traefik/config/dynamic/<app>.yml` — the Traefik **file** provider, not
+Docker labels — or the equivalent Caddy fragment, while attaching the service to
+the shared network. Certificate selection is a resolver name chosen from
+`tls.staging` (`letsencrypt-staging` or `letsencrypt`).
+
+**This is a category Dockhand has no equivalent of.** It is the difference
+between declaring `exposure: internal` and hand-writing six Traefik labels
+correctly in every stack. It is also, at present, the least advertised thing in
+the product.
+
+### Why this matters for everything below
+
+A crosswalk of feature *headlines* treats "Git Integration" as one comparable
+capability. It is not: Dockhand's is git-pull-then-compose-up with webhooks,
+scheduled sync and per-stack branch tracking, and AppBay has no equivalent
+(`pull` is Docker image pull plus Ollama models; `catalog` is a source-based app
+catalog). That particular absence is real. But the same crosswalk cannot see
+that AppBay's compiler has no counterpart at all, because Dockhand publishes no
+headline for a thing it does not have. **Read the capability counts below as a
+measure of surface, not of substance.**
+
 ## The finding
 
-AppBay's friendliness gap and its power gap have the same cause, and closing
-either does not require a feature. Both are **exposure**. [both]
+Three things are true at once, and the first was missed by both investigations
+because both measured surfaces rather than mechanisms.
+
+**AppBay owns a capability Dockhand does not have.** The trait compiler turns a
+declaration into generated ingress, TLS resolver selection, auth, scoped env and
+secret wiring. Dockhand applies your Compose file as written and leaves all of
+it to you. This is the strategic asset in the product, and it is close to
+unadvertised.
+
+**AppBay's automation surface is real but undeclared**, so nothing outside the
+project can be programmed against it.
+
+**AppBay's command surface is largely hidden**, so users cannot find what is
+already there.
+
+Only the last two are exposure problems, and neither needs a feature to fix.
+[both]
 
 The CLI ships **47 top-level commands and documents 34**; the **13 it never
 names** are `dive`, `exec`, `mcp`, `models`, `ollama`, `profile`, `run`, `shell`,
@@ -37,6 +115,13 @@ Crosswalking the 26 capabilities Dockhand advertises: five have a documented
 front door, **eight exist but are reachable only through a command nothing
 names**, and thirteen are genuinely absent — all of them multi-host, Git-sync,
 scanning, scheduling and browsing subsystems. [one]
+
+The git-stack absence is real: Dockhand deploys from a tracked repository with
+webhooks, scheduled sync and per-stack branch selection, while `pull` is Docker
+image pull plus Ollama models and `catalog` is a source-based app catalog.
+**But this crosswalk is mechanism-blind in one direction**: it can only compare
+against headlines Dockhand publishes, so it cannot register the compiler, for
+which Dockhand has no headline because it has no such thing.
 
 ### The uncomfortable half
 
@@ -68,10 +153,10 @@ Note `secrets check`, the command that answers whether every secret URI
 resolves, has no `--json`. The only `--json` in `secrets.ts` is on the
 state-changing `vault rotate-password`.
 
-## What Dockhand actually is
+## Dockhand's implementation and traction
 
 Relevant because it bounds what is worth copying: nothing here is a module you
-could adopt. It is a web application over the Docker socket.
+could adopt.
 
 | | |
 |---|---|
@@ -87,8 +172,8 @@ could adopt. It is a web application over the Docker socket.
 
 Its README carries no install instructions, no CLI and no command list — About,
 Features, Tech Stack, Screenshots, Licence, and 19 screenshots carrying the
-pitch. Its advantage is not architecture. It is that everything it has is
-visible, and that it has a machine-readable contract.
+pitch. Its advantage is not architecture and not depth. It is that everything it
+has is visible, and that it publishes a machine-readable contract.
 
 A feature race against a weekly-cadence 1.0 with that much feedback behind it is
 not winnable, and the brief's exclusion of significant features is the right
@@ -97,6 +182,24 @@ call rather than a constraint to work around. [both]
 ## Recommendations
 
 Ordered by value per unit of work. Nothing below adds a feature.
+
+### P0 — Lead with the compiler, because nothing else has one *(documentation; hours)*
+
+The strongest claim AppBay can make is one it currently does not make: *your
+Compose file is never modified, and AppBay generates the ingress, TLS, auth and
+scoped-env configuration that Compose cannot express.* Dockhand, Portainer and
+every other Compose GUI hand that work back to the user as labels to type.
+
+Concretely: put a worked before/after at the top of the README and the docs
+landing page. A plain Compose service, plus six lines of `appbay.yaml` declaring
+`ingress: {host, port, exposure: internal, tls: {staging: true}}`, plus the
+generated `traefik/dynamic/<app>.yml` it produces. One screenful, three panes.
+It demonstrates the product's whole thesis and costs a page.
+
+This outranks the rest because it changes what a reader thinks the product *is*.
+The other items make AppBay easier to use once you have decided to; this is the
+one that makes the case for deciding to. It is also the honest answer to "why
+not just run Dockhand".
 
 ### P0 — One first run, taught identically everywhere *(documentation; hours)* [both]
 
@@ -208,6 +311,11 @@ strings.
 
 The tempting responses to this review are all more expensive and less valuable
 than the list above.
+
+**Do not answer the feature gap with features.** The thirteen absent
+subsystems are real, and thirteen is not a sprint. The asymmetry worth pressing
+is the compiler, which is one document away from being visible, against a
+feature list that is thirteen subsystems away from being closed.
 
 **Do not chase Dockhand's feature list.** Vulnerability scanning, Git-repository
 deploys, webhook triggers, multi-host agents, backup destinations and
