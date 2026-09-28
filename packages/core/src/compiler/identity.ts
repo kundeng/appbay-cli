@@ -114,11 +114,6 @@ export const NAMESPACE_LABEL = "com.appbay.namespace";
 export const SHARED_NETWORK = "appbay_shared";
 
 /**
- * The container a shepherd shares a namespace with when an action asks for `share`.
- * No trait sets `share` today; if one does, this must become the app's real container
- * (`containerName`), since `appbay.<app>` is not one (review ledger row 24).
- */
-/**
  * The compose project name for an app: compose's own normalization of the directory name
  * (lowercase; only `[a-z0-9_-]`; no leading `-` or `_`), which is what compose derived when
  * nothing said `-p`. Stated with `-p` at every compose call and used for the observer's
@@ -130,6 +125,11 @@ export function composeProject(appName: string): string {
   return normalized || "app";
 }
 
+/**
+ * The container a shepherd shares a namespace with when an action asks for `share`.
+ * No trait sets `share` today; if one does, this must become the app's real container
+ * (`containerName`), since `appbay.<app>` is not one (review ledger row 24).
+ */
 export function shepherdTarget(appName: string): string {
   return `appbay.${appName}`;
 }

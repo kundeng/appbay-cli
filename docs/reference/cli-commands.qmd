@@ -37,7 +37,7 @@ appbay setup --status
 | `--ingress-provider <p>` | `traefik` | Edge to install: `traefik` or `caddy` |
 | `--yes` | `false` | Non-interactive: accept all defaults |
 | `--status` | — | Report what is already set up, and change nothing |
-| `--reset` | — | Tear down system apps and remove generated configs |
+| `--reset` | — | Stop discovered apps and remove generated configs |
 
 ⚠️ The administrator `setup` creates is the **edge** administrator, which guards apps behind
 the reverse proxy — and since RFC-001 §1 that is the SAME account that signs in to the web
@@ -256,9 +256,9 @@ appbay delete myapp --keep-volumes --force
 | `--keep-volumes` | `false` | Keep Docker volumes after deletion |
 | `--force` | `false` | Skip confirmation prompt (required to proceed) |
 
-Without `--force`, the command exits with an error and instructions. Runs `docker compose down` (with `-v` unless `--keep-volumes`) before removing the app definition directory.
+Without `--force`, the command exits with an error and instructions. Before removing anything, it requires the discovered app to resolve to its own direct directory under the apps root; aliases and escaped paths are refused. When a rendered file or running container requires `docker compose down`, every project container must carry ownership for this Appbay home; unknown, missing or foreign ownership stops the deletion. A render-less project with only exited containers needs no runtime mutation and can be deleted directly.
 
-**Exit codes:** 0 = deleted, 1 = not found or confirmation required.
+**Exit codes:** 0 = deleted, 1 = not found, confirmation required, unsafe path, unknown runtime state, foreign/missing ownership, or stop failure.
 
 ### `appbay restart`
 

@@ -30,12 +30,25 @@ vi.mock("node:fs", () => ({
 
 import * as fs from "node:fs";
 import {
+  projectOwnershipError,
   resolveAppbayHome,
   resolveServerCompose,
   resolveAppsDir,
   resolveRendersDir,
   resolveStateDir,
 } from "../appbay-home.js";
+
+const observedRow = (workingDir: string) => ({
+  name: "app-1",
+  id: "id",
+  service: "app",
+  workingDir,
+  state: "running",
+  status: "running",
+  ports: "",
+  health: "",
+  exitCode: 0,
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -150,5 +163,19 @@ describe("Custom $APPBAY_HOME propagates to all resolvers", () => {
       resolveStateDir(),
     ];
     expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+describe("projectOwnershipError", () => {
+  it("accepts only the renders root and its descendants", () => {
+    const home = "/srv/appbay";
+    expect(projectOwnershipError(home, [observedRow("/srv/appbay/var/lib/renders/whoami")])).toBeNull();
+    expect(projectOwnershipError(home, [observedRow("/srv/appbay/var/lib/renders")])).toBeNull();
+    expect(projectOwnershipError(home, [observedRow("/srv/appbay/var/lib/renders-other/whoami")])).toContain("foreign working directory");
+    expect(projectOwnershipError(home, [observedRow("/srv/other/var/lib/renders/whoami")])).toContain("foreign working directory");
+  });
+
+  it("fails closed when the runtime omits the ownership label", () => {
+    expect(projectOwnershipError("/srv/appbay", [observedRow("")])).toContain("no working-directory ownership label");
   });
 });

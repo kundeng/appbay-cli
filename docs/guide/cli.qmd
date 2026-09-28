@@ -256,6 +256,8 @@ appbay delete myapp --force
 | `--keep-volumes` | Keep Docker volumes after deletion |
 | `--force` | Skip confirmation prompt (required to proceed) |
 
+Deletion exits with an error before removing files if runtime state cannot be checked, stopping fails, or the discovered app is an alias or resolves outside its direct directory under the apps root. When deletion must run Compose, missing or foreign runtime ownership is also refused. A render-less project with only exited containers needs no runtime mutation and can be deleted directly.
+
 ### appbay eject
 
 Export a rendered Compose file that runs standalone without Appbay. All traits, overlays, and variables are resolved and baked into the output.

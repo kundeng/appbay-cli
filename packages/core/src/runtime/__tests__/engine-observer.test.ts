@@ -86,7 +86,7 @@ describe("engine observer", () => {
 
   it("reads a compose project's rows: service label, health from the status line, exit code by inspect", async () => {
     containers = [
-      c("app-web-1", "running", { "com.docker.compose.project": "app", "com.docker.compose.service": "web" }, { Status: "Up 9 seconds (healthy)" }),
+      c("app-web-1", "running", { "com.docker.compose.project": "app", "com.docker.compose.service": "web", "com.docker.compose.project.working_dir": "/srv/appbay/var/lib/renders/app" }, { Status: "Up 9 seconds (healthy)" }),
       c("app-job-1", "exited", { "com.docker.compose.project": "app", "com.docker.compose.service": "job" }, { ExitCode: 137 }),
       c("other-1", "running", { "com.docker.compose.project": "other" }),
     ];
@@ -94,6 +94,7 @@ describe("engine observer", () => {
     expect(rows.kind).toBe("ok");
     if (rows.kind !== "ok") return;
     expect(rows.value.map((r) => [r.service, r.state, r.health, r.exitCode])).toEqual([["web", "running", "healthy", 0], ["job", "exited", "", 137]]);
+    expect(rows.value[0]?.workingDir).toBe("/srv/appbay/var/lib/renders/app");
     expect(await findCrashedServices(obs(), "app")).toEqual({ kind: "ok", value: ["job exited 137"] });
     const ready = await isReady(obs(), "app");
     expect(ready).toMatchObject({ kind: "ok", value: { ready: false } });

@@ -136,14 +136,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   if (projectsFile.error) {
     return emptyDeployResult([...compileErrors, { stage: "projects", message: projectsFile.error }], warnings);
   }
-  // Two directories that normalize to one compose project would share containers' rows in
-  // every observation; the run is refused before anything starts, like an order it cannot honour.
+  // Two directories that normalize to one compose project cannot be observed independently.
+  // Refuse only those apps; unrelated targets still converge.
   const byProject = new Map<string, string[]>();
   for (const a of installed) byProject.set(composeProject(a.name), [...(byProject.get(composeProject(a.name)) ?? []), a.name]);
-  const clashes = [...byProject.entries()].filter(([, names]) => names.length > 1);
-  if (clashes.length > 0) {
-    return emptyDeployResult([...compileErrors, ...clashes.map(([project, names]) => ({ stage: "projects", message: `apps ${names.join(" and ")} would share the compose project "${project}"; rename one` }))], warnings);
-  }
+  const projectClash = new Map([...byProject.entries()].filter(([, names]) => names.length > 1));
 
   const graph = deployOrder(
     compileResult.apps,
@@ -156,6 +153,8 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
 
   const appsWithCompileErrors = new Set(compileResult.errors.map((e) => e.appName).filter((n): n is string => Boolean(n)));
   const refusalOf = (app: (typeof graph.order)[number]): string | undefined => {
+    const clash = projectClash.get(composeProject(app.appName));
+    if (clash) return `not deployed: apps ${clash.join(" and ")} would share the compose project "${composeProject(app.appName)}"; rename one`;
     if (appsWithCompileErrors.has(app.appName)) {
       return "not deployed: its configuration did not compile (see the errors above). " +
         "Deploying it would start a container that cannot serve its declared routes.";

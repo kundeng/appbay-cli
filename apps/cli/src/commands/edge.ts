@@ -1,12 +1,12 @@
 /** Caddy Security local edge-identity administration. */
 import { Command } from "commander";
 import { randomBytes } from "node:crypto";
-import { EdgeIdentityStore, restartEdgeForIdentityChange, migrateEdge, deploy, writeRenderedOutput, resolveDeployEnv, containerCompose, findContainerByLabel, APP_LABEL, IngressProviderSchema, type IngressProvider, compileInstall, composeProject } from "@appbay/core";
+import { EdgeIdentityStore, restartEdgeForIdentityChange, migrateEdge, deploy, writeRenderedOutput, resolveDeployEnv, containerCompose, engineObserver, findContainerByLabel, APP_LABEL, IngressProviderSchema, type IngressProvider, compileInstall, composeProject } from "@appbay/core";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { dockerCompose } from "../utils/docker.js";
 import { upsertIngressProvider } from "./init.js";
-import { resolveAppbayHome } from "../utils/appbay-home.js";
+import { projectOwnershipError, resolveAppbayHome } from "../utils/appbay-home.js";
 import { askSecret } from "../utils/prompt.js";
 
 async function readPasswordFromStdin(): Promise<string> {
@@ -140,8 +140,10 @@ const migrate = new Command("migrate")
 
     const renderFor = (p: IngressProvider) => join(rendersDir, p, "docker-compose.rendered.yml");
 
-    const result = await migrateEdge({
-      appbayHome, from, to,
+    let result: Awaited<ReturnType<typeof migrateEdge>>;
+    try {
+      result = await migrateEdge({
+        appbayHome, from, to,
       validateCandidate: async () => {
         const compiled = await compileInstall(appbayHome, { apps: [to] });
         if (compiled.errors.length > 0) return compiled.errors.map((e) => `${e.stage}: ${e.message}`).join("; ");
@@ -172,6 +174,10 @@ const migrate = new Command("migrate")
       stopStack: async (p) => {
         const render = renderFor(p);
         if (!existsSync(render)) return;
+        const rows = await engineObserver(appbayHome).project(p);
+        if (rows.kind === "unknown") throw new Error(`could not verify ${p} ownership: ${rows.reason}`);
+        const ownershipError = projectOwnershipError(appbayHome, rows.value);
+        if (ownershipError) throw new Error(`refusing to stop ${p}: ${ownershipError}`);
         const down = containerCompose(["-p", composeProject(p), "down"], render, undefined, appbayHome);
         if (down.exitCode !== 0) throw new Error(`compose down ${p}: ${down.output.trim()}`);
       },
@@ -194,7 +200,11 @@ const migrate = new Command("migrate")
         }
         return `${p} did not come up within 60 s (${last})`;
       },
-    });
+      });
+    } catch (err) {
+      console.error(`  ✗ Edge migration failed before it could complete — ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
 
     for (const step of result.steps) {
       console.log(`  ${step.ok ? "✓" : "✗"} ${step.label}${step.detail ? ` — ${step.detail}` : ""}`);

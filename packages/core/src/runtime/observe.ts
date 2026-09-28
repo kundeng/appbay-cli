@@ -37,6 +37,8 @@ export interface ComposePsRow {
   state: string;
   /** The runtime's human status line, e.g. "Up 3 seconds (healthy)". */
   status: string;
+  /** Compose directory recorded by the runtime; identifies the Appbay home that created it. */
+  workingDir: string;
   /** Published ports, rendered `host->container/proto`, comma-joined. */
   ports: string;
   /** `healthy`, `unhealthy`, `starting`, or "" when the service declares no healthcheck. */
@@ -67,6 +69,7 @@ export interface Observer {
 
 const COMPOSE_PROJECT = "com.docker.compose.project";
 const COMPOSE_SERVICE = "com.docker.compose.service";
+const COMPOSE_WORKING_DIR = "com.docker.compose.project.working_dir";
 
 /** Ports as `host->container/proto`, comma-joined, from the API's port list. */
 export function formatPorts(ports: ContainerSummary["Ports"]): string {
@@ -108,6 +111,7 @@ async function rowsFrom(summaries: ContainerSummary[], options: EngineOptions): 
       name,
       id: c.Id,
       service: c.Labels?.[COMPOSE_SERVICE] ?? name,
+      workingDir: c.Labels?.[COMPOSE_WORKING_DIR] ?? "",
       state,
       status: c.Status,
       ports: formatPorts(c.Ports),

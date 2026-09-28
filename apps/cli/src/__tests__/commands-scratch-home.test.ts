@@ -85,6 +85,13 @@ describe("commands against a scratch home", () => {
     expect(pull.stderr).toContain('app "typo" not found');
   });
 
+  it("reports a never-deployed app as skipped rather than pulled", () => {
+    const pull = appbay(["pull", "whoami"]);
+    expect(pull.status, pull.stderr).toBe(0);
+    expect(pull.stdout).toContain("nothing to pull (not deployed");
+    expect(pull.stdout).toContain("0 pulled, 1 skipped");
+  });
+
   it("compile renders whoami and its traefik fragment", () => {
     const r = appbay(["compile", "whoami"]);
     expect(r.status, r.stderr).toBe(0);

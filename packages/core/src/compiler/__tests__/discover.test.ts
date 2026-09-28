@@ -78,6 +78,21 @@ describe("discoverApps", () => {
     expect(noCompose).toBeUndefined();
   });
 
+  it("skips legacy edge migration backup directories", async () => {
+    const tmpAppsDir = mkdtempSync(join(tmpdir(), "appbay-discover-backup-test-"));
+    try {
+      for (const name of ["caddy.pre-traefik", "traefik.pre-caddy"]) {
+        const appDir = join(tmpAppsDir, name);
+        mkdirSync(appDir, { recursive: true });
+        writeFileSync(join(appDir, "docker-compose.yml"), "services:\n  edge:\n    image: example/edge\n");
+      }
+
+      expect(await discoverApps({ appsDir: tmpAppsDir })).toEqual([]);
+    } finally {
+      rmSync(tmpAppsDir, { recursive: true, force: true });
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // 5. Returns empty array for empty apps dir
   // ---------------------------------------------------------------------------

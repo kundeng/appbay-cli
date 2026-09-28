@@ -42,6 +42,8 @@ export const restartCommand = new Command("restart")
       process.exit(1);
     }
 
+    if (stopFailed > 0) process.exit(1);
+
     console.log("\nCompiling and starting apps...\n");
     const result = await deploy({
       appbayHome,

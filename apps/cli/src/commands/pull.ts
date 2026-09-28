@@ -81,12 +81,15 @@ export const pullCommand = new Command("pull")
 
     console.log(`Pulling images for ${apps.length} app(s)...\n`);
 
+    let completed = 0;
     let pulled = 0;
+    let skipped = 0;
     for (const app of apps) {
       const renderPath = join(rendersDir, app.name, "docker-compose.rendered.yml");
       if (!existsSync(renderPath)) {
         console.log(`  ${app.name}... nothing to pull (not deployed; the render decides the images)`);
-        pulled++;
+        completed++;
+        skipped++;
         continue;
       }
       const target = renderPath;
@@ -98,19 +101,21 @@ export const pullCommand = new Command("pull")
       }
       if (pullable.length === 0) {
         console.log(`  ${app.name}... nothing to pull (built locally)`);
-        pulled++;
+        completed++;
+        skipped++;
         continue;
       }
       console.log(`  ${app.name}...`);
       const result = dockerCompose(["-p", composeProject(app.name), "pull", ...pullable], target);
       if (result.exitCode === 0) {
         console.log(`    pulled`);
+        completed++;
         pulled++;
       } else {
         console.log(`    failed: ${result.output.trim().split("\n")[0]}`);
       }
     }
 
-    console.log(`\n${pulled} pulled`);
-    process.exit(pulled === apps.length ? 0 : 1);
+    console.log(`\n${pulled} pulled, ${skipped} skipped`);
+    process.exit(completed === apps.length ? 0 : 1);
   });

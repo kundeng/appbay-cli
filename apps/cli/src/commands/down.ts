@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { stat } from "node:fs/promises";
 import { discoverApps, deployOrder, loadProjects, composeProject, engineObserver } from "@appbay/core";
 import { dockerCompose } from "../utils/docker.js";
-import { resolveAppbayHome } from "../utils/appbay-home.js";
+import { projectOwnershipError, resolveAppbayHome } from "../utils/appbay-home.js";
 import { pad } from "../utils/formatting.js";
 
 async function renderedComposeExists(composePath: string): Promise<boolean> {
@@ -58,31 +58,31 @@ export async function stopApps(appbayHome: string, names: string[]): Promise<Sto
   for (const { app } of [...graph.order].reverse()) {
     const composePath = join(rendersDir, app.name, "docker-compose.rendered.yml");
     const project = composeProject(app.name);
-    let result;
-    if (await renderedComposeExists(composePath)) {
-      console.log(`  Stopping ${app.name}...`);
-      result = dockerCompose(["-p", project, "down"], composePath);
-    } else {
-      // No render. The runtime says whether anything runs under the project: nothing means
-      // not deployed. Something does NOT get stopped from here: a container carries its app
-      // and namespace labels but not the install it came from, and two homes on one host
-      // share project names, so a `down` by name from this home would reach the other's
-      // containers (it did, on the Podman guest, 2026-09-06). Re-rendering with `up` and
-      // then `down` acts on this install's own render.
-      const rows = await observer.project(app.name);
-      if (rows.kind === "unknown") {
-        console.error(`  Failed to stop ${app.name}: could not ask the runtime (${rows.reason})`);
-        failed++;
-        continue;
-      }
-      if (rows.value.length === 0) {
-        console.log(`  - ${pad(app.name, 14)} (not deployed)`);
-        continue;
-      }
-      console.error(`  Failed to stop ${app.name}: no render here, but ${String(rows.value.length)} container(s) run under project "${project}" (this install's, or another home's on this host). Run: appbay up ${app.name}, then appbay down ${app.name}.`);
+    const hasRender = await renderedComposeExists(composePath);
+    const rows = await observer.project(app.name);
+    if (rows.kind === "unknown") {
+      console.error(`  Failed to stop ${app.name}: could not ask the runtime (${rows.reason})`);
       failed++;
       continue;
     }
+    const hasRunningContainer = rows.value.some((row) => row.state === "running");
+    if (!hasRender && !hasRunningContainer) {
+      console.log(rows.value.length === 0
+        ? `  - ${pad(app.name, 14)} (not deployed)`
+        : `  - ${pad(app.name, 14)} (${String(rows.value.length)} container(s) exist, none running)`);
+      continue;
+    }
+
+    // Compose down addresses the whole project, including exited containers. Verify every
+    // row before invoking it; a local running row beside a foreign exited row is still unsafe.
+    const ownershipError = projectOwnershipError(appbayHome, rows.value);
+    if (ownershipError) {
+      console.error(`  Failed to stop ${app.name}: project "${project}" is not owned by this Appbay home: ${ownershipError}.`);
+      failed++;
+      continue;
+    }
+    console.log(`  Stopping ${app.name}...`);
+    const result = dockerCompose(["-p", project, "down"], hasRender ? composePath : app.composePath);
     if (result.exitCode !== 0) {
       console.error(`  Failed to stop ${app.name} (exit ${result.exitCode}):`);
       console.error(`    ${result.output}`);

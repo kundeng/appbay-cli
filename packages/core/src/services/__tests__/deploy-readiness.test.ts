@@ -26,7 +26,7 @@ beforeEach(async () => {
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 
 const row = (name: string, state: string, health = ""): ComposePsRow =>
-  ({ name: `appbay.${name}.${name}`, id: "id", service: name, state, status: state, ports: "", health, exitCode: 0 });
+  ({ name: `appbay.${name}.${name}`, id: "id", service: name, workingDir: "", state, status: state, ports: "", health, exitCode: 0 });
 
 /** A compose runner that records mutations, and an observer whose answers per project depend on how often it was asked. */
 function runner(answers: Record<string, (n: number) => ComposePsRow | ComposePsRow[]>): { run: DockerComposeRunner; observer: Observer; log: string[] } {

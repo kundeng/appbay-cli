@@ -346,11 +346,11 @@ async function resetSetup(): Promise<void> {
     const stop = await stopApps(appbayHome, []);
     if (stop.failed > 0) throw new Error("an app did not stop");
   } catch (err) {
-    console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; nothing was removed.`);
+    console.error(`  Reset aborted: ${err instanceof Error ? err.message : String(err)}; generated files were not removed. Apps stopped before the failure remain stopped.`);
     process.exit(1);
   }
-  // stopApps refuses a render-less app whose project has containers (it cannot tell whose
-  // they are); the abort above covers that. This asks once more about the two edges.
+  // stopApps verifies Compose's working-directory label before a project-wide stop. This asks
+  // once more about the two edges in case an edge remains after the ordered stop.
   for (const provider of ["caddy", "traefik"]) {
     const state = await edgeState(provider, appbayHome);
     if (state === "not-running") continue;
@@ -375,6 +375,7 @@ async function resetSetup(): Promise<void> {
     "var/lib/renders",
     "var/cache",
     "docker-compose.server.yml",
+    "etc/system.yaml",
     "project.yaml",
   ];
 

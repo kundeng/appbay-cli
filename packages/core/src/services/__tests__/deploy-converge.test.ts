@@ -23,7 +23,7 @@ beforeEach(async () => {
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 
 const row = (state: string, id = "id-1", exitCode = 0): ComposePsRow =>
-  ({ name: CONTAINER, id, service: APP, state, status: state, ports: "", health: "", exitCode });
+  ({ name: CONTAINER, id, service: APP, workingDir: join(home, "var", "lib", "renders", APP), state, status: state, ports: "", health: "", exitCode });
 
 /** An observer answering `project()` from a queue, one entry per ask, repeating the last. */
 function observerWith(answers: Array<Inspection<ComposePsRow[]>>): Observer {
@@ -107,14 +107,30 @@ describe("a target nothing matches is named, not dropped (S48 round 3)", () => {
     expect(result.apps[0]?.error).toContain("started nothing");
   });
 
-  it("two apps that would share a compose project are refused before anything runs (S48 round 9)", async () => {
+  it("refuses clashing apps while an unrelated target proceeds (S48 round 10)", async () => {
     const twin = join(home, "etc", "apps", "who.ami");
+    const other = join(home, "etc", "apps", "nginx");
     await mkdir(twin, { recursive: true });
+    await mkdir(other, { recursive: true });
     await writeFile(join(twin, "docker-compose.yml"), "services:\n  x:\n    image: traefik/whoami\n");
-    const result = await deploy({ appbayHome: home, dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
-    expect(result.apps).toEqual([]);
-    expect(result.compileErrors.map((e) => e.message).join("\n")).toContain('share the compose project "whoami"');
-    await rm(twin, { recursive: true, force: true });
+    await writeFile(join(other, "docker-compose.yml"), "services:\n  nginx:\n    image: nginx\n");
+    composeCalls.length = 0;
+    const result = await deploy({ appbayHome: home, targetApps: [APP, "nginx"], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+    expect(result.apps.find((a) => a.appName === APP)?.status).toBe("failed");
+    expect(result.apps.find((a) => a.appName === "nginx")?.status).not.toBe("failed");
+    expect(result.apps.find((a) => a.appName === APP)?.error).toContain('share the compose project "whoami"');
+    expect(composeCalls).toContainEqual(["-p", "nginx", "up", "-d"]);
+  });
+
+  it("passes the normalized directory name to compose at the deploy call site", async () => {
+    const mixedCase = join(home, "etc", "apps", "Ngin.X");
+    await mkdir(mixedCase, { recursive: true });
+    await writeFile(join(mixedCase, "docker-compose.yml"), "services:\n  nginx:\n    image: nginx\n");
+    composeCalls.length = 0;
+
+    await deploy({ appbayHome: home, targetApps: ["Ngin.X"], dockerCompose: compose, crashGraceMs: 0, observer: observerWith([ok(row("running"))]) });
+
+    expect(composeCalls).toContainEqual(["-p", "nginx", "up", "-d"]);
   });
 
   it("an empty target list deploys nothing, not everything", async () => {

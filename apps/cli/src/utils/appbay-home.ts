@@ -12,11 +12,22 @@
  *   4. `~/.appbay`  — silent fallback when nothing is configured
  */
 
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute, relative, sep } from "node:path";
 import { homedir } from "node:os";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { readSystemConfig, SYSTEM_CONFIG_FILE } from "./system-config.js";
-import { explainHome, resolveHome, type HomeTier } from "@appbay/core";
+import { explainHome, resolveHome, type ComposePsRow, type HomeTier } from "@appbay/core";
+
+/** Refuse project-wide mutation unless every existing container belongs to this home. */
+export function projectOwnershipError(appbayHome: string, rows: ComposePsRow[]): string | null {
+  const renders = join(appbayHome, "var", "lib", "renders");
+  const foreign = rows.find((row) => {
+    if (!row.workingDir) return true;
+    const rel = relative(renders, row.workingDir);
+    return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+  });
+  return foreign ? `container ${foreign.name} has ${foreign.workingDir ? `foreign working directory ${foreign.workingDir}` : "no working-directory ownership label"}` : null;
+}
 
 /** Path to the persisted home-directory config (outside APPBAY_HOME itself). */
 const CONFIG_DIR = join(homedir(), ".config", "appbay");
