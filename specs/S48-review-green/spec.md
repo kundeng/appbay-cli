@@ -124,7 +124,7 @@ round n:
 - [x] 2.7 review round 7, fixes
 - [x] 2.8 review round 8, fixes
 - [x] 2.9 review round 9, fixes
-- [ ] 2.10 review round 10 and onward until a round returns nothing above LOW in every region (see `docs/history/2026-09-06-s48-handoff.md`)
+- [x] 2.10 review round 10 and onward until a round returns nothing above LOW in every region (see `docs/history/2026-09-06-s48-handoff.md`)
 - [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
 
 ## Log
@@ -328,3 +328,28 @@ discovery and refuses a name nothing matches; the scratch-home test runs `delete
 --force` and checks `etc/system.yaml` survives. Its refusal remedy now names `up`, `down`,
 then `delete` (the `down` it named refused in the same state). The rest of both reports is
 in `docs/history/2026-09-06-s48-handoff.md` as the next agent's first list.
+
+**2026-09-28 — round 10 completed.** The handoff's core, CLI, and diff findings were read
+against the current functions and their callers with CodeGraph and full source reads. The
+round returned no unresolved finding above LOW after these dispositions:
+
+| # | lens | where | finding | disposition |
+|---|---|---|---|---|
+| R10.1 | Q3 HIGH | `delete.ts` | the CLI argument had been used as a path, so `delete .. --force` removed install state | fixed earlier in `34017b3`; discovery resolves the target |
+| R10.2 | S1/Q3 HIGH | `down.ts`, `delete.ts`, `edge.ts`, `runtime/observe.ts` | project-wide Compose mutation could reach a same-named project from another Appbay home | fixed `a8da108`: the Engine observer reads Compose's working-directory label and every mutation verifies all affected rows; fake-socket tests cover local, foreign, missing, mixed and inert rows |
+| R10.3 | Q1 MED | `restart.ts` | restart deployed after a refused stop | fixed `a8da108`: any stop failure exits before deploy |
+| R10.4 | S1 MED | `deploy-service.ts` | one normalized project-name clash refused unrelated targets and could strand a restart or migration | fixed `a8da108`: only the clashing apps receive refusal verdicts; unrelated targets converge |
+| R10.5 | Q3 MED | `delete.ts` | an in-tree directory symlink could alias a real sibling app and delete the sibling | found in the confirming read and fixed `a8da108`: the real compose directory must be the target's direct named child of `etc/apps`; tests cover internal and external aliases |
+| R10.6 | LOW | CLI, tests, docs | exited rows were called running; skipped pulls counted as pulled; migration throws lacked a command-level message; reset overstated rollback and retained the current system config; the legacy backup skip and normalized deploy `-p` call lacked integration coverage; one identity docblock was detached | fixed `a8da108`; documentation and regression coverage updated |
+
+Verification on the committed behavior: `pnpm turbo typecheck test` passed (core 1150,
+CLI 409, DB 27; one core skip); system-app, straddle, CLI-doc, manifest and server-compose
+checks passed or produced the documented public-tree skip; frozen install and all builds
+passed after the stale OSS lockfile was refreshed in `a4aba19`. The exact final Linux ARM64
+binary passed deploy-reporting 10/10, apply-success 6/6 and lifecycle 8/8 on both the rootful
+Podman 5.8 guest and the Docker 29 Rocky guest.
+
+S48 remains ACTIVE at task 3.1 because `check:subset` is not green: the committed public
+tree has 350 paths absent from the private fork and 139 shared paths with different blobs.
+That drift predates this continuation and spans the two long-diverged histories; it requires
+an explicit merge/reconciliation disposition rather than being hidden as a test exception.
