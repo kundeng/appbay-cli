@@ -1,0 +1,58 @@
+review_date: 2026-09-28
+status: proposed
+repositories:
+  appbay-cli:
+    root: /Users/kundeng/Projects/appbay-cli
+    commit: af2c4b8
+    worktree: dirty_before_review
+    codegraph_files: 414
+    codegraph_nodes: 3052
+    codegraph_edges: 10040
+    active_spec: S48-review-green
+  appbay:
+    root: /Users/kundeng/Projects/appbay
+    commit: 4ae70c1
+    worktree: clean_after_codegraph_init
+    codegraph_files: 492
+    codegraph_nodes: 3811
+    codegraph_edges: 12331
+journeys:
+  cli_up:
+    status: implemented_in_source_live_guest_pending
+    entry: appbay-cli/apps/cli/src/commands/up.ts
+    apply: appbay-cli/packages/core/src/services/deploy-service.ts:71
+  web_up:
+    status: fragmented
+    entry: appbay/apps/web/src/components/apps/app-detail.tsx:62
+    apply: appbay/apps/web/src/server/routers/deployments.ts:185
+  web_planner:
+    status: browser_supplies_apply_artifact
+    entry: appbay/apps/web/src/components/deploy/deploy-planner.tsx:417
+    worker: appbay/apps/web/src/server/queue/workers/deploy.ts:144
+  compose_editor:
+    status: proposed
+    nearest_current_surface: appbay/apps/web/src/components/apps/tabs/config-tab.tsx:270
+  enterprise_multi_user:
+    status: proposed
+    current_gate: appbay/apps/web/src/server/trpc.ts:102
+  openbao_kv:
+    status: proposed
+    current_backend: appbay-cli/packages/core/src/secrets/providers/vault.ts:446
+findings:
+  F1: {severity: high, action: schedule, owner: appbay, gate: single_deploy_path}
+  F2: {severity: high, action: schedule, owner: appbay, gate: server_owned_plan}
+  F3: {severity: high_for_enterprise, action: schedule, owner: appbay, gate: action_authz_and_audit}
+  F4: {severity: medium, action: schedule, owner: appbay-cli, gate: vault_backend_contract}
+  F5: {severity: medium, action: schedule, owner: appbay, gate: editor_save_contract}
+  F6: {severity: medium, action: refine_proposals, owner: both, gate: spec_012_and_002}
+  F7: {severity: medium, action: defer, owner: appbay-cli, gate: provider_lifecycle}
+ordered_actions:
+  - {id: A0, status: proposed, owner: appbay-cli, depends_on: [], deliverable: finish_S48_and_release_checks}
+  - {id: A1, status: proposed, owner: appbay-cli, depends_on: [A0], deliverable: typed_core_extensions}
+  - {id: A2, status: proposed, owner: both, depends_on: [A1], deliverable: one_versioned_core}
+  - {id: A3, status: proposed, owner: appbay, depends_on: [A2], deliverable: server_owned_plan_and_one_apply}
+  - {id: A4, status: proposed, owner: appbay, depends_on: [A3], deliverable: workspace_authz_and_audit}
+  - {id: A5, status: proposed, owner: appbay, depends_on: [A3, A4], deliverable: compose_editor}
+  - {id: A6, status: proposed, owner: both, depends_on: [A1, A4], deliverable: openbao_kv_backend}
+  - {id: A7, status: proposed, owner: both, depends_on: [A6], deliverable: leased_secret_delivery}
+verification_limit: static_source_review_only

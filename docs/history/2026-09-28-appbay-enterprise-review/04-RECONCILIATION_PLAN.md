@@ -1,0 +1,28 @@
+# AppBay Plan
+
+Date: 2026-09-28. Status: proposed review plan. Nothing here activates the recent `SPEC-000` to `SPEC-014` drafts or changes S48's ACTIVE status. Both repositories are in scope. `appbay-cli` is the OSS base; `appbay` is the enterprise application consuming it.
+
+| Order | Owner | Deliverable | Completion gate |
+|---|---|---|---|
+| 0 | `appbay-cli` | Complete S48 without mixing its existing dirty worktree into this review; repair the release and lockfile checks captured by SPEC-004 before publishing core. | Pending S48 review and both guest journeys pass; package install, typecheck, build, and release smoke checks run on the target artifacts. |
+| 1 | `appbay-cli` | Refine SPEC-012 into typed extension contracts, beginning with the vault backend and only the trait/catalog/system-app capabilities a real external package uses. Pass registries through core options; freeze registration before compile; reject duplicate names. Avoid free-form `afterRender` mutation. | A test package outside core composes an extension, validates its config, compiles, and deploys a fixture with unchanged output when no extension is present. Bun binary behavior is tested separately. |
+| 2 | `appbay-cli` and `appbay` | Version and publish one `@appbay/core` API, then replace the private core copy. Rewrite SPEC-002 against current OSS `deploy()`; adapt options and result shapes explicitly. | No private `packages/core` import remains; CLI Up and web Up/queue execute the same core pipeline and produce equivalent render, auxiliary files, secret behavior, refusal, and route transaction on Docker and Podman. |
+| 3 | `appbay` | Replace `applyPlan`, `up`, `enqueue`, and `fullDeploy` behavior with one server-owned plan/apply service. Keep queue and SSE as delivery wrappers. Stop accepting rendered YAML or auxiliary contents from the browser. | Stale or tampered plan IDs fail before writes; a per-app compile error refuses that app; resolved secrets and executable artifact bytes are absent from apply requests; UI and CLI E2E agree. |
+| 4 | `appbay` | Build identity-to-workspace membership, action authorization, and durable audit. Refine SPEC-013 and define an authoritative store, migration, backup, and retention contract. | Two identities and two roles: allowed and denied deploy, edit, secret, shell, and user-management actions are checked at the API boundary and audited with actor, scope, decision, and outcome. CLI actor attribution is explicit. |
+| 5 | `appbay` with core validation APIs | Build the Compose-aware editor over operator-owned source: YAML view, structured view where round-tripping is safe, upstream read-only view, AppBay override editor, validation, redacted plan preview, revision check, and atomic save. | Concurrent edit conflict, invalid YAML, path traversal, comment preservation or explicitly shown formatting change, and failed save are covered; generated render is never edited. |
+| 6 | OSS adapter plus enterprise policy UI | Implement optional OpenBao KV v2 as a backend behind `vault://`. Configure endpoint, TLS, auth, mount, and explicit workspace-to-OpenBao namespace mapping per installation/target. The adapter is explicitly included in supported CLI and server builds; the enterprise app owns policy and access workflows. | `secrets set/get/delete/list/check`, deploy, and web metadata agree on one backend; scoped identities cannot read another workspace; no plaintext enters plan, database, log, or browser; local vault continues to work. |
+| 7 | Separate later spec | Leased/dynamic secrets, OpenBao Agent delivery, renewal, rotation, and revocation; optional managed OpenBao deployment only after bootstrap/HA/recovery design. | Long-running apps survive lease renewal/rotation and fail visibly on loss of credentials. |
+
+## Spec Dispositions
+
+- Keep the 2026-09-24 Dockhand files in history as proposals. SPEC-000's tier rule stands. SPEC-012 needs the secret backend seam and tighter compiler extension rules. SPEC-002 needs the current OSS `deploy()` signature and a plan/apply API. SPEC-013 needs an authoritative enterprise store and a policy model for workspaces. SPEC-014 stays deferred until provider values, secrets, and migrations have one lifecycle.
+- Place the stable OSS extension contract in `docs/design/` when accepted. Place enterprise identity, authorization, audit, and secret tenancy contracts in `appbay/docs/design/` when accepted. Then create ordered DRAFT specs in the owning repos. Active implementation stays gated by the existing spec lifecycle.
+- Haloy's quickstart is a useful UX baseline for client installation, server enrollment, deploy, and status ([quickstart](https://haloy.dev/docs/quickstart)). The AppBay onboarding spec should show the same complete first journey with a stock Compose app; no Dockerfile build system is required for that journey.
+
+## Decisions To Confirm At Spec Refinement
+
+1. Which enterprise identity key is stable across provider rename and email change: edge subject, OIDC issuer+subject, or an AppBay principal ID linked to both? Username alone is the current context ID (`ent:apps/web/src/server/edge-identity.ts:69-72`).
+2. Which store is authoritative for workspaces, grants, and audit? `@appbay/db` currently describes itself as a rebuildable cache (`ent:packages/db/src/schema.ts:1-17`).
+3. Which targets may use OpenBao, and how will target agents receive a scoped machine identity? Namespaces in OpenBao and AppBay need an explicit mapping. Dynamic credentials are outside the KV v2 first release.
+
+The next implementation unit is S48 completion. This review does not rewrite or commit its existing modified files. No package publication or production secret migration was performed.
