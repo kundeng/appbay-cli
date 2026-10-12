@@ -12,8 +12,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { tmpdir, homedir } from "node:os";
+import { join, isAbsolute } from "node:path";
 
 /**
  * Fixture homes live under the package, NOT under `os.tmpdir()`.
@@ -24,9 +24,6 @@ import { join } from "node:path";
  * cannot distinguish healthy from broken tests nothing.
  */
 const FIXTURE_ROOT = join(process.cwd(), ".tmp-home-tests");
-
-const ORIGINAL_HOME = process.env.HOME;
-const ORIGINAL_APPBAY_HOME = process.env.APPBAY_HOME;
 
 let fakeHome: string;
 let configFile: string;
@@ -85,16 +82,17 @@ function scaffold(path: string): string {
 beforeEach(() => {
   mkdirSync(FIXTURE_ROOT, { recursive: true });
   fakeHome = mkdtempSync(join(FIXTURE_ROOT, "home-"));
-  process.env.HOME = fakeHome;
-  delete process.env.APPBAY_HOME;
+  vi.stubEnv("HOME", fakeHome);
+  vi.stubEnv("USERPROFILE", fakeHome);
+  vi.stubEnv("APPBAY_HOME", undefined);
+  // Fail before importing a writer if the native home redirect is ineffective.
+  expect(homedir()).toBe(fakeHome);
   configFile = join(fakeHome, ".config", "appbay", "home");
 });
 
 afterEach(() => {
   rmSync(fakeHome, { recursive: true, force: true });
-  if (ORIGINAL_HOME !== undefined) process.env.HOME = ORIGINAL_HOME;
-  if (ORIGINAL_APPBAY_HOME !== undefined) process.env.APPBAY_HOME = ORIGINAL_APPBAY_HOME;
-  else delete process.env.APPBAY_HOME;
+  vi.unstubAllEnvs();
 });
 
 // ---------------------------------------------------------------------------
@@ -208,7 +206,7 @@ describe("appbay home set", () => {
     }
     // On macOS /tmp is a symlink, so compare the resolved suffix, not the literal.
     expect(readFileSync(configFile, "utf-8").trim()).toContain("myappbay");
-    expect(readFileSync(configFile, "utf-8").trim().startsWith("/")).toBe(true);
+    expect(isAbsolute(readFileSync(configFile, "utf-8").trim())).toBe(true);
     expect(target).toBeTruthy();
   });
 

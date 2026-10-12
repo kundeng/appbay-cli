@@ -43,7 +43,7 @@ export type {
 } from "./cache.js";
 
 /** Type alias for the Drizzle database instance with full schema. */
-export type AppbayDatabase = BetterSQLite3Database<typeof schema>;
+export type AppbayDatabase = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
 /**
  * Create a new Drizzle database connection backed by SQLite.

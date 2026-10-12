@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import Database from "better-sqlite3";
 import {
   createTestDatabase,
   createDatabase,
@@ -362,32 +361,10 @@ describe("file-based database lifecycle", () => {
   it("creates a database at a temp path, uses it, and destroys it", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "appbay-db-test-"));
     const dbPath = join(tmpDir, "appbay.db");
-
+    let db: AppbayDatabase | undefined;
     try {
-      const db = createDatabase(dbPath);
-
-      // The database file is created by better-sqlite3 on connection.
-      // We need to create tables manually since we are not running migrations.
-      // For a file-based database, we use the same bootstrap SQL as createTestDatabase.
-      const sqlite = new Database(dbPath);
-      sqlite.pragma("foreign_keys = ON");
-      sqlite.exec(`
-        CREATE TABLE IF NOT EXISTS apps (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL UNIQUE,
-          project TEXT NOT NULL DEFAULT 'default',
-          environment TEXT NOT NULL DEFAULT 'default',
-          operator_id TEXT,
-          status TEXT NOT NULL DEFAULT 'stopped',
-          last_deployed_at TEXT,
-          created_at TEXT NOT NULL
-        );
-      `);
-      sqlite.close();
-
-      // Re-open with Drizzle and verify it works
-      const db2 = createDatabase(dbPath);
-      db2.insert(apps)
+      db = createDatabase(dbPath);
+      db.insert(apps)
         .values({
           id: randomUUID(),
           name: "test-app",
@@ -395,10 +372,15 @@ describe("file-based database lifecycle", () => {
         })
         .run();
 
-      const result = db2.select().from(apps).all();
+      // Close and reopen the real connection to prove persistence, then release
+      // the Windows file handle before deleting the fixture.
+      db.$client.close();
+      db = createDatabase(dbPath);
+      const result = db.select().from(apps).all();
       expect(result).toHaveLength(1);
       expect(result[0]!.name).toBe("test-app");
     } finally {
+      if (db?.$client.open) db.$client.close();
       // Clean up the temporary directory
       rmSync(tmpDir, { recursive: true, force: true });
     }

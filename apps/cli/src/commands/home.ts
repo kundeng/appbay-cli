@@ -32,7 +32,7 @@ import { Command } from "commander";
 import { tmpdir } from "node:os";
 import { SYSTEM_CONFIG_FILE } from "../utils/system-config.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import { resolveAppbayHome, explainAppbayHome, saveAppbayHome, clearSavedAppbayHome, tiersShadowingSaved, CONFIG_FILE } from "../utils/appbay-home.js";
 import type { HomeTier } from "@appbay/core";
 import { checkHomeAssertion, loadInstanceConfig, type HomeMismatch } from "@appbay/core";
@@ -180,9 +180,9 @@ const clearCommand = new Command("clear")
     console.log(`Resolved home is now ${resolveAppbayHome()}`);
   });
 
-/** Linux keeps temp under /tmp and /var/tmp; macOS under /private/tmp and /var/folders, which os.tmpdir() names. */
+/** Keep known POSIX roots and the native temporary-directory boundary. */
 function isTempPath(p: string): boolean {
-  const roots = ["/tmp/", "/var/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/", tmpdir().replace(/\/+$/, "") + "/"];
+  const roots = ["/tmp/", "/var/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/", tmpdir().replace(/[\\/]+$/, "") + sep];
   return roots.some((r) => p.startsWith(r));
 }
 

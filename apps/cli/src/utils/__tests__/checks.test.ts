@@ -133,7 +133,9 @@ describe("runInitPreflight", () => {
     // ("docker-compose >= 2.23.1", "podman-compose >= 1.5.0") rather than saying a bare
     // "Compose >= 2.23.1" that was only ever true for Docker. Match the shape, not one
     // literal, so this test does not have to change again per provider.
-    expect(names.some((n) => /^(docker|podman)-compose >= \d/.test(n))).toBe(true);
+    // An absent/unidentified provider uses the generic Compose version check;
+    // the preflight still returns that required check instead of omitting it.
+    expect(names.some((n) => /^(?:(docker|podman)-compose|Compose) >= \d/.test(n))).toBe(true);
   });
 });
 
