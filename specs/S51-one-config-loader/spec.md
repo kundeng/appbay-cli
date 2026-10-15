@@ -1,18 +1,18 @@
 ---
-spec_id: S49-one-config-loader
+spec_id: S51-one-config-loader
 status: DRAFT
 closed_as: null
-since: 2026-09-06
+since: 2026-10-14
 until: null
 epic: config
 features: [env-schema, print-config, eslint-strict]
 supersedes: []
 superseded_by: null
-depends_on: [S48-review-green]
+depends_on: [S50-remote-endpoint]
 anchors: [data-architecture]
 ---
 
-# S49: one reader for the environment, and a linter
+# S51: one reader for the environment, and a linter
 
 # 1 · Requirements
 
@@ -78,3 +78,8 @@ devtime only (`update`) may stay CLI-side behind the same schema type.
 
 **2026-09-06** — drafted at the close of S48 to carry the S13 and hygiene findings from the
 2026-09-06 review.
+
+**2026-10-14** — renumbered from S49 to S51 behind S50 (owner, 2026-10-14). S50 moves the
+runtime endpoint variables (`APPBAY_RUNTIME_SOCKET`, `DOCKER_HOST`, `DOCKER_CONTEXT`,
+`CONTAINER_HOST`) behind `resolveEndpoint()` in `runtime/endpoint.ts`; this sprint's loader
+absorbs that one function rather than the scattered reads its inventory lists.

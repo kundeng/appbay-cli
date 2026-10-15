@@ -75,7 +75,7 @@ const RULES: Rule[] = [
     owners: ["packages/core/src/runtime/"],
     exempt: {},
     allowed: {
-      "packages/core/src/compiler/builds.ts": "S49 1.5: six sites in the build path",
+      "packages/core/src/compiler/builds.ts": "S51 1.5: six sites in the build path",
     },
   },
   {

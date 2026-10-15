@@ -1,6 +1,6 @@
 ---
 spec_id: S50-remote-endpoint
-status: DRAFT
+status: ACTIVE
 closed_as: null
 since: 2026-10-14
 until: null
@@ -56,7 +56,7 @@ Today the two halves of a deploy can reach two daemons. `packages/core/src/runti
 - Any file sync, tunnel that outlives a command, DNS record, or certificate distribution (providers, per the decision).
 - More than one endpoint per system; multi-host scheduling.
 - #17, #18 and #19 (separate defects; a hardening sprint adopts them).
-- Folding the environment reads into S49's single loader. S49 lists `DOCKER_HOST` and the socket variables for its schema; this sprint keeps them in `runtime/` behind one function so S49 can absorb them without a second resolver.
+- Folding the environment reads into S51's single loader (renumbered from S49). S51 lists `DOCKER_HOST` and the socket variables for its schema; this sprint keeps them in `runtime/` behind one function so S51 can absorb them without a second resolver.
 
 # 2 · Design
 

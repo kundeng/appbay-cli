@@ -1,13 +1,13 @@
 ---
 spec_id: S48-review-green
-status: ACTIVE
-closed_as: null
-since: 2026-09-06
+status: CLOSED
+closed_as: FORK-FORWARD
+since: 2026-10-14
 until: null
 epic: correctness
 features: [restart-through-deploy, journeys-workdir, cli-spawns-through-runtime, scheduled-findings-closed, review-rounds]
 supersedes: []
-superseded_by: null
+superseded_by: S52-public-private-agreement
 depends_on: [S47-converge-chain]
 anchors: [data-architecture]
 ---
@@ -30,7 +30,7 @@ its callers, fixing what each round finds, until a round returns nothing above L
   CLI tests, `tsc`, the arch rules, the repo's `check:*` scripts, and the deploy-reporting,
   apply-success and lifecycle journeys on both Lima guests pass.
 - **Not in this sprint, with the destination named:** the config loader that replaces 34 raw
-  `process.env` reads (S49, drafted at close, with the inventory); eslint adoption (S49);
+  `process.env` reads (S49, drafted at close, with the inventory; renumbered S51 on 2026-10-14); eslint adoption (S51);
   issue #11 (ship the injector, a feature); D1, D2, D3 and ledger rows 22, 28 (Kun's); issue
   #75 (needs a public host); issue #12 (a trait owns its converge).
 
@@ -125,7 +125,8 @@ round n:
 - [x] 2.8 review round 8, fixes
 - [x] 2.9 review round 9, fixes
 - [x] 2.10 review round 10 and onward until a round returns nothing above LOW in every region (see `docs/history/2026-09-06-s48-handoff.md`)
-- [ ] 3.1 journeys on both guests; ledger; pillars current state; S49 drafted; close
+- [x] 3.1a journeys on both guests (2026-09-28: Podman 5.8 and Docker 29, deploy reporting 10/10, apply success 6/6, lifecycle 8/8); ledger; pillars current state; S49 drafted
+- [>] 3.1b `check:subset` agreement with the private fork -> S52-public-private-agreement
 
 ## Log
 
@@ -165,7 +166,7 @@ diff). Every finding was read against the file before it was acted on.
 
 Not taken from round 1: `builds.ts` still spawns the container binary through a local `bin`
 (six sites in the build path, listed in the first arch rule; no journey here exercises the
-build) — carried to S49 as a task beside the config loader.
+build) — carried to S49 (now S51) as a task beside the config loader.
 
 **2026-09-06 — round 2.** Three fresh reviewers over the same regions plus the round-1 diff.
 Round 1's fixes had introduced four defects; every finding was read against the file.
@@ -353,3 +354,12 @@ S48 remains ACTIVE at task 3.1 because `check:subset` is not green: the committe
 tree has 350 paths absent from the private fork and 139 shared paths with different blobs.
 That drift predates this continuation and spans the two long-diverged histories; it requires
 an explicit merge/reconciliation disposition rather than being hidden as a test exception.
+
+**2026-10-14 — closed FORK-FORWARD.** Owner's choice (2026-10-14): close S48 rather than hold it
+open on the cross-repository gate, move S49 behind the new S50, and activate S50. Task 3.1 is
+split: its journeys, ledger, pillar and drafting parts are complete (3.1a); the `check:subset`
+gate moves whole to `S52-public-private-agreement` (3.1b), unweakened. Close evidence on macOS
+at `3ac717a` plus the S50 draft: `pnpm turbo build typecheck test` passes, core 1144 passed /
+7 skipped, CLI 409, DB 27 (the extra skips against the 2026-09-28 Linux run are
+platform-gated tests).
+

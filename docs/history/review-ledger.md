@@ -5,7 +5,7 @@ discussed; this file is where its outcome lands. One row per finding, appended i
 it is raised, updated in the turn its status changes. The position line at the top is what
 the next session resumes from.
 
-**Position (2026-09-28):** S48 round 10 and both-engine journeys are green; task 3.1 remains open because `check:subset` measures 350 public-only paths and 139 differing shared paths against the private fork. Resume from `docs/history/2026-09-28-s48-handoff.md` · open product decisions: D1, D2, D3 (review 04), row 28, issue #11, row 22, issue #12 · S49 stays DRAFT. The human review track starts at docs/steering/product.md.
+**Position (2026-10-14):** S48 closed FORK-FORWARD; its `check:subset` gate moved to S52 (public/private agreement). S50 (remote endpoint, #15/#16) is ACTIVE on branch `s50-remote-endpoint`; S49 was renumbered S51 behind it. Open product decisions: D1, D2, D3 (review 04), row 28, issue #11, row 22, issue #12. The human review track starts at docs/steering/product.md.
 
 ## Protocol
 

@@ -14,8 +14,8 @@ so this page does not depend on a review date.
 
 ## Current state
 
-After the hardening, ownership, verification, boot-order, socket, crash, one-scope and
-identity sprints that followed the first seam review:
+After the hardening, ownership, verification, boot-order, socket, crash, one-scope,
+identity, converge-chain and review-green sprints that followed the first seam review:
 
 - **Correct:** the deploy path finds the edge by label, observes the runtime over its API
   socket, waits for readiness in project order, and reports unknown when it could not look.
@@ -28,6 +28,8 @@ identity sprints that followed the first seam review:
   against a real unix-socket server; a system app is compiled and its edge target pinned.
 - **Documented:** the docs map, the one-scope model, the projects file and the injection
   modes describe the code as it is; the docs checks are green.
-- **Review-ready:** the deploy path is the counter-example the pillar was named for: one
-  870-line file, the converge written twice, and the verdict kept in fifteen counter sites
-  with one decrement. The reconcile restructure of that path is the first work on this pillar.
+- **Review-ready:** the deploy path is a chain of converges with the report folded from their
+  verdicts (S47): `services/deploy-service.ts` is 185 lines, and the chain, the executor, the
+  route and the report are separate files under `services/deploy/`, the largest 258 lines, with
+  no counter written during execution (measured 2026-10-14). S48's review rounds, through round 10, ended
+  with nothing above LOW in every region.
