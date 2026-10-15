@@ -24,10 +24,10 @@
  * why `runBuildAction` is not best-effort and why a failed `verify` blocks.
  */
 
-import { spawnSync } from "node:child_process";
+import type { SpawnSyncOptionsWithStringEncoding } from "node:child_process";
 import type { BuildSpec } from "../schemas/appbay-yaml.js";
 import type { ShepherdAction } from "../traits/types.js";
-import { containerBin } from "../runtime/container-runtime.js";
+import { containerSpawnSync } from "../runtime/container-runtime.js";
 import { findContainerByLabel } from "../runtime/observe.js";
 import { APP_LABEL } from "./identity.js";
 
@@ -180,6 +180,9 @@ function normaliseArgs(args: unknown): Record<string, string> {
  * a Caddy without its DNS module compiles, runs, serves, and quietly issues certificates
  * from its internal CA forever. Failing the deploy is the only outcome that surfaces that.
  */
+/** Captured output, as text: every build-path call reads stdout or stderr. */
+const PIPED: SpawnSyncOptionsWithStringEncoding = { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" };
+
 export function buildShepherdAction(build: ResolvedBuild, appDir: string): ShepherdAction {
   return {
     phase: "pre-deploy",
@@ -187,7 +190,8 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
     label: `Build ${build.image} for service ${build.service}`,
     timeoutMs: 1_800_000,
     run: async (ctx) => {
-      const bin = containerBin();
+      // Every runtime call takes the deploy's home, so it reaches that home's endpoint (S50).
+      const home = ctx.appbayHome;
 
       // 🚨 THERE IS NO PRESENCE CHECK HERE, AND THAT IS THE FIX (#77).
       //
@@ -208,16 +212,11 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
       // rather than from a name. A no-op rebuild against a warm layer cache is cheap; a
       // silently stale image is not.
       if (build.pullIfPresent) {
-        const pull = spawnSync(bin, ["pull", build.pullIfPresent], {
-          stdio: ["pipe", "pipe", "pipe"],
-          encoding: "utf-8",
-        });
+        const pull = containerSpawnSync(["pull", build.pullIfPresent], PIPED, home);
         if (pull.status === 0) {
-          spawnSync(bin, ["tag", build.pullIfPresent, build.image], {
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          verifyOrThrow(bin, build);
-          await evictStaleContainer(bin, build, ctx.appName);
+          containerSpawnSync(["tag", build.pullIfPresent, build.image], PIPED, home);
+          verifyOrThrow(home, build);
+          await evictStaleContainer(home, build, ctx.appName);
           return { built: false, reason: `pulled ${build.pullIfPresent}` };
         }
         // Pull failed — fall through and build. Recorded rather than fatal: the escape
@@ -232,18 +231,14 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
       args.push(build.context);
 
       console.log(`    Building ${build.image} (this can take several minutes)...`);
-      const result = spawnSync(bin, args, {
-        cwd: appDir,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-      });
+      const result = containerSpawnSync(args, { ...PIPED, cwd: appDir }, home);
       if (result.status !== 0) {
         const tail = String(result.stderr ?? "").trim().split("\n").slice(-6).join("\n");
         throw new Error(`build failed for ${build.image}:\n${tail}`);
       }
 
-      verifyOrThrow(bin, build);
-      await evictStaleContainer(bin, build, ctx.appName);
+      verifyOrThrow(home, build);
+      await evictStaleContainer(home, build, ctx.appName);
       return { built: true, image: build.image };
     },
   };
@@ -275,18 +270,15 @@ export function buildShepherdAction(build: ResolvedBuild, appDir: string): Sheph
  * disagrees about naming all leave `up -d` to do what it would have done anyway. The
  * failure mode of doing nothing here is the pre-existing bug, not a worse one.
  */
-async function evictStaleContainer(bin: string, build: ResolvedBuild, appName: string): Promise<void> {
+async function evictStaleContainer(appbayHome: string, build: ResolvedBuild, appName: string): Promise<void> {
   const inspectId = (ref: string, format: string): string => {
-    const r = spawnSync(bin, ["inspect", "--format", format, ref], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    });
+    const r = containerSpawnSync(["inspect", "--format", format, ref], PIPED, appbayHome);
     return r.status === 0 ? String(r.stdout ?? "").trim() : "";
   };
 
   // The container is found by the labels the compiler stamps, not by rebuilding its name:
   // the namespace is part of the name and this function does not know it.
-  const found = await findContainerByLabel(APP_LABEL, appName, { labels: { "com.docker.compose.service": build.service } });
+  const found = await findContainerByLabel(APP_LABEL, appName, { appbayHome, labels: { "com.docker.compose.service": build.service } });
   if (found.kind !== "ok" || found.value === null) return; // no container yet, or cannot tell — `up -d` decides
   const container = found.value.name;
   const running = inspectId(container, "{{.Image}}");
@@ -298,16 +290,13 @@ async function evictStaleContainer(bin: string, build: ResolvedBuild, appName: s
   console.log(
     `    ${build.image} moved; removing stale container ${container} so it is recreated.`,
   );
-  spawnSync(bin, ["rm", "-f", container], { stdio: ["pipe", "pipe", "pipe"] });
+  containerSpawnSync(["rm", "-f", container], PIPED, appbayHome);
 }
 
-function verifyOrThrow(bin: string, build: ResolvedBuild): void {
+function verifyOrThrow(appbayHome: string, build: ResolvedBuild): void {
   if (!build.verify) return;
   const [cmd, ...rest] = build.verify.command;
-  const check = spawnSync(bin, ["run", "--rm", "--entrypoint", cmd, build.image, ...rest], {
-    stdio: ["pipe", "pipe", "pipe"],
-    encoding: "utf-8",
-  });
+  const check = containerSpawnSync(["run", "--rm", "--entrypoint", cmd, build.image, ...rest], PIPED, appbayHome);
   const output = `${check.stdout ?? ""}${check.stderr ?? ""}`;
   assertVerificationResult(build, check.status, output);
 }

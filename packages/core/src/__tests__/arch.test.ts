@@ -65,18 +65,14 @@ const RULES: Rule[] = [
       "apps/cli/src/commands/up.ts": "re-invokes appbay for --open",
       "apps/cli/src/commands/install.ts": "re-invokes appbay validate after an install",
     },
-    allowed: {
-      "packages/core/src/compiler/builds.ts": "2.1/2.4",
-    },
+    allowed: {},
   },
   {
     name: "nothing outside runtime/ spawns the container binary, by any name",
     pattern: /\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync|tryExec)\(\s*(?:(?:bin|binary|runtime)\s*,|"(?:docker|podman)")|\b\w+\(\s*(?:cli)?containerBin\(|\b(?:spawn|spawnSync|execFile|execFileSync|exec|execSync)\s*(?:as|:)\s*\w+\s*[,}]|\bBun\.spawn(?:Sync)?\(/,
     owners: ["packages/core/src/runtime/"],
     exempt: {},
-    allowed: {
-      "packages/core/src/compiler/builds.ts": "S51 1.5: six sites in the build path",
-    },
+    allowed: {},
   },
   {
     name: "Go-template parsing of runtime output lives in runtime/",

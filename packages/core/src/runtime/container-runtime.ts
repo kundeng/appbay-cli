@@ -36,7 +36,7 @@ import {
   type InstanceConfig,
 } from "../schemas/instance.js";
 import { podmanRootfulEnv } from "./podman-rootful.js";
-import { resolveEndpointFrom, readDockerContext, type Endpoint } from "./endpoint.js";
+import { resolveEndpointFrom, readDockerContext, endpointEnv, type Endpoint } from "./endpoint.js";
 import { resolveHome } from "./home.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
@@ -358,6 +358,7 @@ export function containerExec(
   const result = spawnSync(bin, args, {
     encoding: "utf-8",
     ...spawnOptions,
+    env: childEnv(appbayHome, spawnOptions.env),
   });
 
   if (result.error) {
@@ -387,7 +388,7 @@ export function containerSpawnSync(
   options: SpawnSyncOptionsWithStringEncoding,
   appbayHome?: string,
 ): SpawnSyncReturns<string> {
-  return spawnSync(containerBin(appbayHome), args, options);
+  return spawnSync(containerBin(appbayHome), args, { ...options, env: childEnv(appbayHome, options.env) });
 }
 
 /**
@@ -399,7 +400,19 @@ export function containerSpawn(
   options: SpawnOptions & { appbayHome?: string } = {},
 ): ChildProcess {
   const { appbayHome, ...spawnOptions } = options;
-  return spawn(containerBin(appbayHome), args, spawnOptions);
+  return spawn(containerBin(appbayHome), args, { ...spawnOptions, env: childEnv(appbayHome, spawnOptions.env) });
+}
+
+/**
+ * The environment of a container-binary child: the caller's (or this process's), pointed at
+ * the resolved endpoint — S50 1.2. Every spawn of the binary goes through here, so compose
+ * and observation cannot reach different daemons (#16).
+ */
+export function childEnv(appbayHome: string | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const { set, unset } = endpointEnv(resolveEndpoint(appbayHome), resolveContainerRuntime(appbayHome));
+  const env: NodeJS.ProcessEnv = { ...base, ...set };
+  for (const key of unset) delete env[key];
+  return env;
 }
 
 /**
