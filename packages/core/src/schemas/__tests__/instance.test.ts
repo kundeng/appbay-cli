@@ -57,6 +57,13 @@ describe("parseInstanceConfig", () => {
     expect(parseInstanceConfig("container_runtime: rkt\n")).toEqual({});
   });
 
+  it("accepts an endpoint with a supported scheme and drops the file on any other (S50)", () => {
+    expect(parseInstanceConfig("endpoint: ssh://ops@server\n").endpoint).toBe("ssh://ops@server");
+    expect(parseInstanceConfig("endpoint: unix:///var/run/docker.sock\n").endpoint).toBe("unix:///var/run/docker.sock");
+    expect(InstanceConfigSchema.safeParse({ endpoint: "npipe:////./pipe/docker_engine" }).success).toBe(false);
+    expect(InstanceConfigSchema.safeParse({ endpoint: "ssh://" }).success).toBe(false);
+  });
+
   it("treats every key as optional", () => {
     expect(InstanceConfigSchema.safeParse({}).success).toBe(true);
   });

@@ -36,6 +36,7 @@ import {
   type InstanceConfig,
 } from "../schemas/instance.js";
 import { podmanRootfulEnv } from "./podman-rootful.js";
+import { resolveEndpointFrom, readDockerContext, type Endpoint } from "./endpoint.js";
 import { resolveHome } from "./home.js";
 
 // ⚠️ ContainerRuntime and DEFAULT_CONTAINER_RUNTIME are NOT re-exported here.
@@ -118,6 +119,29 @@ export function resolveIngressProvider(appbayHome?: string): IngressProvider {
 }
 
 /**
+ * The runtime endpoint this command deploys to and observes — S50.
+ *
+ * Resolved once per process and home: the environment cannot change under a running
+ * command, and a second resolution could spawn `docker context` again for the same answer.
+ */
+export function resolveEndpoint(appbayHome?: string): Endpoint {
+  const home = appbayHome ?? defaultAppbayHome();
+  const cached = endpointCache.get(home);
+  if (cached) return cached;
+  const endpoint = resolveEndpointFrom({
+    runtime: resolveContainerRuntime(home),
+    env: process.env,
+    configured: instanceConfig(home).endpoint,
+    readContext: readDockerContext,
+    uid: process.getuid?.() ?? 0,
+  });
+  endpointCache.set(home, endpoint);
+  return endpoint;
+}
+
+const endpointCache = new Map<string, Endpoint>();
+
+/**
  * Which DNS provider, if any, drives the ACME DNS-01 challenge here?
  *
  * ⚠️ `undefined` is the meaningful answer, not a missing one — it means this installation
@@ -153,8 +177,9 @@ export function containerBin(appbayHome?: string): string {
  * home argument it clears everything.
  */
 export function clearContainerRuntimeCache(appbayHome?: string): void {
-  if (appbayHome === undefined) cache.clear();
-  else cache.delete(appbayHome);
+  // The endpoint is derived from the same config, so it goes with it.
+  if (appbayHome === undefined) { cache.clear(); endpointCache.clear(); }
+  else { cache.delete(appbayHome); endpointCache.delete(appbayHome); }
 }
 
 // ---------------------------------------------------------------------------

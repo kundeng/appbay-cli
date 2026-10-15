@@ -19,7 +19,7 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseInstanceConfig } from "@appbay/core";
-import { upsertContainerRuntime } from "../init.js";
+import { upsertContainerRuntime, upsertEndpoint } from "../init.js";
 
 let home: string;
 const configPath = () => join(home, "project.yaml");
@@ -113,5 +113,20 @@ describe("upsertContainerRuntime", () => {
     const cfg = parseInstanceConfig(readFileSync(configPath(), "utf-8"));
     expect(cfg.project).toBe("demo");
     expect(cfg.container_runtime).toBe("podman");
+  });
+});
+
+describe("upsertEndpoint (S50)", () => {
+  it("adds the endpoint to an existing config and reports unchanged on the second converge", async () => {
+    writeFileSync(configPath(), "project: demo\ndomain: local\n", "utf-8");
+    expect(await upsertEndpoint(home, "ssh://ops@server")).toBe("created");
+    expect(parseInstanceConfig(readFileSync(configPath(), "utf-8")).endpoint).toBe("ssh://ops@server");
+    expect(await upsertEndpoint(home, "ssh://ops@server")).toBe("unchanged");
+  });
+
+  it("replaces a recorded endpoint", async () => {
+    writeFileSync(configPath(), "project: demo\nendpoint: ssh://ops@old\n", "utf-8");
+    expect(await upsertEndpoint(home, "ssh://ops@new")).toBe("updated");
+    expect(parseInstanceConfig(readFileSync(configPath(), "utf-8")).endpoint).toBe("ssh://ops@new");
   });
 });

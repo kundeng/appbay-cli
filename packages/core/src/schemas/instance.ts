@@ -212,6 +212,16 @@ export const InstanceConfigSchema = z.object({
    * an error. The published port stays the way in until RFC-001 §1's cutover closes it.
    */
   server_host: z.string().optional(),
+
+  /**
+   * The runtime endpoint this system deploys to and observes — S50.
+   *
+   * Absent means "follow the environment": `DOCKER_HOST`, `DOCKER_CONTEXT`, then the Docker
+   * CLI's current context. Setting it records the choice with the installation, so a home
+   * operated from another machine targets the same daemon without an exported variable.
+   * The environment still wins for one invocation, as it does for every key here.
+   */
+  endpoint: z.string().regex(/^(unix|ssh|tcp):\/\/./, "expected unix://, ssh:// or tcp://").optional(),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;

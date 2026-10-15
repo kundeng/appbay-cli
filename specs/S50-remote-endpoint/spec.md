@@ -97,9 +97,9 @@ On a laptop, `DOCKER_CONTEXT=lab appbay up whoami`, home on an export the server
 
 # 3 · Tasks
 
-- [ ] 1. Foundation
+- [x] 1. Foundation
   - [x] 1.1 `runtime/endpoint.ts`: `Endpoint` union, `resolveEndpoint()` with sources, `endpointEnv()`; unit tests for order and parsing. Requirements: 1.1, 1.7.
-  - [ ] 1.2 `endpoint` in `InstanceConfigSchema`; `init --endpoint` writes it. Requirements: 1.4.
+  - [x] 1.2 `endpoint` in `InstanceConfigSchema`; `init --endpoint` writes it. Requirements: 1.4.
 - [ ] 2. Core
   - [ ] 2.1 Spawn helpers in `container-runtime.ts` merge `endpointEnv()`; grep proves no spawn bypasses them. Requirements: 1.2.
   - [ ] 2.2 `runtime/bridge.ts` and `socket.ts` delegation; `engine-api.ts` unchanged apart from where the socket comes from. Requirements: 1.3.
@@ -117,3 +117,4 @@ On a laptop, `DOCKER_CONTEXT=lab appbay up whoami`, home on an export the server
 
 - 2026-10-14: drafted from #15/#16 and the owner's decision (option B). Resolution order, the Bun `createConnection` gap and the bridge were measured before writing (section "Verified before writing").
 - 2026-10-14: 1.1 done. `resolveEndpointFrom` is pure (environment, configured value and a context reader passed in); 22 unit tests cover each precedence step, Podman's rule, URL forms and `endpointEnv`. Live on macOS: the current context resolved to OrbStack's socket, `DOCKER_CONTEXT=homecloud-work` to its `ssh://` host, a missing context to the CLI's own error. `endpoint.ts` imports `runtimeSocketFor` from `socket.ts`; task 2.2 moves that function here so `socket.ts` can depend on `endpoint.ts` without a cycle.
+- 2026-10-14: 1.2 done. `endpoint` in `InstanceConfigSchema` (scheme-checked; a bad value drops the file to defaults like every other key); `resolveEndpoint(home)` in `container-runtime.ts`, cached per home and cleared with the runtime cache; `appbay init --endpoint` validated by `parseHost`, written on a fresh install and upserted on an existing one (`upsertEndpoint`). `runtimeSocketFor` moved into `endpoint.ts` so `endpoint.ts` imports nothing else from `runtime/`. Full suite: core 1170 passed / 7 skipped, CLI 411, DB 27.

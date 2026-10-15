@@ -10,21 +10,8 @@
  */
 import { existsSync } from "node:fs";
 import { resolveContainerRuntime } from "./container-runtime.js";
+import { runtimeSocketFor } from "./endpoint.js";
 
-export function runtimeSocketFor(
-  runtime: string,
-  uid: number,
-  xdgRuntimeDir?: string,
-  override?: string,
-  containerHost?: string,
-): string {
-  if (override) return override;
-  // CONTAINER_HOST is podman's variable; a docker install ignores it (a stray podman path must
-  // not redirect docker). Docker's own DOCKER_HOST is folded into `override` by the resolver.
-  if (runtime !== "podman") return "/var/run/docker.sock";
-  if (containerHost?.startsWith("unix://")) return containerHost.slice("unix://".length);
-  return uid === 0 ? "/run/podman/podman.sock" : `${xdgRuntimeDir ?? `/run/user/${uid}`}/podman/podman.sock`;
-}
 
 /** The socket this process observes the runtime through. */
 export function resolveRuntimeSocket(appbayHome?: string): string {

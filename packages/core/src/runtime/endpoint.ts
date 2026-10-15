@@ -17,7 +17,6 @@
  */
 import { spawnSync } from "node:child_process";
 import { z } from "zod";
-import { runtimeSocketFor } from "./socket.js";
 import type { ContainerRuntime } from "../schemas/instance.js";
 
 export type EndpointSource =
@@ -47,6 +46,25 @@ export interface EndpointInputs {
   /** Reads a named context's host; `undefined` names the CLI's current context. */
   readContext: (name: string | undefined) => ContextHost;
   uid: number;
+}
+
+/**
+ * The runtime's default local socket. `override` and `containerHost` are the pre-S50
+ * inputs `socket.ts` still passes; task 2.2 replaces that caller with `resolveEndpoint`.
+ */
+export function runtimeSocketFor(
+  runtime: string,
+  uid: number,
+  xdgRuntimeDir?: string,
+  override?: string,
+  containerHost?: string,
+): string {
+  if (override) return override;
+  // CONTAINER_HOST is podman's variable; a docker install ignores it (a stray podman path must
+  // not redirect docker). Docker's own DOCKER_HOST is folded into `override` by the resolver.
+  if (runtime !== "podman") return "/var/run/docker.sock";
+  if (containerHost?.startsWith("unix://")) return containerHost.slice("unix://".length);
+  return uid === 0 ? "/run/podman/podman.sock" : `${xdgRuntimeDir ?? `/run/user/${uid}`}/podman/podman.sock`;
 }
 
 /** Parse a docker host URL. TLS for `tcp` comes from the caller, which knows its source. */

@@ -51,7 +51,7 @@ import {
   parseInstanceConfig,
   SERVER_CONTAINER,
   SHARED_NETWORK,
-  NAMESPACES_DIR_REL, runtimeProfile } from "@appbay/core";
+  NAMESPACES_DIR_REL, runtimeProfile, parseHost } from "@appbay/core";
 import {
   resolveAppbayHome,
   saveAppbayHome,
@@ -580,6 +580,7 @@ async function writeProjectConfig(
   containerRuntime?: ContainerRuntime,
   ingressProvider?: IngressProvider,
   acmeDnsProvider?: AcmeDnsProvider,
+  endpoint?: string,
 ): Promise<boolean> {
   // RFC-001 §2.1: written to etc/system.yaml. `project.yaml` shared a filename with
   // `etc/projects/<name>/project.yaml` — a different file with a different schema — while
@@ -623,6 +624,10 @@ domain: ${domain}
   // ⚠️ No default to compare against — absent means "no DNS-01", which is a real choice.
   if (acmeDnsProvider) {
     content += `acme_dns_provider: ${acmeDnsProvider}\n`;
+  }
+  // Absent means "follow the environment", so only an explicit choice is written.
+  if (endpoint) {
+    content += `endpoint: ${endpoint}\n`;
   }
   await writeFile(configPath, content, "utf-8");
   return true;
@@ -690,6 +695,14 @@ async function upsertContainerStore(
   return upsertInstanceKey(appbayHome, "container_store", store, "");
 }
 
+/** Same, for the runtime endpoint (S50). Absent means "follow the environment", so there is no default. */
+export async function upsertEndpoint(
+  appbayHome: string,
+  endpoint: string,
+): Promise<"created" | "updated" | "unchanged"> {
+  return upsertInstanceKey(appbayHome, "endpoint", endpoint, "");
+}
+
 /** Same, for the ACME DNS-01 provider. */
 async function upsertAcmeDnsProvider(
   appbayHome: string,
@@ -710,7 +723,7 @@ async function upsertAcmeDnsProvider(
  */
 async function upsertInstanceKey(
   appbayHome: string,
-  key: "container_runtime" | "ingress_provider" | "acme_dns_provider" | "container_store",
+  key: "container_runtime" | "ingress_provider" | "acme_dns_provider" | "container_store" | "endpoint",
   value: string,
   defaultValue: string,
 ): Promise<"created" | "updated" | "unchanged"> {
@@ -776,6 +789,10 @@ export const initCommand = new Command("init")
     "DNS provider for the ACME DNS-01 challenge (cloudflare). Absent means no DNS-01.",
   )
   .option(
+    "--endpoint <url>",
+    "runtime endpoint to deploy to: unix:///path, ssh://user@host or tcp://host:port. Absent follows DOCKER_HOST, DOCKER_CONTEXT and the current context.",
+  )
+  .option(
     "--ingress-provider <provider>",
     'reverse proxy to emit config for: "traefik" or "caddy" (default: traefik)',
   )
@@ -793,6 +810,7 @@ export const initCommand = new Command("init")
       containerRuntime?: string;
       ingressProvider?: string;
       acmeDnsProvider?: string;
+      endpoint?: string;
       refreshSystemApps?: boolean;
       yes?: boolean;
       force?: boolean;
@@ -888,6 +906,17 @@ export const initCommand = new Command("init")
           process.exit(1);
         }
         acmeDnsProvider = parsed.data;
+      }
+
+      let endpoint: string | undefined;
+      if (options.endpoint !== undefined) {
+        // Parsed with the resolver's own parser, so init accepts exactly what deploy can use.
+        const parsed = parseHost(options.endpoint, "system.yaml");
+        if (parsed.kind === "unsupported") {
+          console.error(`Invalid --endpoint "${options.endpoint}": ${parsed.reason}.`);
+          process.exit(1);
+        }
+        endpoint = options.endpoint.trim();
       }
 
       // ── Resolve APPBAY_HOME (3-tier: env > --dir/prompt > default) ──────
@@ -1099,6 +1128,7 @@ export const initCommand = new Command("init")
         containerRuntime,
         ingressProvider,
         acmeDnsProvider,
+        endpoint,
       );
       if (configWritten) {
         console.log(`  Project: ${projectName}`);
@@ -1106,6 +1136,7 @@ export const initCommand = new Command("init")
         if (containerRuntime) console.log(`  Runtime: ${containerRuntime}`);
         if (ingressProvider) console.log(`  Ingress: ${ingressProvider}`);
         if (acmeDnsProvider) console.log(`  ACME DNS: ${acmeDnsProvider}`);
+        if (endpoint) console.log(`  Endpoint: ${endpoint}`);
         console.log("  Wrote project.yaml");
       } else {
         console.log(`  Project config already exists (project: ${projectName}, domain: ${domain})`);
@@ -1177,6 +1208,11 @@ export const initCommand = new Command("init")
               ? `  ACME DNS: ${acmeDnsProvider} (already set)`
               : `  ACME DNS: ${acmeDnsProvider} (${outcome})`,
           );
+        }
+        if (endpoint) {
+          const outcome = await upsertEndpoint(appbayHome, endpoint);
+          clearContainerRuntimeCache(appbayHome);
+          console.log(outcome === "unchanged" ? `  Endpoint: ${endpoint} (already set)` : `  Endpoint: ${endpoint} (${outcome})`);
         }
       }
 
